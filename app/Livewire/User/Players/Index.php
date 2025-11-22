@@ -62,7 +62,8 @@ class Index extends Component
 
     public function render()
     {
-        $query = User::query();
+        $query = User::query()
+            ->where('visible_in_players', true);
 
         // Search by name or email
         if ($this->search) {

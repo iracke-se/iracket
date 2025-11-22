@@ -6,15 +6,18 @@ namespace App\Models;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -36,6 +39,8 @@ class User extends Authenticatable
         'terms_accepted_at',
         'verification_code',
         'verification_code_expires_at',
+        'club_id',
+        'visible_in_players',
     ];
 
     /**
@@ -129,5 +134,65 @@ class User extends Authenticatable
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new ResetPasswordNotification($token));
+    }
+
+    /**
+     * Get the club the user belongs to
+     */
+    public function club(): BelongsTo
+    {
+        return $this->belongsTo(Club::class);
+    }
+
+    /**
+     * Get matches where user is player 1
+     */
+    public function matchesAsPlayer1(): HasMany
+    {
+        return $this->hasMany(GameMatch::class, 'player1_id');
+    }
+
+    /**
+     * Get matches where user is player 2
+     */
+    public function matchesAsPlayer2(): HasMany
+    {
+        return $this->hasMany(GameMatch::class, 'player2_id');
+    }
+
+    /**
+     * Get all matches for the user
+     */
+    public function allMatches()
+    {
+        return GameMatch::where('player1_id', $this->id)
+            ->orWhere('player2_id', $this->id);
+    }
+
+    /**
+     * Get monthly rankings
+     */
+    public function monthlyRankings(): HasMany
+    {
+        return $this->hasMany(MonthlyRanking::class);
+    }
+
+    /**
+     * Get current month ranking
+     */
+    public function currentMonthRanking()
+    {
+        return $this->monthlyRankings()
+            ->where('year', now()->year)
+            ->where('month', now()->month)
+            ->first();
+    }
+
+    /**
+     * Get notifications
+     */
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
     }
 }

@@ -1,0 +1,60 @@
+<?php
+
+namespace App\Livewire\Admin\Matches;
+
+use App\Models\GameMatch;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+class Index extends Component
+{
+    use WithPagination;
+
+    public string $search = '';
+    public string $status = '';
+
+    protected $queryString = [
+        'search' => ['except' => ''],
+        'status' => ['except' => ''],
+    ];
+
+    public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingStatus()
+    {
+        $this->resetPage();
+    }
+
+    public function delete($id)
+    {
+        GameMatch::findOrFail($id)->delete();
+        session()->flash('message', 'Match deleted successfully.');
+    }
+
+    public function render()
+    {
+        $matches = GameMatch::query()
+            ->with(['player1', 'player2', 'winner'])
+            ->when($this->search, function ($query) {
+                $query->whereHas('player1', function ($q) {
+                    $q->where('first_name', 'like', '%' . $this->search . '%')
+                      ->orWhere('last_name', 'like', '%' . $this->search . '%');
+                })->orWhereHas('player2', function ($q) {
+                    $q->where('first_name', 'like', '%' . $this->search . '%')
+                      ->orWhere('last_name', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->when($this->status, function ($query) {
+                $query->where('status', $this->status);
+            })
+            ->orderBy('played_at', 'desc')
+            ->paginate(10);
+
+        return view('livewire.admin.matches.index', [
+            'matches' => $matches,
+        ])->layout('components.layouts.admin');
+    }
+}
