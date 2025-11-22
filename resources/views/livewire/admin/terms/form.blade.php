@@ -159,7 +159,13 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    function initQuillEditor() {
+        // Check if Quill is already initialized on this element
+        const editorElement = document.getElementById('quill-editor');
+        if (!editorElement || editorElement.classList.contains('ql-container')) {
+            return;
+        }
+
         const quill = new Quill('#quill-editor', {
             theme: 'snow',
             placeholder: 'Write your content here...',
@@ -182,6 +188,12 @@
         quill.on('text-change', function() {
             @this.dispatch('contentUpdated', { content: quill.root.innerHTML });
         });
-    });
+    }
+
+    // Initialize on initial page load
+    document.addEventListener('DOMContentLoaded', initQuillEditor);
+
+    // Initialize on Livewire navigation
+    document.addEventListener('livewire:navigated', initQuillEditor);
 </script>
 @endpush

@@ -50,7 +50,7 @@
 
                         @if(auth()->user()->hasRole(['Admin', 'Manager']))
                             <flux:menu.radio.group>
-                                <flux:menu.item :href="route('admin.terms.index')" icon="squares-2x2" wire:navigate>{{ __('Admin Dashboard') }}</flux:menu.item>
+                                <flux:menu.item :href="route('admin.dashboard')" icon="squares-2x2" wire:navigate>{{ __('Admin Dashboard') }}</flux:menu.item>
                             </flux:menu.radio.group>
 
                             <flux:menu.separator />

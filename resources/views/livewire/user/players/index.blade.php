@@ -179,7 +179,11 @@
     @else
         <div class="space-y-3">
             @foreach($players as $player)
-                <div class="flex items-center gap-4 p-4 bg-zinc-800 rounded-xl">
+                @php
+                    $currentRanking = $player->monthlyRankings->first();
+                    $clubRanking = $player->club?->monthlyRankings->first();
+                @endphp
+                <a href="{{ route('players.show', $player) }}" wire:navigate class="flex items-center gap-4 p-4 bg-zinc-800 rounded-xl hover:bg-zinc-700/80 transition-colors">
                     <!-- Avatar -->
                     @if($player->profile_picture)
                         <img src="{{ Storage::url($player->profile_picture) }}" alt="{{ $player->name }}" class="w-12 h-12 rounded-full object-cover">
@@ -194,7 +198,17 @@
                     <!-- Player Info -->
                     <div class="flex-1 min-w-0">
                         <h3 class="text-white font-medium truncate">{{ $player->name }}</h3>
-                        <div class="flex items-center gap-2 text-sm text-zinc-400">
+                        @if($player->club)
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span class="text-sm text-zinc-400 truncate">{{ $player->club->name }}</span>
+                                @if($clubRanking)
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-accent/20 text-accent">
+                                        #{{ $clubRanking->rank }}
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+                        <div class="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
                             @if($player->age)
                                 <span>{{ $player->age }} {{ __('years') }}</span>
                             @endif
@@ -207,12 +221,17 @@
                         </div>
                     </div>
 
-                    <!-- Points (placeholder for now) -->
+                    <!-- Points -->
                     <div class="text-right">
-                        <div class="text-lg font-bold text-white">--</div>
-                        <div class="text-xs text-zinc-400">{{ __('points') }}</div>
+                        @if($currentRanking)
+                            <div class="text-lg font-bold text-white">{{ number_format($currentRanking->points) }}</div>
+                            <div class="text-xs text-zinc-400">{{ __('points') }}</div>
+                        @else
+                            <div class="text-lg font-bold text-zinc-500">--</div>
+                            <div class="text-xs text-zinc-500">{{ __('points') }}</div>
+                        @endif
                     </div>
-                </div>
+                </a>
             @endforeach
         </div>
 

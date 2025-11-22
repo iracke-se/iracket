@@ -18,9 +18,72 @@
         </div>
     @endif
 
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <!-- Total Users -->
+        <div class="bg-zinc-800 rounded-xl p-4 border border-zinc-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-400">{{ __('Total Users') }}</p>
+                    <p class="text-2xl font-bold text-white mt-1">{{ $totalUsers }}</p>
+                </div>
+                <div class="p-3 bg-accent/10 rounded-lg">
+                    <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verified Users -->
+        <div class="bg-zinc-800 rounded-xl p-4 border border-zinc-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-400">{{ __('Verified') }}</p>
+                    <p class="text-2xl font-bold text-white mt-1">{{ $verifiedUsers }}</p>
+                </div>
+                <div class="p-3 bg-green-500/10 rounded-lg">
+                    <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unverified Users -->
+        <div class="bg-zinc-800 rounded-xl p-4 border border-zinc-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-400">{{ __('Unverified') }}</p>
+                    <p class="text-2xl font-bold text-white mt-1">{{ $unverifiedUsers }}</p>
+                </div>
+                <div class="p-3 bg-yellow-500/10 rounded-lg">
+                    <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- This Month -->
+        <div class="bg-zinc-800 rounded-xl p-4 border border-zinc-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-400">{{ __('This Month') }}</p>
+                    <p class="text-2xl font-bold text-white mt-1">{{ $usersThisMonth }}</p>
+                </div>
+                <div class="p-3 bg-blue-500/10 rounded-lg">
+                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Filters -->
-    <div class="flex gap-4 mb-6">
-        <div class="flex-1">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="md:col-span-1">
             <input
                 type="text"
                 wire:model.live.debounce.300ms="search"
@@ -29,12 +92,30 @@
             >
         </div>
         <select
-            wire:model.live="role"
+            wire:model.live="gender"
             class="px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
         >
-            <option value="">{{ __('All Roles') }}</option>
-            <option value="Admin">{{ __('Admin') }}</option>
-            <option value="Manager">{{ __('Manager') }}</option>
+            <option value="">{{ __('All Genders') }}</option>
+            <option value="male">{{ __('Male') }}</option>
+            <option value="female">{{ __('Female') }}</option>
+            <option value="other">{{ __('Other') }}</option>
+        </select>
+        <select
+            wire:model.live="club"
+            class="px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        >
+            <option value="">{{ __('All Clubs') }}</option>
+            @foreach($clubs as $clubOption)
+                <option value="{{ $clubOption->id }}">{{ $clubOption->name }}</option>
+            @endforeach
+        </select>
+        <select
+            wire:model.live="verified"
+            class="px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        >
+            <option value="">{{ __('All Status') }}</option>
+            <option value="1">{{ __('Verified') }}</option>
+            <option value="0">{{ __('Unverified') }}</option>
         </select>
     </div>
 
@@ -45,7 +126,8 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider">{{ __('Name') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider">{{ __('Email') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider">{{ __('Roles') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider">{{ __('Gender') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider">{{ __('Club') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider">{{ __('Verified') }}</th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-zinc-300 uppercase tracking-wider">{{ __('Actions') }}</th>
                 </tr>
@@ -62,15 +144,8 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-zinc-400">{{ $user->email }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex gap-1">
-                                @forelse($user->roles as $role)
-                                    <span class="px-2 py-1 text-xs font-medium bg-accent/10 text-accent rounded-full">{{ $role->name }}</span>
-                                @empty
-                                    <span class="text-zinc-500">-</span>
-                                @endforelse
-                            </div>
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-zinc-400">{{ ucfirst($user->gender ?? '-') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-zinc-400">{{ $user->club?->name ?? '-' }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             @if($user->email_verified_at)
                                 <span class="text-green-400">{{ __('Yes') }}</span>
@@ -79,6 +154,7 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <a href="{{ route('players.show', $user) }}" class="text-blue-400 hover:text-blue-300 mr-3" wire:navigate>{{ __('View') }}</a>
                             <a href="{{ route('admin.users.edit', $user->id) }}" class="text-accent hover:text-accent/80 mr-3" wire:navigate>{{ __('Edit') }}</a>
                             @if($user->id !== auth()->id())
                                 <button wire:click="delete({{ $user->id }})" wire:confirm="Are you sure you want to delete this user?" class="text-red-400 hover:text-red-300">{{ __('Delete') }}</button>
@@ -87,7 +163,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-zinc-400">{{ __('No users found.') }}</td>
+                        <td colspan="6" class="px-6 py-8 text-center text-zinc-400">{{ __('No users found.') }}</td>
                     </tr>
                 @endforelse
             </tbody>

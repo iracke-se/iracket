@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Users;
 
+use App\Models\Club;
 use App\Models\User;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -11,11 +12,15 @@ class Index extends Component
     use WithPagination;
 
     public string $search = '';
-    public string $role = '';
+    public string $gender = '';
+    public string $club = '';
+    public string $verified = '';
 
     protected $queryString = [
         'search' => ['except' => ''],
-        'role' => ['except' => ''],
+        'gender' => ['except' => ''],
+        'club' => ['except' => ''],
+        'verified' => ['except' => ''],
     ];
 
     public function updatingSearch()
@@ -23,7 +28,17 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function updatingRole()
+    public function updatingGender()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingClub()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingVerified()
     {
         $this->resetPage();
     }
@@ -44,6 +59,7 @@ class Index extends Component
     public function render()
     {
         $users = User::query()
+            ->with('club')
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('first_name', 'like', '%' . $this->search . '%')
@@ -51,14 +67,40 @@ class Index extends Component
                       ->orWhere('email', 'like', '%' . $this->search . '%');
                 });
             })
-            ->when($this->role, function ($query) {
-                $query->role($this->role);
+            ->when($this->gender, function ($query) {
+                $query->where('gender', $this->gender);
+            })
+            ->when($this->club, function ($query) {
+                $query->where('club_id', $this->club);
+            })
+            ->when($this->verified !== '', function ($query) {
+                if ($this->verified === '1') {
+                    $query->whereNotNull('email_verified_at');
+                } else {
+                    $query->whereNull('email_verified_at');
+                }
             })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
+        // Stats
+        $totalUsers = User::count();
+        $verifiedUsers = User::whereNotNull('email_verified_at')->count();
+        $unverifiedUsers = User::whereNull('email_verified_at')->count();
+        $usersThisMonth = User::whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+
+        // Get clubs for filter
+        $clubs = Club::orderBy('name')->get();
+
         return view('livewire.admin.users.index', [
             'users' => $users,
+            'totalUsers' => $totalUsers,
+            'verifiedUsers' => $verifiedUsers,
+            'unverifiedUsers' => $unverifiedUsers,
+            'usersThisMonth' => $usersThisMonth,
+            'clubs' => $clubs,
         ])->layout('components.layouts.admin');
     }
 }

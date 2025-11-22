@@ -63,7 +63,15 @@ class Index extends Component
     public function render()
     {
         $query = User::query()
-            ->where('visible_in_players', true);
+            ->where('visible_in_players', true)
+            ->with(['club.monthlyRankings' => function ($q) {
+                $q->where('year', now()->year)
+                  ->where('month', now()->month);
+            }])
+            ->with(['monthlyRankings' => function ($q) {
+                $q->where('year', now()->year)
+                  ->where('month', now()->month);
+            }]);
 
         // Search by name or email
         if ($this->search) {
@@ -88,8 +96,50 @@ class Index extends Component
             $query->where('age', '<=', $this->ageTo);
         }
 
-        // For now, just order by name since points aren't implemented yet
-        $query->orderBy('first_name');
+        // Filter by ranking range
+        if ($this->rankingFrom || $this->rankingTo) {
+            $query->whereHas('monthlyRankings', function ($q) {
+                $q->where('year', now()->year)
+                  ->where('month', now()->month);
+
+                if ($this->rankingFrom) {
+                    $q->where('points', '>=', $this->rankingFrom);
+                }
+                if ($this->rankingTo) {
+                    $q->where('points', '<=', $this->rankingTo);
+                }
+            });
+        }
+
+        // Sort by points or name
+        switch ($this->sortBy) {
+            case 'points_desc':
+                $query->leftJoin('monthly_rankings', function ($join) {
+                    $join->on('users.id', '=', 'monthly_rankings.user_id')
+                         ->where('monthly_rankings.year', '=', now()->year)
+                         ->where('monthly_rankings.month', '=', now()->month);
+                })
+                ->orderByDesc('monthly_rankings.points')
+                ->select('users.*');
+                break;
+            case 'points_asc':
+                $query->leftJoin('monthly_rankings', function ($join) {
+                    $join->on('users.id', '=', 'monthly_rankings.user_id')
+                         ->where('monthly_rankings.year', '=', now()->year)
+                         ->where('monthly_rankings.month', '=', now()->month);
+                })
+                ->orderBy('monthly_rankings.points')
+                ->select('users.*');
+                break;
+            case 'name_asc':
+                $query->orderBy('first_name');
+                break;
+            case 'name_desc':
+                $query->orderByDesc('first_name');
+                break;
+            default:
+                $query->orderBy('first_name');
+        }
 
         $players = $query->paginate(20);
 

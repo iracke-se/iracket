@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\GoogleController;
 use App\Livewire\Auth\VerifyEmail;
 use App\Livewire\Public\Terms\Show as TermsShow;
 use App\Livewire\Settings\Appearance;
+use App\Livewire\Settings\Club as SettingsClub;
 use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\TwoFactor;
@@ -28,6 +29,7 @@ use App\Livewire\Admin\Matches\Index as AdminMatchesIndex;
 use App\Livewire\Admin\Matches\Form as AdminMatchesForm;
 use App\Livewire\Admin\Staff\Index as AdminStaffIndex;
 use App\Livewire\Admin\Staff\Form as AdminStaffForm;
+use App\Livewire\Admin\Dashboard\Index as AdminDashboard;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -55,6 +57,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/profile', Profile::class)->name('profile.edit');
     Route::get('settings/password', Password::class)->name('user-password.edit');
     Route::get('settings/appearance', Appearance::class)->name('appearance.edit');
+    Route::get('settings/club', SettingsClub::class)->name('club.edit');
 
     // Information page
     Route::get('information', Information::class)->name('information');
@@ -102,7 +105,10 @@ Route::middleware(['auth'])->group(function () {
 
 // Admin Routes
 Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.')->group(function () {
-    Route::redirect('/', 'admin/terms');
+    Route::redirect('/', 'admin/dashboard');
+
+    // Dashboard
+    Route::get('dashboard', AdminDashboard::class)->name('dashboard');
 
     // Terms
     Route::get('terms', AdminTermsIndex::class)->name('terms.index');

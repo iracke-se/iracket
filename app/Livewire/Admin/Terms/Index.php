@@ -35,8 +35,16 @@ class Index extends Component
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
+        // Stats
+        $totalTerms = Term::count();
+        $activeTerms = Term::where('is_active', true)->count();
+        $inactiveTerms = Term::where('is_active', false)->count();
+
         return view('livewire.admin.terms.index', [
             'terms' => $terms,
+            'totalTerms' => $totalTerms,
+            'activeTerms' => $activeTerms,
+            'inactiveTerms' => $inactiveTerms,
         ])->layout('components.layouts.admin');
     }
 }

@@ -53,8 +53,20 @@ class Index extends Component
             ->orderBy('played_at', 'desc')
             ->paginate(10);
 
+        // Stats
+        $totalMatches = GameMatch::count();
+        $confirmedMatches = GameMatch::where('status', 'confirmed')->count();
+        $pendingMatches = GameMatch::where('status', 'pending')->count();
+        $matchesThisMonth = GameMatch::whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+
         return view('livewire.admin.matches.index', [
             'matches' => $matches,
+            'totalMatches' => $totalMatches,
+            'confirmedMatches' => $confirmedMatches,
+            'pendingMatches' => $pendingMatches,
+            'matchesThisMonth' => $matchesThisMonth,
         ])->layout('components.layouts.admin');
     }
 }

@@ -6,7 +6,7 @@
             <button
                 x-data
                 @click="$flux.appearance = 'light'"
-                :class="$flux.appearance === 'light' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-700 border-zinc-600 text-zinc-300 hover:border-zinc-500'"
+                :class="$flux.appearance === 'light' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-100 border-zinc-300 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-700 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500'"
                 class="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all"
             >
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -18,7 +18,7 @@
             <button
                 x-data
                 @click="$flux.appearance = 'dark'"
-                :class="$flux.appearance === 'dark' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-700 border-zinc-600 text-zinc-300 hover:border-zinc-500'"
+                :class="$flux.appearance === 'dark' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-100 border-zinc-300 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-700 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500'"
                 class="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all"
             >
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -30,7 +30,7 @@
             <button
                 x-data
                 @click="$flux.appearance = 'system'"
-                :class="$flux.appearance === 'system' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-700 border-zinc-600 text-zinc-300 hover:border-zinc-500'"
+                :class="$flux.appearance === 'system' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-100 border-zinc-300 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-700 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500'"
                 class="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all"
             >
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -42,9 +42,10 @@
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-zinc-700">
-                                <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400 w-16">#</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400 w-12">#</th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400">{{ __('Player') }}</th>
                                 <th class="px-4 py-3 text-right text-sm font-medium text-zinc-400">{{ __('Points') }}</th>
+                                <th class="px-4 py-3 text-right text-sm font-medium text-zinc-400 w-20">+/-</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -69,6 +70,15 @@
                                         </a>
                                     </td>
                                     <td class="px-4 py-3 text-sm text-right text-white">{{ number_format($ranking->points) }}</td>
+                                    <td class="px-4 py-3 text-sm text-right {{ $ranking->points_change > 0 ? 'text-green-400' : ($ranking->points_change < 0 ? 'text-red-400' : 'text-zinc-400') }}">
+                                        @if($ranking->points_change > 0)
+                                            +{{ number_format($ranking->points_change) }}
+                                        @elseif($ranking->points_change < 0)
+                                            {{ number_format($ranking->points_change) }}
+                                        @else
+                                            0
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -92,9 +102,10 @@
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-zinc-700">
-                                <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400 w-16">#</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400 w-12">#</th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400">{{ __('Player') }}</th>
                                 <th class="px-4 py-3 text-right text-sm font-medium text-zinc-400">{{ __('Points') }}</th>
+                                <th class="px-4 py-3 text-right text-sm font-medium text-zinc-400 w-20">+/-</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -119,6 +130,15 @@
                                         </a>
                                     </td>
                                     <td class="px-4 py-3 text-sm text-right text-white">{{ number_format($ranking->points) }}</td>
+                                    <td class="px-4 py-3 text-sm text-right {{ $ranking->points_change > 0 ? 'text-green-400' : ($ranking->points_change < 0 ? 'text-red-400' : 'text-zinc-400') }}">
+                                        @if($ranking->points_change > 0)
+                                            +{{ number_format($ranking->points_change) }}
+                                        @elseif($ranking->points_change < 0)
+                                            {{ number_format($ranking->points_change) }}
+                                        @else
+                                            0
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -145,6 +165,7 @@
                                 <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400 w-16">#</th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-zinc-400">{{ __('Club') }}</th>
                                 <th class="px-4 py-3 text-right text-sm font-medium text-zinc-400">{{ __('Points') }}</th>
+                                <th class="px-4 py-3 text-right text-sm font-medium text-zinc-400 w-20">+/-</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -169,6 +190,15 @@
                                         </a>
                                     </td>
                                     <td class="px-4 py-3 text-sm text-right text-white">{{ number_format($ranking->total_points) }}</td>
+                                    <td class="px-4 py-3 text-sm text-right {{ $ranking->points_change > 0 ? 'text-green-400' : ($ranking->points_change < 0 ? 'text-red-400' : 'text-zinc-400') }}">
+                                        @if($ranking->points_change > 0)
+                                            +{{ number_format($ranking->points_change) }}
+                                        @elseif($ranking->points_change < 0)
+                                            {{ number_format($ranking->points_change) }}
+                                        @else
+                                            0
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>

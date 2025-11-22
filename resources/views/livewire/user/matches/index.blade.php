@@ -10,8 +10,9 @@
         </a>
     </div>
 
-    <!-- Year Selector -->
-    <div class="mb-6">
+    <!-- Filters -->
+    <div class="space-y-3 mb-6">
+        <!-- Year Selector -->
         <select
             wire:model.live="selectedYear"
             class="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -20,6 +21,69 @@
                 <option value="{{ $year }}">{{ $year }}</option>
             @endforeach
         </select>
+
+        <!-- Opponent Filter -->
+        <div class="relative">
+            @if($selectedOpponentUser)
+                <!-- Selected Opponent Display -->
+                <div class="flex items-center justify-between px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        @if($selectedOpponentUser->profile_picture)
+                            <img src="{{ Storage::url($selectedOpponentUser->profile_picture) }}" alt="{{ $selectedOpponentUser->name }}" class="w-8 h-8 rounded-full object-cover">
+                        @else
+                            <div class="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center">
+                                <span class="text-xs font-medium text-zinc-300">{{ $selectedOpponentUser->initials() }}</span>
+                            </div>
+                        @endif
+                        <span class="text-white">{{ $selectedOpponentUser->name }}</span>
+                    </div>
+                    <button wire:click="clearOpponentFilter" class="text-zinc-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            @else
+                <!-- Opponent Search -->
+                <div class="relative">
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="opponentSearch"
+                        placeholder="{{ __('Filter by opponent...') }}"
+                        class="w-full px-4 py-3 pl-10 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    >
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+
+                <!-- Opponents Dropdown -->
+                @if($opponentSearch && $opponents->isNotEmpty())
+                    <div class="absolute top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                        @foreach($opponents as $opponent)
+                            <button
+                                wire:click="selectOpponent({{ $opponent->id }})"
+                                class="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-700 transition-colors text-left"
+                            >
+                                @if($opponent->profile_picture)
+                                    <img src="{{ Storage::url($opponent->profile_picture) }}" alt="{{ $opponent->name }}" class="w-8 h-8 rounded-full object-cover">
+                                @else
+                                    <div class="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center">
+                                        <span class="text-xs font-medium text-zinc-300">{{ $opponent->initials() }}</span>
+                                    </div>
+                                @endif
+                                <div>
+                                    <div class="text-sm text-white">{{ $opponent->name }}</div>
+                                    @if($opponent->club)
+                                        <div class="text-xs text-zinc-400">{{ $opponent->club->name }}</div>
+                                    @endif
+                                </div>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+            @endif
+        </div>
     </div>
 
     <!-- Matches by Month -->

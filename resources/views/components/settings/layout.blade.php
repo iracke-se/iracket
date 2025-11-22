@@ -31,6 +31,13 @@
         >
             {{ __('Appearance') }}
         </a>
+        <a
+            href="{{ route('club.edit') }}"
+            wire:navigate
+            class="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('club.edit') ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' }}"
+        >
+            {{ __('Club') }}
+        </a>
     </div>
 
     <!-- Content -->
