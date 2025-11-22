@@ -1,22 +1,44 @@
-<div class="flex items-start max-md:flex-col">
-    <div class="me-10 w-full pb-4 md:w-[220px]">
-        <flux:navlist>
-            <flux:navlist.item :href="route('profile.edit')" wire:navigate>{{ __('Profile') }}</flux:navlist.item>
-            <flux:navlist.item :href="route('user-password.edit')" wire:navigate>{{ __('Password') }}</flux:navlist.item>
-            @if (Laravel\Fortify\Features::canManageTwoFactorAuthentication())
-                <flux:navlist.item :href="route('two-factor.show')" wire:navigate>{{ __('Two-Factor Auth') }}</flux:navlist.item>
-            @endif
-            <flux:navlist.item :href="route('appearance.edit')" wire:navigate>{{ __('Appearance') }}</flux:navlist.item>
-        </flux:navlist>
+<div class="space-y-6">
+    <!-- Navigation Tabs -->
+    <div class="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+        <a
+            href="{{ route('profile.edit') }}"
+            wire:navigate
+            class="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('profile.edit') ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' }}"
+        >
+            {{ __('Profile') }}
+        </a>
+        <a
+            href="{{ route('user-password.edit') }}"
+            wire:navigate
+            class="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('user-password.edit') ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' }}"
+        >
+            {{ __('Password') }}
+        </a>
+        @if (Laravel\Fortify\Features::canManageTwoFactorAuthentication())
+            <a
+                href="{{ route('two-factor.show') }}"
+                wire:navigate
+                class="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('two-factor.show') ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' }}"
+            >
+                {{ __('Two-Factor') }}
+            </a>
+        @endif
+        <a
+            href="{{ route('appearance.edit') }}"
+            wire:navigate
+            class="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('appearance.edit') ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' }}"
+        >
+            {{ __('Appearance') }}
+        </a>
     </div>
 
-    <flux:separator class="md:hidden" />
+    <!-- Content -->
+    <div class="bg-zinc-800 rounded-xl p-6">
+        <h2 class="text-lg font-semibold text-white">{{ $heading ?? '' }}</h2>
+        <p class="text-sm text-zinc-400 mt-1">{{ $subheading ?? '' }}</p>
 
-    <div class="flex-1 self-stretch max-md:pt-6">
-        <flux:heading>{{ $heading ?? '' }}</flux:heading>
-        <flux:subheading>{{ $subheading ?? '' }}</flux:subheading>
-
-        <div class="mt-5 w-full max-w-lg">
+        <div class="mt-6">
             {{ $slot }}
         </div>
     </div>

@@ -10,6 +10,7 @@ use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\TwoFactor;
 use App\Livewire\User\Information\Index as Information;
 use App\Livewire\User\Notifications\Index as Notifications;
+use App\Livewire\User\Players\Index as Players;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -31,10 +32,6 @@ Route::get('verify-email', VerifyEmail::class)
     ->middleware(['auth'])
     ->name('verification.notice');
 
-Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
-
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');
 
@@ -47,6 +44,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Notifications page
     Route::get('notifications', Notifications::class)->name('notifications');
+
+    // Players page
+    Route::get('players', Players::class)->middleware('verified')->name('players');
 
     // GET route for logout (convenience)
     Route::get('logout', function () {

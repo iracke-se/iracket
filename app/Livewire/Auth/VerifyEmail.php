@@ -29,7 +29,7 @@ class VerifyEmail extends Component
 
         if ($user->isVerificationCodeValid($this->code)) {
             $user->markEmailAsVerified();
-            return redirect()->intended('dashboard');
+            return redirect()->intended('players');
         }
 
         $this->error = 'Invalid or expired verification code. Please try again or request a new code.';

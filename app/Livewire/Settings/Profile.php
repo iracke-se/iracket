@@ -24,6 +24,8 @@ class Profile extends Component
 
     public ?string $gender = '';
 
+    public ?int $age = null;
+
     public $profile_picture;
 
     public ?string $current_profile_picture = null;
@@ -39,6 +41,7 @@ class Profile extends Component
         $this->email = $user->email;
         $this->phone_number = $user->phone_number ?? '';
         $this->gender = $user->gender ?? '';
+        $this->age = $user->age;
         $this->current_profile_picture = $user->profile_picture;
     }
 
@@ -62,6 +65,7 @@ class Profile extends Component
             ],
             'phone_number' => ['nullable', 'string', 'max:20'],
             'gender' => ['nullable', 'string', 'in:male,female,other,prefer_not_to_say'],
+            'age' => ['nullable', 'integer', 'min:1', 'max:120'],
             'profile_picture' => ['nullable', 'image', 'max:2048'],
         ]);
 
