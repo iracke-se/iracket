@@ -29,6 +29,6 @@ class Show extends Component
 
         return view('livewire.admin.scraper.show', [
             'logs' => $logs,
-        ]);
+        ])->layout('components.layouts.admin');
     }
 }
