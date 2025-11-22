@@ -2,20 +2,20 @@
     @include('partials.settings-heading')
 
     <x-settings.layout
-        :heading="__('Two Factor Authentication')"
-        :subheading="__('Manage your two-factor authentication settings')"
+        :heading="__('user-settings.two_factor_heading')"
+        :subheading="__('user-settings.two_factor_subheading')"
     >
         <div class="space-y-4" wire:cloak>
             @if ($twoFactorEnabled)
                 <div class="space-y-4">
                     <div class="flex items-center gap-3">
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-500/20 text-green-400">
-                            {{ __('Enabled') }}
+                            {{ __('user-settings.enabled') }}
                         </span>
                     </div>
 
                     <p class="text-sm text-zinc-400">
-                        {{ __('With two-factor authentication enabled, you will be prompted for a secure, random pin during login, which you can retrieve from the TOTP-supported application on your phone.') }}
+                        {{ __('user-settings.two_factor_enabled_description') }}
                     </p>
 
                     <livewire:settings.two-factor.recovery-codes :$requiresConfirmation/>
@@ -28,7 +28,7 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016zM12 9v2m0 4h.01"/>
                             </svg>
-                            {{ __('Disable 2FA') }}
+                            {{ __('user-settings.disable_2fa') }}
                         </button>
                     </div>
                 </div>
@@ -36,12 +36,12 @@
                 <div class="space-y-4">
                     <div class="flex items-center gap-3">
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-500/20 text-red-400">
-                            {{ __('Disabled') }}
+                            {{ __('user-settings.disabled') }}
                         </span>
                     </div>
 
                     <p class="text-sm text-zinc-400">
-                        {{ __('When you enable two-factor authentication, you will be prompted for a secure pin during login. This pin can be retrieved from a TOTP-supported application on your phone.') }}
+                        {{ __('user-settings.two_factor_disabled_description') }}
                     </p>
 
                     <button
@@ -51,7 +51,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                         </svg>
-                        {{ __('Enable 2FA') }}
+                        {{ __('user-settings.enable_2fa') }}
                     </button>
                 </div>
             @endif
@@ -109,7 +109,7 @@
                             wire:click="resetVerification"
                             class="flex-1 px-4 py-3 bg-zinc-700 text-zinc-300 rounded-lg hover:bg-zinc-600 transition-colors"
                         >
-                            {{ __('Back') }}
+                            {{ __('user-settings.back') }}
                         </button>
 
                         <button
@@ -117,7 +117,7 @@
                             x-bind:disabled="$wire.code.length < 6"
                             class="flex-1 px-4 py-3 bg-accent text-white font-medium rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50"
                         >
-                            {{ __('Confirm') }}
+                            {{ __('user-settings.confirm') }}
                         </button>
                     </div>
                 </div>
@@ -156,7 +156,7 @@
                     <div class="relative flex items-center justify-center w-full">
                         <div class="absolute inset-0 w-full h-px top-1/2 bg-zinc-600"></div>
                         <span class="relative px-2 text-sm bg-zinc-800 text-zinc-400">
-                            {{ __('or, enter the code manually') }}
+                            {{ __('user-settings.enter_code_manually') }}
                         </span>
                     </div>
 

@@ -6,10 +6,10 @@
     <div class="px-6 space-y-2">
         <div class="flex items-center gap-2">
             <flux:icon.lock-closed variant="outline" class="size-4"/>
-            <flux:heading size="lg" level="3">{{ __('2FA Recovery Codes') }}</flux:heading>
+            <flux:heading size="lg" level="3">{{ __('user-settings.recovery_codes_heading') }}</flux:heading>
         </div>
         <flux:text variant="subtle">
-            {{ __('Recovery codes let you regain access if you lose your 2FA device. Store them in a secure password manager.') }}
+            {{ __('user-settings.recovery_codes_description') }}
         </flux:text>
     </div>
 
@@ -24,7 +24,7 @@
                 aria-expanded="false"
                 aria-controls="recovery-codes-section"
             >
-                {{ __('View Recovery Codes') }}
+                {{ __('user-settings.view_recovery_codes') }}
             </flux:button>
 
             <flux:button
@@ -36,7 +36,7 @@
                 aria-expanded="true"
                 aria-controls="recovery-codes-section"
             >
-                {{ __('Hide Recovery Codes') }}
+                {{ __('user-settings.hide_recovery_codes') }}
             </flux:button>
 
             @if (filled($recoveryCodes))
@@ -46,7 +46,7 @@
                     variant="filled"
                     wire:click="regenerateRecoveryCodes"
                 >
-                    {{ __('Regenerate Codes') }}
+                    {{ __('user-settings.regenerate_codes') }}
                 </flux:button>
             @endif
         </div>
@@ -80,7 +80,7 @@
                         @endforeach
                     </div>
                     <flux:text variant="subtle" class="text-xs">
-                        {{ __('Each recovery code can be used once to access your account and will be removed after use. If you need more, click Regenerate Codes above.') }}
+                        {{ __('user-settings.recovery_codes_usage') }}
                     </flux:text>
                 @endif
             </div>

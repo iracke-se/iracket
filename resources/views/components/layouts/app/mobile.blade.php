@@ -1,14 +1,15 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
+        @stack('styles')
     </head>
     <body class="min-h-screen bg-white dark:bg-zinc-900">
         <!-- Top Bar -->
-        <header class="fixed top-0 left-0 right-0 z-50 bg-zinc-900 border-b border-zinc-800">
+        <header class="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
             <div class="flex items-center justify-between px-4 h-14">
                 <!-- Back Button -->
-                <button onclick="history.back()" class="flex items-center justify-center w-10 h-10 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                <button onclick="history.back()" class="flex items-center justify-center w-10 h-10 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
@@ -17,13 +18,13 @@
                 <!-- Logo and Title -->
                 <a href="{{ route('players.index') }}" class="flex items-center gap-2" wire:navigate>
                     <img src="/assets/images/icon.png" alt="iRacket" class="h-7">
-                    <span class="font-semibold text-white">iRacket</span>
+                    <span class="font-semibold text-zinc-900 dark:text-white">iRacket</span>
                 </a>
 
                 <!-- Profile Dropdown -->
                 <flux:dropdown position="bottom" align="end">
-                    <button class="flex items-center justify-center w-10 h-10 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-sm font-medium text-white">
+                    <button class="flex items-center justify-center w-10 h-10 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-700 text-sm font-medium text-zinc-900 dark:text-white">
                             {{ auth()->user()->initials() }}
                         </span>
                     </button>
@@ -79,10 +80,10 @@
         </main>
 
         <!-- Bottom Navigation -->
-        <nav class="fixed bottom-0 left-0 right-0 z-50 bg-zinc-900 border-t border-zinc-800">
+        <nav class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
             <div class="flex items-center justify-around h-16">
                 <!-- Players -->
-                <a href="{{ route('players.index') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('players.*') ? 'text-accent' : 'text-zinc-400 hover:text-white' }} transition-colors" wire:navigate>
+                <a href="{{ route('players.index') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('players.*') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
                     </svg>
@@ -90,7 +91,7 @@
                 </a>
 
                 <!-- Bubbler -->
-                <a href="{{ route('bubbler.index') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('bubbler.*') ? 'text-accent' : 'text-zinc-400 hover:text-white' }} transition-colors" wire:navigate>
+                <a href="{{ route('bubbler.index') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('bubbler.*') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
                     </svg>
@@ -98,7 +99,7 @@
                 </a>
 
                 <!-- My Profile -->
-                <a href="{{ route('profile.edit') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('profile.*') ? 'text-accent' : 'text-zinc-400 hover:text-white' }} transition-colors" wire:navigate>
+                <a href="{{ route('profile.edit') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('profile.*') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                     </svg>
@@ -106,7 +107,7 @@
                 </a>
 
                 <!-- My Matches -->
-                <a href="{{ route('matches.index') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('matches.*') ? 'text-accent' : 'text-zinc-400 hover:text-white' }} transition-colors" wire:navigate>
+                <a href="{{ route('matches.index') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('matches.*') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                     </svg>
@@ -114,7 +115,7 @@
                 </a>
 
                 <!-- Information -->
-                <a href="{{ route('information') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('information') ? 'text-accent' : 'text-zinc-400 hover:text-white' }} transition-colors" wire:navigate>
+                <a href="{{ route('information') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('information') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
@@ -124,5 +125,6 @@
         </nav>
 
         @fluxScripts
+        @stack('scripts')
     </body>
 </html>

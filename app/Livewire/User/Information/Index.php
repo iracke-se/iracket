@@ -20,6 +20,8 @@ class Index extends Component
         app()->setLocale($locale);
 
         $this->dispatch('language-switched');
+
+        return $this->redirect(route('information'), navigate: true);
     }
 
     public function render()

@@ -30,6 +30,7 @@ use App\Livewire\Admin\Matches\Form as AdminMatchesForm;
 use App\Livewire\Admin\Staff\Index as AdminStaffIndex;
 use App\Livewire\Admin\Staff\Form as AdminStaffForm;
 use App\Livewire\Admin\Dashboard\Index as AdminDashboard;
+use App\Livewire\Admin\Localization\Index as AdminLocalization;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -134,4 +135,7 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
     Route::get('staff', AdminStaffIndex::class)->name('staff.index');
     Route::get('staff/create', AdminStaffForm::class)->name('staff.create');
     Route::get('staff/{id}/edit', AdminStaffForm::class)->name('staff.edit');
+
+    // Localization
+    Route::get('localization', AdminLocalization::class)->name('localization.index');
 });

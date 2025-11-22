@@ -4,7 +4,7 @@
             font-size: 1.875rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
-            color: #fafafa;
+            color: #18181b;
         }
 
         .dark .terms-content h1 {
@@ -22,11 +22,11 @@
             font-weight: 600;
             margin-top: 2rem;
             margin-bottom: 1rem;
-            color: #d4d4d4;
+            color: #3f3f46;
         }
 
         .dark .terms-content h2 {
-            color: #d4d4d4;
+            color: #d4d4d8;
         }
 
         @media (min-width: 768px) {
@@ -40,6 +40,11 @@
             font-weight: 600;
             margin-top: 1.5rem;
             margin-bottom: 0.75rem;
+            color: #52525b;
+        }
+
+        .dark .terms-content h3 {
+            color: #a1a1aa;
         }
 
         .terms-content p {
@@ -86,16 +91,28 @@
         }
 
         .terms-content thead tr {
+            border-bottom: 2px solid #e4e4e7;
+        }
+
+        .dark .terms-content thead tr {
             border-bottom: 2px solid #404040;
         }
 
         .terms-content tbody tr {
+            border-bottom: 1px solid #e4e4e7;
+        }
+
+        .dark .terms-content tbody tr {
             border-bottom: 1px solid #404040;
         }
 
         .terms-content th {
-            color: #fafafa;
+            color: #18181b;
             font-weight: 600;
+        }
+
+        .dark .terms-content th {
+            color: #fafafa;
         }
     </style>
 
