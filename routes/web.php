@@ -31,6 +31,8 @@ use App\Livewire\Admin\Staff\Index as AdminStaffIndex;
 use App\Livewire\Admin\Staff\Form as AdminStaffForm;
 use App\Livewire\Admin\Dashboard\Index as AdminDashboard;
 use App\Livewire\Admin\Localization\Index as AdminLocalization;
+use App\Livewire\Admin\Scraper\Index as AdminScraperIndex;
+use App\Livewire\Admin\Scraper\Show as AdminScraperShow;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -138,4 +140,8 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
 
     // Localization
     Route::get('localization', AdminLocalization::class)->name('localization.index');
+
+    // Scraper
+    Route::get('scraper', AdminScraperIndex::class)->name('scraper.index');
+    Route::get('scraper/{run}', AdminScraperShow::class)->name('scraper.show');
 });

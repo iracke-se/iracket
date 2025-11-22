@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30907.101
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebScraper", "WebScraper\WebScraper.csproj", "{513A7670-C652-48F7-8FCA-865F1C5ED0B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Services", "Services\Services.csproj", "{4280AF6D-A402-46CD-95E1-41713C86C779}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{611B30AC-16C0-4C8F-B1A0-33FB04DB6ACF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{513A7670-C652-48F7-8FCA-865F1C5ED0B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{513A7670-C652-48F7-8FCA-865F1C5ED0B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{513A7670-C652-48F7-8FCA-865F1C5ED0B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{513A7670-C652-48F7-8FCA-865F1C5ED0B4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4280AF6D-A402-46CD-95E1-41713C86C779}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4280AF6D-A402-46CD-95E1-41713C86C779}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4280AF6D-A402-46CD-95E1-41713C86C779}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4280AF6D-A402-46CD-95E1-41713C86C779}.Release|Any CPU.Build.0 = Release|Any CPU
+		{611B30AC-16C0-4C8F-B1A0-33FB04DB6ACF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{611B30AC-16C0-4C8F-B1A0-33FB04DB6ACF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{611B30AC-16C0-4C8F-B1A0-33FB04DB6ACF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{611B30AC-16C0-4C8F-B1A0-33FB04DB6ACF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9CB34E0C-A46C-4D12-8BF0-36248D4E825E}
+	EndGlobalSection
+EndGlobal
