@@ -13,6 +13,8 @@ class Index extends Component
 
     public string $search = '';
     public string $hasMembers = '';
+    public array $selectedClubs = [];
+    public bool $selectAll = false;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -27,6 +29,59 @@ class Index extends Component
     public function updatingHasMembers()
     {
         $this->resetPage();
+    }
+
+    public function updatedSelectAll($value)
+    {
+        if ($value) {
+            $this->selectedClubs = $this->getFilteredClubIds();
+        } else {
+            $this->selectedClubs = [];
+        }
+    }
+
+    public function getFilteredClubIds(): array
+    {
+        return Club::query()
+            ->when($this->search, function ($query) {
+                $query->where('name', 'like', '%' . $this->search . '%')
+                      ->orWhere('location', 'like', '%' . $this->search . '%');
+            })
+            ->when($this->hasMembers !== '', function ($query) {
+                if ($this->hasMembers === '1') {
+                    $query->has('members');
+                } else {
+                    $query->doesntHave('members');
+                }
+            })
+            ->pluck('id')
+            ->toArray();
+    }
+
+    public function sendNotification()
+    {
+        if (empty($this->selectedClubs)) {
+            session()->flash('error', 'Please select at least one club.');
+            return;
+        }
+
+        // Get all user IDs from selected clubs
+        $userIds = User::whereIn('club_id', $this->selectedClubs)
+            ->pluck('id')
+            ->toArray();
+
+        if (empty($userIds)) {
+            session()->flash('error', 'Selected clubs have no members.');
+            return;
+        }
+
+        return redirect()->route('admin.notifications.send', ['users' => implode(',', $userIds)]);
+    }
+
+    public function clearSelection()
+    {
+        $this->selectedClubs = [];
+        $this->selectAll = false;
     }
 
     public function delete($id)

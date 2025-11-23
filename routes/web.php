@@ -34,6 +34,7 @@ use App\Livewire\Admin\Dashboard\Index as AdminDashboard;
 use App\Livewire\Admin\Localization\Index as AdminLocalization;
 use App\Livewire\Admin\Scraper\Index as AdminScraperIndex;
 use App\Livewire\Admin\Scraper\Show as AdminScraperShow;
+use App\Livewire\Admin\Scraper\Settings as AdminScraperSettings;
 use App\Livewire\Admin\Notifications\Send as AdminNotificationsSend;
 use App\Livewire\Admin\Contacts\Index as AdminContactsIndex;
 use App\Livewire\Admin\Contacts\Respond as AdminContactsRespond;
@@ -145,17 +146,21 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
     Route::get('matches/create', AdminMatchesForm::class)->name('matches.create');
     Route::get('matches/{id}/edit', AdminMatchesForm::class)->name('matches.edit');
 
-    // Staff
-    Route::get('staff', AdminStaffIndex::class)->name('staff.index');
-    Route::get('staff/create', AdminStaffForm::class)->name('staff.create');
-    Route::get('staff/{id}/edit', AdminStaffForm::class)->name('staff.edit');
-
     // Localization
     Route::get('localization', AdminLocalization::class)->name('localization.index');
 
-    // Scraper
-    Route::get('scraper', AdminScraperIndex::class)->name('scraper.index');
-    Route::get('scraper/{run}', AdminScraperShow::class)->name('scraper.show');
+    // Admin-only routes (not accessible by Manager)
+    Route::middleware(['role:Admin'])->group(function () {
+        // Staff
+        Route::get('staff', AdminStaffIndex::class)->name('staff.index');
+        Route::get('staff/create', AdminStaffForm::class)->name('staff.create');
+        Route::get('staff/{id}/edit', AdminStaffForm::class)->name('staff.edit');
+
+        // Scraper
+        Route::get('scraper', AdminScraperIndex::class)->name('scraper.index');
+        Route::get('scraper/settings', AdminScraperSettings::class)->name('scraper.settings');
+        Route::get('scraper/{run}', AdminScraperShow::class)->name('scraper.show');
+    });
 
     // Notifications
     Route::get('notifications/send', AdminNotificationsSend::class)->name('notifications.send');

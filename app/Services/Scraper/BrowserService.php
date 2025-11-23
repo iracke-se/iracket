@@ -2,8 +2,10 @@
 
 namespace App\Services\Scraper;
 
+use App\Models\Scraper\ScraperSetting;
 use Spatie\Browsershot\Browsershot;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class BrowserService
 {
@@ -306,10 +308,28 @@ class BrowserService
     }
 
     /**
-     * Get main URL
+     * Get main URL (legacy, use getUrlFor() instead)
      */
     public function getMainUrl(): string
     {
+        return $this->mainUrl;
+    }
+
+    /**
+     * Get URL for a specific scraper type
+     * First checks database settings, then falls back to config
+     */
+    public function getUrlFor(string $type): string
+    {
+        // Check if settings table exists (for migrations/fresh installs)
+        if (Schema::hasTable('scraper_settings')) {
+            $url = ScraperSetting::getUrl($type);
+            if ($url) {
+                return $url;
+            }
+        }
+
+        // Fall back to config main URL
         return $this->mainUrl;
     }
 

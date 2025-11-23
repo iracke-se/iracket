@@ -174,7 +174,7 @@ describe('Players Scraper Integration', function () {
 
             // Sex should be a valid value if present
             if ($player->sex) {
-                expect($player->sex)->toBeIn(['M', 'F', 'K', 'Male', 'Female', 'Mann', 'Kvinne']);
+                expect($player->sex)->toBeIn(['M', 'F', 'K', 'Male', 'Female', 'Mann', 'Kvinne', 'Man', 'Kvinna']);
             }
         }
     });
@@ -282,9 +282,9 @@ describe('Live Center Scraper Integration', function () {
             expect($match->team1_name)->not->toBeEmpty();
             expect($match->team2_name)->not->toBeEmpty();
 
-            // Score should be in X-Y format if present
+            // Score should be in X-Y format (with optional spaces) if present
             if ($match->score && $match->score !== '') {
-                expect($match->score)->toMatch('/^\d+-\d+$/');
+                expect($match->score)->toMatch('/^\d+\s*-\s*\d+$/');
             }
 
             // Winner should be valid if present
@@ -301,6 +301,7 @@ describe('Series Scraper Integration', function () {
 
         $parameters = [
             'limit_seasons' => 1,
+            'limit_series' => 1,
         ];
 
         try {

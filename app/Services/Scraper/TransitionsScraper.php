@@ -17,46 +17,70 @@ class TransitionsScraper extends BaseScraperService
     {
         $this->info("Starting transitions scrape");
 
-        // Navigate to player list page
-        $mainUrl = $this->browserService->getMainUrl();
+        // Navigate to SBTF portal to establish session
+        $loginUrl = 'https://www.profixio.com/fx/login.php?login_public=SBTF.SE.BT';
 
-        $browser = Browsershot::url($mainUrl)
+        $browser = Browsershot::url($loginUrl)
             ->setNodeBinary(config('scraper.browser.node_binary'))
             ->setNpmBinary(config('scraper.browser.npm_binary'))
             ->timeout(config('scraper.browser.timeout'))
             ->waitUntilNetworkIdle()
-            ->noSandbox();
+            ->noSandbox()
+            ->addChromiumArguments(['--disable-web-security', '--disable-features=IsolateOrigins,site-per-process']);
 
         if (config('scraper.browser.chrome_path')) {
             $browser->setChromePath(config('scraper.browser.chrome_path'));
         }
 
-        // Click player list menu
-        $playerListSelector = $this->browserService->getSelector('player_list');
-        $clickJs = $this->browserService->jsClickAndWait($playerListSelector);
+        // Fetch transitions page using the transitions tab URL
+        $initJs = <<<JS
+        (async function() {
+            try {
+                // Fetch the transitions page (transitions tab on player list)
+                const response = await fetch('https://www.profixio.com/fx/lisens/public_overgang.php', {
+                    credentials: 'include'
+                });
+                const html = await response.text();
 
-        $this->withRetry(function () use ($browser, $clickJs) {
-            $browser->evaluate($clickJs);
-        }, 'Click player list menu');
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
 
-        $this->delay('after_click');
+                // Get periods from dropdown
+                var periods = [];
+                var periodsSelect = doc.getElementById('periode');
+                if (periodsSelect) {
+                    for (let i = 0; i < periodsSelect.options.length; i++) {
+                        periods.push({
+                            value: periodsSelect.options[i].value,
+                            text: periodsSelect.options[i].innerHTML.trim()
+                        });
+                    }
+                }
 
-        // Click transitions tab
-        $transitionsTabSelector = '#main-col > div.meny > div > div.undermeny > ul > li:nth-child(2) > a';
-        $clickTransitionsJs = $this->browserService->jsClickAndWait($transitionsTabSelector);
+                return JSON.stringify({
+                    periods: periods,
+                    pageTitle: doc.title
+                });
+            } catch (e) {
+                return JSON.stringify({ error: e.message });
+            }
+        })();
+        JS;
 
-        $this->withRetry(function () use ($browser, $clickTransitionsJs) {
-            $browser->evaluate($clickTransitionsJs);
-        }, 'Click transitions tab');
+        $initJson = $this->withRetry(function () use ($browser, $initJs) {
+            return $browser->evaluate($initJs);
+        }, 'Fetch transitions page');
 
-        $this->delay('after_click');
+        $initData = json_decode($initJson, true);
 
-        // Get periods from dropdown
-        $periodsJs = $this->browserService->jsGetDropdownOptions('periode');
-        $periodsJson = $this->withRetry(function () use ($browser, $periodsJs) {
-            return $browser->evaluate($periodsJs);
-        }, 'Get periods dropdown');
-        $periods = json_decode($periodsJson, true) ?? [];
+        if (isset($initData['error'])) {
+            $this->error("Failed to fetch data: " . $initData['error']);
+            return;
+        }
+
+        $this->info("Page title: " . ($initData['pageTitle'] ?? 'unknown'));
+
+        $periods = $initData['periods'] ?? [];
 
         // Filter out "all" option
         $periods = array_filter($periods, fn($p) => $p['value'] !== '0');
@@ -88,22 +112,64 @@ class TransitionsScraper extends BaseScraperService
 
     protected function scrapeTransitionsForPeriod(Browsershot $browser, array $period): void
     {
-        // Select period
-        $selectPeriodJs = $this->browserService->jsSelectOption('periode', $period['value']);
-        $this->withRetry(function () use ($browser, $selectPeriodJs) {
-            $browser->evaluate($selectPeriodJs);
-        }, "Select period: {$period['text']}");
+        $periodValue = $period['value'];
+        $periodName = $period['text'];
 
-        $this->delay('after_select');
+        // Fetch transitions data using POST with form data
+        $fetchTransitionsJs = <<<JS
+        (async function() {
+            try {
+                const formData = new URLSearchParams();
+                formData.append('periode', '{$periodValue}');
 
-        // Get transitions data
-        $transitionsSelector = '#main-col > div.maincontent > form > table > tbody > tr';
-        $transitionsJs = $this->browserService->jsGetTransitions($transitionsSelector);
+                const response = await fetch('https://www.profixio.com/fx/lisens/public_overgang.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData.toString(),
+                    credentials: 'include'
+                });
 
-        $transitionsJson = $this->withRetry(function () use ($browser, $transitionsJs) {
-            return $browser->evaluate($transitionsJs);
-        }, "Get transitions for {$period['text']}");
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                // Get transition data from table
+                const rows = doc.querySelectorAll('#main-col > div.maincontent > form > table > tbody > tr');
+                let transitions = [];
+
+                for (let i = 0; i < rows.length; i++) {
+                    const cells = rows[i].querySelectorAll('td');
+                    if (cells.length >= 6) {
+                        transitions.push({
+                            surname: cells[0]?.innerText.trim() || '',
+                            firstName: cells[1]?.innerText.trim() || '',
+                            born: cells[2]?.innerText.trim() || '',
+                            from: cells[3]?.innerText.trim() || '',
+                            to: cells[4]?.innerText.trim() || '',
+                            completionDate: cells[5]?.innerText.trim() || ''
+                        });
+                    }
+                }
+
+                return JSON.stringify(transitions);
+            } catch (e) {
+                return JSON.stringify({ error: e.message });
+            }
+        })();
+        JS;
+
+        $transitionsJson = $this->withRetry(function () use ($browser, $fetchTransitionsJs) {
+            return $browser->evaluate($fetchTransitionsJs);
+        }, "Get transitions for {$periodName}");
+
         $transitions = json_decode($transitionsJson, true) ?? [];
+
+        if (isset($transitions['error'])) {
+            $this->warning("Error fetching transitions: " . $transitions['error']);
+            return;
+        }
 
         if (empty($transitions)) {
             return;
@@ -117,7 +183,7 @@ class TransitionsScraper extends BaseScraperService
 
             ScrapedTransition::create([
                 'scraper_run_id' => $this->run->id,
-                'period' => $period['text'],
+                'period' => $periodName,
                 'surname' => trim($transition['surname'] ?? ''),
                 'first_name' => trim($transition['firstName'] ?? ''),
                 'born' => trim($transition['born'] ?? ''),
@@ -129,6 +195,6 @@ class TransitionsScraper extends BaseScraperService
             $this->run->incrementScraped();
         }
 
-        $this->info("Scraped {$period['text']}: " . count($transitions) . " transitions");
+        $this->info("Scraped {$periodName}: " . count($transitions) . " transitions");
     }
 }

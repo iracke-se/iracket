@@ -23,7 +23,8 @@ class RankingsScraper extends BaseScraperService
 
         // Navigate directly to rankings page with gender parameter
         $genderParam = $gender === 'female' ? 'k' : 'm';
-        $rankingsUrl = config('scraper.main_url') . "?gender={$genderParam}";
+        $baseUrl = $this->browserService->getUrlFor('rankings');
+        $rankingsUrl = $baseUrl . "?gender={$genderParam}";
 
         $browser = Browsershot::url($rankingsUrl)
             ->setNodeBinary(config('scraper.browser.node_binary'))
