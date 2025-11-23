@@ -44,11 +44,17 @@ class BrowserService
      */
     public function navigateTo(string $url): Browsershot
     {
-        return Browsershot::url($url)
+        $browser = Browsershot::url($url)
             ->setNodeBinary($this->browserConfig['node_binary'])
             ->setNpmBinary($this->browserConfig['npm_binary'])
             ->timeout($this->browserConfig['timeout'])
             ->waitUntilNetworkIdle();
+
+        if ($this->browserConfig['chrome_path']) {
+            $browser->setChromePath($this->browserConfig['chrome_path']);
+        }
+
+        return $browser;
     }
 
     /**
@@ -88,14 +94,14 @@ class BrowserService
         (function () {
             var arr = [];
             var select = document.getElementById('{$id}');
-            if (!select) return arr;
+            if (!select) return JSON.stringify(arr);
             for (let i = 0; i < select.options.length; i++) {
                 arr.push({
                     value: select.options[i].value,
                     text: select.options[i].innerHTML.trim()
                 });
             }
-            return arr;
+            return JSON.stringify(arr);
         })();
         JS;
     }
@@ -108,10 +114,11 @@ class BrowserService
         return <<<JS
         (function () {
             const rows = document.querySelectorAll('{$selector} tr');
-            return Array.from(rows, row => {
+            var result = Array.from(rows, row => {
                 const columns = row.querySelectorAll('td');
                 return Array.from(columns, column => column.innerText.trim());
             });
+            return JSON.stringify(result);
         })();
         JS;
     }
@@ -173,7 +180,7 @@ class BrowserService
                     result.push(data);
                 }
             }
-            return result;
+            return JSON.stringify(result);
         })();
         JS;
     }
@@ -200,7 +207,7 @@ class BrowserService
                     results.push(data);
                 }
             }
-            return results;
+            return JSON.stringify(results);
         })();
         JS;
     }
@@ -227,7 +234,7 @@ class BrowserService
                     });
                 }
             }
-            return result;
+            return JSON.stringify(result);
         })();
         JS;
     }
@@ -252,7 +259,7 @@ class BrowserService
                 rowData.values = coData;
                 ar.push(rowData);
             }
-            return ar;
+            return JSON.stringify(ar);
         })();
         JS;
     }
@@ -277,7 +284,7 @@ class BrowserService
                 }
                 ar.push(coData);
             }
-            return ar;
+            return JSON.stringify(ar);
         })();
         JS;
     }

@@ -47,4 +47,8 @@ return [
         'redirect' => env('APPLE_REDIRECT_URI'),
     ],
 
+    'mobile_app' => [
+        'bearer_token' => env('MOBILE_APP_BEARER_TOKEN'),
+    ],
+
 ];

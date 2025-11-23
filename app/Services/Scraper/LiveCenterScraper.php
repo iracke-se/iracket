@@ -27,7 +27,12 @@ class LiveCenterScraper extends BaseScraperService
             ->setNodeBinary(config('scraper.browser.node_binary'))
             ->setNpmBinary(config('scraper.browser.npm_binary'))
             ->timeout(config('scraper.browser.timeout'))
-            ->waitUntilNetworkIdle();
+            ->waitUntilNetworkIdle()
+            ->noSandbox();
+
+        if (config('scraper.browser.chrome_path')) {
+            $browser->setChromePath(config('scraper.browser.chrome_path'));
+        }
 
         // Click live center menu
         $liveCenterSelector = $this->browserService->getSelector('live_center');
@@ -41,9 +46,10 @@ class LiveCenterScraper extends BaseScraperService
 
         // Get divisions from dropdown
         $divisionsJs = $this->browserService->jsGetDropdownOptions('filter4_id');
-        $divisions = $this->withRetry(function () use ($browser, $divisionsJs) {
+        $divisionsJson = $this->withRetry(function () use ($browser, $divisionsJs) {
             return $browser->evaluate($divisionsJs);
         }, 'Get divisions dropdown');
+        $divisions = json_decode($divisionsJson, true) ?? [];
 
         // Filter out empty values
         $divisions = array_filter($divisions, fn($d) => !empty($d['value']));
@@ -53,13 +59,26 @@ class LiveCenterScraper extends BaseScraperService
             $divisions = array_slice($divisions, $skip, $take ?: null);
         }
 
+        // Apply limits for testing
+        $limitDivisions = $this->getParameter('limit_divisions');
+        if ($limitDivisions && $limitDivisions > 0) {
+            $divisions = array_slice(array_values($divisions), 0, $limitDivisions);
+        }
+
         $this->info("Processing divisions: " . count($divisions));
 
         // Get periods from dropdown
         $periodsJs = $this->browserService->jsGetDropdownOptions('filter1_id');
-        $periods = $this->withRetry(function () use ($browser, $periodsJs) {
+        $periodsJson = $this->withRetry(function () use ($browser, $periodsJs) {
             return $browser->evaluate($periodsJs);
         }, 'Get periods dropdown');
+        $periods = json_decode($periodsJson, true) ?? [];
+
+        // Apply limits for testing
+        $limitPeriods = $this->getParameter('limit_periods');
+        if ($limitPeriods && $limitPeriods > 0) {
+            $periods = array_slice($periods, 0, $limitPeriods);
+        }
 
         // Process each division
         foreach ($divisions as $division) {
@@ -114,9 +133,10 @@ class LiveCenterScraper extends BaseScraperService
 
         // Get match data
         $matchesJs = $this->jsGetMatches();
-        $matches = $this->withRetry(function () use ($browser, $matchesJs) {
+        $matchesJson = $this->withRetry(function () use ($browser, $matchesJs) {
             return $browser->evaluate($matchesJs);
         }, "Get matches for {$division} - {$period['text']}");
+        $matches = json_decode($matchesJson, true) ?? [];
 
         if (empty($matches)) {
             return;
@@ -174,7 +194,7 @@ class LiveCenterScraper extends BaseScraperService
                     });
                 }
             }
-            return result;
+            return JSON.stringify(result);
         })();
         JS;
     }

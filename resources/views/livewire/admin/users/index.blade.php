@@ -81,6 +81,26 @@
         </div>
     </div>
 
+    <!-- Selection Actions -->
+    @if(count($selectedUsers) > 0)
+        <div class="mb-4 p-4 bg-accent/10 border border-accent/20 rounded-lg flex items-center justify-between">
+            <div class="text-accent font-medium">
+                {{ count($selectedUsers) }} {{ count($selectedUsers) === 1 ? 'user' : 'users' }} selected
+            </div>
+            <div class="flex items-center gap-3">
+                <button wire:click="clearSelection" class="px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
+                    Clear selection
+                </button>
+                <button wire:click="sendNotification" class="px-4 py-2 bg-accent text-white font-medium rounded-lg hover:bg-accent/90 transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                    Send Notification
+                </button>
+            </div>
+        </div>
+    @endif
+
     <!-- Filters -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="md:col-span-1">
@@ -124,6 +144,9 @@
         <table class="w-full min-w-[800px]">
             <thead class="bg-zinc-100 dark:bg-zinc-700/50">
                 <tr>
+                    <th class="px-4 py-3 text-left">
+                        <input type="checkbox" wire:model.live="selectAll" class="rounded border-zinc-300 dark:border-zinc-600 text-accent focus:ring-accent">
+                    </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-users.user') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-users.gender') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-users.club') }}</th>
@@ -133,7 +156,10 @@
             </thead>
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @forelse($users as $user)
-                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-700/30">
+                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-700/30 {{ in_array($user->id, $selectedUsers) ? 'bg-accent/5' : '' }}">
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <input type="checkbox" wire:model.live="selectedUsers" value="{{ $user->id }}" class="rounded border-zinc-300 dark:border-zinc-600 text-accent focus:ring-accent">
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
@@ -164,7 +190,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-zinc-500 dark:text-zinc-400">{{ __('admin-users.no_users_found') }}</td>
+                        <td colspan="6" class="px-6 py-8 text-center text-zinc-500 dark:text-zinc-400">{{ __('admin-users.no_users_found') }}</td>
                     </tr>
                 @endforelse
             </tbody>

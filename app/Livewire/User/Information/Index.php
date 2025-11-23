@@ -2,15 +2,20 @@
 
 namespace App\Livewire\User\Information;
 
+use App\Models\Notification;
 use Livewire\Component;
 
 class Index extends Component
 {
     public string $locale;
+    public int $unreadNotificationsCount = 0;
 
     public function mount()
     {
         $this->locale = app()->getLocale();
+        $this->unreadNotificationsCount = Notification::where('user_id', auth()->id())
+            ->whereNull('read_at')
+            ->count();
     }
 
     public function switchLanguage(string $locale)

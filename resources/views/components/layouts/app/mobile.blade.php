@@ -4,6 +4,11 @@
         @include('partials.head')
         @stack('styles')
     </head>
+    @php
+        $unreadNotificationsCount = auth()->check()
+            ? \App\Models\Notification::where('user_id', auth()->id())->whereNull('read_at')->count()
+            : 0;
+    @endphp
     <body class="min-h-screen bg-white dark:bg-zinc-900">
         <!-- Top Bar -->
         <header class="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
@@ -115,10 +120,17 @@
                 </a>
 
                 <!-- Information -->
-                <a href="{{ route('information') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('information') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                <a href="{{ route('information') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('information') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors relative" wire:navigate>
+                    <div class="relative">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        @if($unreadNotificationsCount > 0)
+                            <span class="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                                {{ $unreadNotificationsCount > 99 ? '99+' : $unreadNotificationsCount }}
+                            </span>
+                        @endif
+                    </div>
                     <span class="text-xs font-medium">Info</span>
                 </a>
             </div>

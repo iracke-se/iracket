@@ -24,7 +24,12 @@ class PlayerListScraper extends BaseScraperService
             ->setNodeBinary(config('scraper.browser.node_binary'))
             ->setNpmBinary(config('scraper.browser.npm_binary'))
             ->timeout(config('scraper.browser.timeout'))
-            ->waitUntilNetworkIdle();
+            ->waitUntilNetworkIdle()
+            ->noSandbox();
+
+        if (config('scraper.browser.chrome_path')) {
+            $browser->setChromePath(config('scraper.browser.chrome_path'));
+        }
 
         // Click player list menu
         $playerListSelector = $this->browserService->getSelector('player_list');
@@ -38,18 +43,31 @@ class PlayerListScraper extends BaseScraperService
 
         // Get periods from dropdown
         $periodsJs = $this->browserService->jsGetDropdownOptions('periode');
-        $periods = $this->withRetry(function () use ($browser, $periodsJs) {
+        $periodsJson = $this->withRetry(function () use ($browser, $periodsJs) {
             return $browser->evaluate($periodsJs);
         }, 'Get periods dropdown');
+        $periods = json_decode($periodsJson, true) ?? [];
 
         // Get clubs from dropdown
         $clubsJs = $this->browserService->jsGetDropdownOptions('klubbid');
-        $clubs = $this->withRetry(function () use ($browser, $clubsJs) {
+        $clubsJson = $this->withRetry(function () use ($browser, $clubsJs) {
             return $browser->evaluate($clubsJs);
         }, 'Get clubs dropdown');
+        $clubs = json_decode($clubsJson, true) ?? [];
 
         // Filter out empty values
         $clubs = array_filter($clubs, fn($c) => !empty(trim($c['text'])));
+
+        // Apply limits for testing
+        $limitPeriods = $this->getParameter('limit_periods');
+        $limitClubs = $this->getParameter('limit_clubs');
+
+        if ($limitPeriods && $limitPeriods > 0) {
+            $periods = array_slice($periods, 0, $limitPeriods);
+        }
+        if ($limitClubs && $limitClubs > 0) {
+            $clubs = array_slice(array_values($clubs), 0, $limitClubs);
+        }
 
         $this->info("Found periods: " . count($periods) . ", clubs: " . count($clubs));
 
@@ -105,9 +123,10 @@ class PlayerListScraper extends BaseScraperService
         // Get player data
         $playersJs = $this->browserService->jsGetPlayerList('.table-condensed');
 
-        $players = $this->withRetry(function () use ($browser, $playersJs) {
+        $playersJson = $this->withRetry(function () use ($browser, $playersJs) {
             return $browser->evaluate($playersJs);
         }, "Get players for {$club['text']}");
+        $players = json_decode($playersJson, true) ?? [];
 
         if (empty($players)) {
             return;

@@ -15,11 +15,9 @@ pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
 
-// Scraper tests use database transactions instead of RefreshDatabase
-// to preserve existing data while still rolling back test changes
+// Unit tests don't need database traits
 pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\DatabaseTransactions::class)
-    ->in('Feature/Scraper');
+    ->in('Unit');
 
 /*
 |--------------------------------------------------------------------------

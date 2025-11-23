@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AppleController;
 use App\Http\Controllers\Auth\GoogleController;
 use App\Livewire\Auth\VerifyEmail;
+use App\Livewire\Public\Home\Index as PublicHome;
 use App\Livewire\Public\Terms\Show as TermsShow;
 use App\Livewire\Settings\Appearance;
 use App\Livewire\Settings\Club as SettingsClub;
@@ -33,11 +34,22 @@ use App\Livewire\Admin\Dashboard\Index as AdminDashboard;
 use App\Livewire\Admin\Localization\Index as AdminLocalization;
 use App\Livewire\Admin\Scraper\Index as AdminScraperIndex;
 use App\Livewire\Admin\Scraper\Show as AdminScraperShow;
+use App\Livewire\Admin\Notifications\Send as AdminNotificationsSend;
+use App\Livewire\Admin\Contacts\Index as AdminContactsIndex;
+use App\Livewire\Admin\Contacts\Respond as AdminContactsRespond;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-Route::redirect('/', '/login')->name('home');
+Route::get('/', PublicHome::class)->name('home');
+
+// Locale Switching
+Route::get('locale/{locale}', function (string $locale) {
+    if (in_array($locale, ['en', 'sv'])) {
+        session(['locale' => $locale]);
+    }
+    return redirect()->back();
+})->name('locale.switch');
 
 // Social Authentication Routes
 Route::get('auth/google', [GoogleController::class, 'redirect'])->name('auth.google');
@@ -144,4 +156,11 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
     // Scraper
     Route::get('scraper', AdminScraperIndex::class)->name('scraper.index');
     Route::get('scraper/{run}', AdminScraperShow::class)->name('scraper.show');
+
+    // Notifications
+    Route::get('notifications/send', AdminNotificationsSend::class)->name('notifications.send');
+
+    // Contacts
+    Route::get('contacts', AdminContactsIndex::class)->name('contacts.index');
+    Route::get('contacts/{id}/respond', AdminContactsRespond::class)->name('contacts.respond');
 });

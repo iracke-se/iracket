@@ -15,6 +15,8 @@ class Index extends Component
     public string $gender = '';
     public string $club = '';
     public string $verified = '';
+    public array $selectedUsers = [];
+    public bool $selectAll = false;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -41,6 +43,58 @@ class Index extends Component
     public function updatingVerified()
     {
         $this->resetPage();
+    }
+
+    public function updatedSelectAll($value)
+    {
+        if ($value) {
+            $this->selectedUsers = $this->getFilteredUserIds();
+        } else {
+            $this->selectedUsers = [];
+        }
+    }
+
+    public function getFilteredUserIds(): array
+    {
+        return User::query()
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('first_name', 'like', '%' . $this->search . '%')
+                      ->orWhere('last_name', 'like', '%' . $this->search . '%')
+                      ->orWhere('email', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->when($this->gender, function ($query) {
+                $query->where('gender', $this->gender);
+            })
+            ->when($this->club, function ($query) {
+                $query->where('club_id', $this->club);
+            })
+            ->when($this->verified !== '', function ($query) {
+                if ($this->verified === '1') {
+                    $query->whereNotNull('email_verified_at');
+                } else {
+                    $query->whereNull('email_verified_at');
+                }
+            })
+            ->pluck('id')
+            ->toArray();
+    }
+
+    public function sendNotification()
+    {
+        if (empty($this->selectedUsers)) {
+            session()->flash('error', 'Please select at least one user.');
+            return;
+        }
+
+        return redirect()->route('admin.notifications.send', ['users' => implode(',', $this->selectedUsers)]);
+    }
+
+    public function clearSelection()
+    {
+        $this->selectedUsers = [];
+        $this->selectAll = false;
     }
 
     public function delete($id)

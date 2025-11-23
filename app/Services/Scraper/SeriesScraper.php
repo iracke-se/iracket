@@ -28,7 +28,12 @@ class SeriesScraper extends BaseScraperService
             ->setNodeBinary(config('scraper.browser.node_binary'))
             ->setNpmBinary(config('scraper.browser.npm_binary'))
             ->timeout(config('scraper.browser.timeout'))
-            ->waitUntilNetworkIdle();
+            ->waitUntilNetworkIdle()
+            ->noSandbox();
+
+        if (config('scraper.browser.chrome_path')) {
+            $browser->setChromePath(config('scraper.browser.chrome_path'));
+        }
 
         // Click series menu
         $seriesSelector = $this->browserService->getSelector('series');
@@ -42,13 +47,20 @@ class SeriesScraper extends BaseScraperService
 
         // Get seasons data
         $seasonsJs = $this->jsGetSeasons();
-        $seasons = $this->withRetry(function () use ($browser, $seasonsJs) {
+        $seasonsJson = $this->withRetry(function () use ($browser, $seasonsJs) {
             return $browser->evaluate($seasonsJs);
         }, 'Get seasons');
+        $seasons = json_decode($seasonsJson, true) ?? [];
 
         if (empty($seasons)) {
             $this->warning("No seasons found");
             return;
+        }
+
+        // Apply limits for testing
+        $limitSeasons = $this->getParameter('limit_seasons');
+        if ($limitSeasons && $limitSeasons > 0) {
+            $seasons = array_slice($seasons, 0, $limitSeasons);
         }
 
         $this->info("Found seasons: " . count($seasons));
@@ -115,9 +127,10 @@ class SeriesScraper extends BaseScraperService
 
         // Get standings table data
         $standingsJs = $this->jsGetStandings();
-        $standings = $this->withRetry(function () use ($browser, $standingsJs) {
+        $standingsJson = $this->withRetry(function () use ($browser, $standingsJs) {
             return $browser->evaluate($standingsJs);
         }, "Get standings for {$seasonLabel}");
+        $standings = json_decode($standingsJson, true) ?? [];
 
         // Save standings
         foreach ($standings as $index => $standing) {
@@ -158,7 +171,7 @@ class SeriesScraper extends BaseScraperService
                     link: item.getAttribute('href') || ''
                 });
             });
-            return result;
+            return JSON.stringify(result);
         })();
         JS;
     }
@@ -183,7 +196,7 @@ class SeriesScraper extends BaseScraperService
                     });
                 }
             }
-            return result;
+            return JSON.stringify(result);
         })();
         JS;
     }

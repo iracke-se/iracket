@@ -127,6 +127,14 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'scraper' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/scraper/scraper.log'),
+            'level' => env('SCRAPER_LOG_LEVEL', 'debug'),
+            'days' => env('SCRAPER_LOG_DAYS', 7), // Keep only 7 days, older moved to archive
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

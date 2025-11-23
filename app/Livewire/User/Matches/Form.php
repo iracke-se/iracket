@@ -4,6 +4,7 @@ namespace App\Livewire\User\Matches;
 
 use App\Models\GameMatch;
 use App\Models\User;
+use App\Services\AutoNotificationService;
 use Livewire\Component;
 
 class Form extends Component
@@ -121,7 +122,12 @@ class Form extends Component
             $this->match->update($data);
             session()->flash('message', __('Match updated successfully.'));
         } else {
-            GameMatch::create($data);
+            $match = GameMatch::create($data);
+
+            // Send notification to opponent
+            $notificationService = app(AutoNotificationService::class);
+            $notificationService->matchCreated($match, $user);
+
             session()->flash('message', __('Match created successfully.'));
         }
 

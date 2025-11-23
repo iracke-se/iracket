@@ -63,6 +63,9 @@ class User extends Authenticatable
         'verification_code_expires_at',
         'club_id',
         'visible_in_players',
+        'fcm_token',
+        'device_type',
+        'fcm_token_updated_at',
     ];
 
     /**

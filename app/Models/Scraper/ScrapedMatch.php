@@ -2,7 +2,7 @@
 
 namespace App\Models\Scraper;
 
-use App\Models\Match;
+use App\Models\GameMatch;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -40,7 +40,7 @@ class ScrapedMatch extends Model
 
     public function syncedMatch(): BelongsTo
     {
-        return $this->belongsTo(Match::class, 'synced_match_id');
+        return $this->belongsTo(GameMatch::class, 'synced_match_id');
     }
 
     public function getPlayer1SetsAttribute(): ?int

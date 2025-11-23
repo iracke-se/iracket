@@ -21,39 +21,73 @@ class RankingsScraper extends BaseScraperService
 
         $this->info("Starting rankings scrape for gender: {$gender}");
 
-        // Navigate to rankings page
-        $mainUrl = $this->browserService->getMainUrl();
+        // Navigate directly to rankings page with gender parameter
+        $genderParam = $gender === 'female' ? 'k' : 'm';
+        $rankingsUrl = config('scraper.main_url') . "?gender={$genderParam}";
 
-        $browser = Browsershot::url($mainUrl)
+        $browser = Browsershot::url($rankingsUrl)
             ->setNodeBinary(config('scraper.browser.node_binary'))
             ->setNpmBinary(config('scraper.browser.npm_binary'))
             ->timeout(config('scraper.browser.timeout'))
-            ->waitUntilNetworkIdle();
+            ->waitUntilNetworkIdle()
+            ->noSandbox();
 
-        // Click rankings menu
-        $rankingsSelector = $this->browserService->getSelector('rankings');
-        $clickJs = $this->browserService->jsClickAndWait($rankingsSelector);
+        if (config('scraper.browser.chrome_path')) {
+            $browser->setChromePath(config('scraper.browser.chrome_path'));
+        }
 
-        $this->withRetry(function () use ($browser, $clickJs) {
-            $browser->evaluate($clickJs);
-        }, 'Click rankings menu');
+        // Get dropdowns (query by name since they don't have ids)
+        $initJs = <<<JS
+        (function () {
+            // Get periods
+            var periods = [];
+            var periodsSelect = document.querySelector('[name="rid"]');
+            if (periodsSelect) {
+                for (let i = 0; i < periodsSelect.options.length; i++) {
+                    periods.push({
+                        value: periodsSelect.options[i].value,
+                        text: periodsSelect.options[i].innerHTML.trim()
+                    });
+                }
+            }
 
-        $this->delay('after_click');
+            // Get divisions
+            var divisions = [];
+            var divisionsSelect = document.querySelector('[name="distr"]');
+            if (divisionsSelect) {
+                for (let i = 0; i < divisionsSelect.options.length; i++) {
+                    divisions.push({
+                        value: divisionsSelect.options[i].value,
+                        text: divisionsSelect.options[i].innerHTML.trim()
+                    });
+                }
+            }
 
-        // Get periods from dropdown
-        $periodsJs = $this->browserService->jsGetDropdownOptions('rid');
-        $periods = $this->withRetry(function () use ($browser, $periodsJs) {
-            return $browser->evaluate($periodsJs);
-        }, 'Get periods dropdown');
+            return JSON.stringify({ periods: periods, divisions: divisions });
+        })();
+        JS;
 
-        // Get divisions from dropdown
-        $divisionsJs = $this->browserService->jsGetDropdownOptions('distr');
-        $divisions = $this->withRetry(function () use ($browser, $divisionsJs) {
-            return $browser->evaluate($divisionsJs);
-        }, 'Get divisions dropdown');
+        $initJson = $this->withRetry(function () use ($browser, $initJs) {
+            return $browser->evaluate($initJs);
+        }, 'Initialize rankings page');
+
+        $initData = json_decode($initJson, true) ?? ['periods' => [], 'divisions' => []];
+        $periods = $initData['periods'] ?? [];
+        $divisions = $initData['divisions'] ?? [];
 
         // Filter out empty values
         $divisions = array_filter($divisions, fn($d) => !empty($d['value']));
+
+        // Apply limits for testing
+        $limitPeriods = $this->getParameter('limit_periods');
+        $limitDivisions = $this->getParameter('limit_divisions');
+
+        if ($limitPeriods && $limitPeriods > 0) {
+            $periods = array_slice($periods, 0, $limitPeriods);
+        }
+        if ($limitDivisions && $limitDivisions > 0) {
+            $divisions = array_slice(array_values($divisions), 0, $limitDivisions);
+        }
 
         $this->info("Found periods: " . count($periods) . ", divisions: " . count($divisions));
 
@@ -125,9 +159,10 @@ class RankingsScraper extends BaseScraperService
         $rankingsSelector = '#main-col > div.maincontent > table.table.table-condensed.table-hover.table-striped > tbody tr';
         $rankingsJs = $this->browserService->jsGetRankings($rankingsSelector);
 
-        $rankings = $this->withRetry(function () use ($browser, $rankingsJs) {
+        $rankingsJson = $this->withRetry(function () use ($browser, $rankingsJs) {
             return $browser->evaluate($rankingsJs);
         }, "Get rankings data for {$division['text']}");
+        $rankings = json_decode($rankingsJson, true) ?? [];
 
         if (empty($rankings)) {
             return;
@@ -135,9 +170,9 @@ class RankingsScraper extends BaseScraperService
 
         // Save rankings to database
         foreach ($rankings as $ranking) {
-            // Parse position and change
+            // Parse position and change (format is "WR05 1" - take the last part)
             $positionParts = explode(' ', trim($ranking['position'] ?? ''));
-            $position = (int) ($positionParts[0] ?? 0);
+            $position = (int) (end($positionParts) ?: 0);
 
             // Parse points and change
             $pointsParts = explode(' ', trim($ranking['points'] ?? ''));

@@ -65,3 +65,17 @@ if (config('scraper.schedule.live_center.enabled')) {
         ->withoutOverlapping()
         ->onOneServer();
 }
+
+/*
+|--------------------------------------------------------------------------
+| Scraper Log Cleanup
+|--------------------------------------------------------------------------
+|
+| Archive old scraper logs daily and clean up old archives
+|
+*/
+
+Schedule::command('scraper:cleanup-logs --days=7 --delete-archived=30')
+    ->daily()
+    ->at('00:00')
+    ->withoutOverlapping();

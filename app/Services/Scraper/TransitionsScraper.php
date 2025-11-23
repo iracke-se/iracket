@@ -24,7 +24,12 @@ class TransitionsScraper extends BaseScraperService
             ->setNodeBinary(config('scraper.browser.node_binary'))
             ->setNpmBinary(config('scraper.browser.npm_binary'))
             ->timeout(config('scraper.browser.timeout'))
-            ->waitUntilNetworkIdle();
+            ->waitUntilNetworkIdle()
+            ->noSandbox();
+
+        if (config('scraper.browser.chrome_path')) {
+            $browser->setChromePath(config('scraper.browser.chrome_path'));
+        }
 
         // Click player list menu
         $playerListSelector = $this->browserService->getSelector('player_list');
@@ -48,12 +53,19 @@ class TransitionsScraper extends BaseScraperService
 
         // Get periods from dropdown
         $periodsJs = $this->browserService->jsGetDropdownOptions('periode');
-        $periods = $this->withRetry(function () use ($browser, $periodsJs) {
+        $periodsJson = $this->withRetry(function () use ($browser, $periodsJs) {
             return $browser->evaluate($periodsJs);
         }, 'Get periods dropdown');
+        $periods = json_decode($periodsJson, true) ?? [];
 
         // Filter out "all" option
         $periods = array_filter($periods, fn($p) => $p['value'] !== '0');
+
+        // Apply limits for testing
+        $limitPeriods = $this->getParameter('limit_periods');
+        if ($limitPeriods && $limitPeriods > 0) {
+            $periods = array_slice(array_values($periods), 0, $limitPeriods);
+        }
 
         $this->info("Found periods: " . count($periods));
 
@@ -88,9 +100,10 @@ class TransitionsScraper extends BaseScraperService
         $transitionsSelector = '#main-col > div.maincontent > form > table > tbody > tr';
         $transitionsJs = $this->browserService->jsGetTransitions($transitionsSelector);
 
-        $transitions = $this->withRetry(function () use ($browser, $transitionsJs) {
+        $transitionsJson = $this->withRetry(function () use ($browser, $transitionsJs) {
             return $browser->evaluate($transitionsJs);
         }, "Get transitions for {$period['text']}");
+        $transitions = json_decode($transitionsJson, true) ?? [];
 
         if (empty($transitions)) {
             return;
