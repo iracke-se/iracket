@@ -93,4 +93,31 @@ return [
     'no_logs_found' => 'Inga loggar hittades.',
     'back' => 'Tillbaka',
     'not_started' => 'Ej startad',
+
+    // Settings Page
+    'settings' => 'Inställningar',
+    'settings_title' => 'Skraparinställningar',
+    'settings_description' => 'Konfigurera skrapar-URLer och andra inställningar',
+    'settings_saved' => 'Inställningar sparade',
+    'settings_reset' => 'Inställningar återställda till standard',
+    'url_settings' => 'URL-inställningar',
+    'url_settings_description' => 'Konfigurera URLer för varje skrapartyp. Dessa URLer används vid körning av skraparna.',
+    'url_rankings_label' => 'Rankningsskrapar-URL',
+    'url_players_label' => 'Spelarlisteskrapar-URL',
+    'url_transitions_label' => 'Övergångsskrapar-URL',
+    'url_series_label' => 'Serieskrapar-URL',
+    'url_live_center_label' => 'Live Center-skrapar-URL',
+    'save_settings' => 'Spara inställningar',
+    'reset_defaults' => 'Återställ till standard',
+    'confirm_reset_defaults' => 'Är du säker på att du vill återställa alla inställningar till standardvärden?',
+    'settings_help_title' => 'Om skrapar-URLer',
+    'settings_help_text' => 'Dessa URLer används av skraparna för att hämta data. Om källwebbplatsen ändrar sina URLer kan du uppdatera dem här utan att ändra koden.',
+
+    // Export Schedule Settings
+    'export_schedule' => 'Exportschema',
+    'export_schedule_description' => 'Konfigurera när den fullständiga dataexporten körs automatiskt. Detta kör alla skrapare och sparar den kompletta datan till JSON-filer.',
+    'monthly_full_export' => 'Månatlig fullständig export',
+    'day_of_month' => 'Dag i månaden',
+    'time' => 'Tid',
+    'export_includes_all' => 'Den fullständiga exporten inkluderar alla skrapare: Spelare, Rankningar (herrar & damer), Övergångar, Serier och Live Center.',
 ];

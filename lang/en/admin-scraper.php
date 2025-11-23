@@ -113,14 +113,11 @@ return [
     'settings_help_title' => 'About Scraper URLs',
     'settings_help_text' => 'These URLs are used by the scrapers to fetch data. If the source website changes their URLs, you can update them here without modifying the code.',
 
-    // Schedule Settings
-    'schedule_settings' => 'Schedule Settings',
-    'schedule_settings_description' => 'Configure when each scraper runs automatically. Enable/disable and set the frequency, day, and time for each scraper type.',
-    'frequency' => 'Frequency',
-    'daily' => 'Daily',
-    'weekly' => 'Weekly',
-    'monthly' => 'Monthly',
-    'day' => 'Day',
-    'day_placeholder' => 'e.g., sunday or 1',
+    // Export Schedule Settings
+    'export_schedule' => 'Export Schedule',
+    'export_schedule_description' => 'Configure when the full data export runs automatically. This runs all scrapers and saves the complete data to JSON files.',
+    'monthly_full_export' => 'Monthly Full Export',
+    'day_of_month' => 'Day of Month',
     'time' => 'Time',
+    'export_includes_all' => 'The full export includes all scrapers: Players, Rankings (male & female), Transitions, Series, and Live Center.',
 ];

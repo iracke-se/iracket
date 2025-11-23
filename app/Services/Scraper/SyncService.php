@@ -91,15 +91,35 @@ class SyncService
         // Find or create club
         $club = $this->findOrCreateClub($player->club_name);
 
-        // Try to find existing user by name
-        $user = $this->findUserByName($player->first_name, $player->surname);
+        // Extract birth year from date_of_birth
+        $birthYear = null;
+        if (!empty($player->date_of_birth)) {
+            if (preg_match('/(\d{4})/', $player->date_of_birth, $matches)) {
+                $birthYear = (int) $matches[1];
+            }
+        }
+
+        // Try to find existing user by name and birth year
+        $user = $this->findUserByNameAndBirthYear(
+            $player->first_name,
+            $player->surname,
+            $birthYear
+        );
 
         if ($user) {
             // Update existing user
-            $user->update([
+            $updateData = [
                 'club_id' => $club?->id,
-                'gender' => $player->gender,
-            ]);
+                'gender' => $player->sex === 'M' ? 'male' : ($player->sex === 'K' ? 'female' : null),
+            ];
+
+            // Set birth_year if not already set
+            if ($birthYear && !$user->birth_year) {
+                $updateData['birth_year'] = $birthYear;
+            }
+
+            $user->update($updateData);
+            $this->markUserAsSynced($user);
 
             $player->update([
                 'is_synced' => true,
@@ -115,8 +135,11 @@ class SyncService
                 'email' => $this->generateEmail($player->first_name, $player->surname),
                 'password' => Hash::make(Str::random(16)),
                 'club_id' => $club?->id,
-                'gender' => $player->gender,
+                'gender' => $player->sex === 'M' ? 'male' : ($player->sex === 'K' ? 'female' : null),
+                'birth_year' => $birthYear,
                 'visible_in_players' => true,
+                'sbtf_synced' => true,
+                'sbtf_synced_at' => now(),
             ]);
 
             $player->update([
@@ -145,16 +168,30 @@ class SyncService
         // Find or create club
         $club = $this->findOrCreateClub($ranking->club);
 
-        // Try to find existing user
-        $user = $this->findUserByName($nameParts['first_name'], $nameParts['last_name']);
+        // Parse birth year from the born field
+        $birthYear = !empty($ranking->born) ? (int) $ranking->born : null;
+
+        // Try to find existing user with birth year for better matching
+        $user = $this->findUserByNameAndBirthYear(
+            $nameParts['first_name'],
+            $nameParts['last_name'],
+            $birthYear
+        );
 
         if ($user) {
             // Update user with ranking data
-            $user->update([
+            $updateData = [
                 'club_id' => $club?->id ?? $user->club_id,
-                'ranking_points' => $ranking->points,
                 'gender' => $ranking->gender,
-            ]);
+            ];
+
+            // Set birth_year if not already set
+            if ($birthYear && !$user->birth_year) {
+                $updateData['birth_year'] = $birthYear;
+            }
+
+            $user->update($updateData);
+            $this->markUserAsSynced($user);
 
             $ranking->update([
                 'is_synced' => true,
@@ -163,16 +200,18 @@ class SyncService
 
             $this->stats['updated']++;
         } else {
-            // Create new user
+            // Create new user with birth_year
             $user = User::create([
                 'first_name' => $nameParts['first_name'],
                 'last_name' => $nameParts['last_name'],
                 'email' => $this->generateEmail($nameParts['first_name'], $nameParts['last_name']),
                 'password' => Hash::make(Str::random(16)),
                 'club_id' => $club?->id,
-                'ranking_points' => $ranking->points,
                 'gender' => $ranking->gender,
+                'birth_year' => $birthYear,
                 'visible_in_players' => true,
+                'sbtf_synced' => true,
+                'sbtf_synced_at' => now(),
             ]);
 
             $ranking->update([
@@ -212,6 +251,37 @@ class SyncService
         return User::where('first_name', $firstName)
             ->where('last_name', $lastName)
             ->first();
+    }
+
+    /**
+     * Find user by name and birth year for more accurate matching
+     */
+    protected function findUserByNameAndBirthYear(string $firstName, string $lastName, ?int $birthYear): ?User
+    {
+        $query = User::where('first_name', $firstName)
+            ->where('last_name', $lastName);
+
+        if ($birthYear) {
+            // First try exact match with birth year
+            $user = $query->clone()->where('birth_year', $birthYear)->first();
+            if ($user) {
+                return $user;
+            }
+        }
+
+        // Fall back to name-only match
+        return $query->first();
+    }
+
+    /**
+     * Mark user as synced with SBTF data
+     */
+    protected function markUserAsSynced(User $user): void
+    {
+        $user->update([
+            'sbtf_synced' => true,
+            'sbtf_synced_at' => now(),
+        ]);
     }
 
     /**
@@ -287,5 +357,146 @@ class SyncService
     public function getStats(): array
     {
         return $this->stats;
+    }
+
+    /**
+     * Claim SBTF data for a registered user
+     * This allows users who register later to claim their scraped data
+     */
+    public function claimDataForUser(User $user): array
+    {
+        $claimed = [
+            'rankings' => 0,
+            'players' => 0,
+        ];
+
+        // Find matching rankings by name and birth year
+        $query = ScrapedRanking::whereNull('synced_user_id');
+
+        // Parse user name to match rankings format (Surname, FirstName)
+        $rankings = $query->get()->filter(function ($ranking) use ($user) {
+            $nameParts = $this->parseName($ranking->name);
+            if (!$nameParts) {
+                return false;
+            }
+
+            // Check name match
+            $nameMatch = strcasecmp($nameParts['first_name'], $user->first_name) === 0
+                && strcasecmp($nameParts['last_name'], $user->last_name) === 0;
+
+            if (!$nameMatch) {
+                return false;
+            }
+
+            // Check birth year if available
+            if ($user->birth_year && !empty($ranking->born)) {
+                return (int) $ranking->born === $user->birth_year;
+            }
+
+            return true;
+        });
+
+        // Link rankings to user
+        foreach ($rankings as $ranking) {
+            $ranking->update([
+                'is_synced' => true,
+                'synced_user_id' => $user->id,
+            ]);
+            $claimed['rankings']++;
+
+            // Update user with birth year if not set
+            if (!$user->birth_year && !empty($ranking->born)) {
+                $user->birth_year = (int) $ranking->born;
+            }
+        }
+
+        // Find matching players
+        $players = ScrapedPlayer::whereNull('synced_user_id')
+            ->where('first_name', $user->first_name)
+            ->where('surname', $user->last_name)
+            ->get();
+
+        // Filter by birth year if available
+        if ($user->birth_year) {
+            $players = $players->filter(function ($player) use ($user) {
+                if (empty($player->date_of_birth)) {
+                    return true;
+                }
+                if (preg_match('/(\d{4})/', $player->date_of_birth, $matches)) {
+                    return (int) $matches[1] === $user->birth_year;
+                }
+                return true;
+            });
+        }
+
+        // Link players to user
+        foreach ($players as $player) {
+            $player->update([
+                'is_synced' => true,
+                'synced_user_id' => $user->id,
+            ]);
+            $claimed['players']++;
+        }
+
+        // Mark user as synced
+        if ($claimed['rankings'] > 0 || $claimed['players'] > 0) {
+            $this->markUserAsSynced($user);
+            $user->save();
+        }
+
+        Log::info("Claimed SBTF data for user {$user->name}", $claimed);
+
+        return $claimed;
+    }
+
+    /**
+     * Get unclaimed scraped data that might match a user
+     * Useful for showing users potential matches they can claim
+     */
+    public function findPotentialMatches(User $user): array
+    {
+        $matches = [
+            'rankings' => [],
+            'players' => [],
+        ];
+
+        // Find potential ranking matches
+        $rankings = ScrapedRanking::whereNull('synced_user_id')
+            ->get()
+            ->filter(function ($ranking) use ($user) {
+                $nameParts = $this->parseName($ranking->name);
+                if (!$nameParts) {
+                    return false;
+                }
+
+                return strcasecmp($nameParts['first_name'], $user->first_name) === 0
+                    && strcasecmp($nameParts['last_name'], $user->last_name) === 0;
+            });
+
+        $matches['rankings'] = $rankings->map(fn($r) => [
+            'id' => $r->id,
+            'period' => $r->period,
+            'division' => $r->division,
+            'position' => $r->position,
+            'points' => $r->points,
+            'born' => $r->born,
+            'club' => $r->club,
+        ])->values()->toArray();
+
+        // Find potential player matches
+        $players = ScrapedPlayer::whereNull('synced_user_id')
+            ->where('first_name', $user->first_name)
+            ->where('surname', $user->last_name)
+            ->get();
+
+        $matches['players'] = $players->map(fn($p) => [
+            'id' => $p->id,
+            'period' => $p->period,
+            'club_name' => $p->club_name,
+            'date_of_birth' => $p->date_of_birth,
+            'license_type' => $p->license_type,
+        ])->values()->toArray();
+
+        return $matches;
     }
 }

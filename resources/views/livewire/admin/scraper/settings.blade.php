@@ -112,41 +112,51 @@
                 </div>
             </div>
 
-            <!-- Schedule Settings Section -->
+            <!-- Full Export Schedule Section -->
             <div class="p-6 border-b border-zinc-200 dark:border-zinc-700">
-                <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">{{ __('admin-scraper.schedule_settings') }}</h2>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{{ __('admin-scraper.schedule_settings_description') }}</p>
+                <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">{{ __('admin-scraper.export_schedule') }}</h2>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{{ __('admin-scraper.export_schedule_description') }}</p>
 
-                <div class="space-y-6">
-                    @foreach(['players', 'rankings', 'transitions', 'series', 'live_center'] as $type)
-                    <div class="bg-zinc-50 dark:bg-zinc-700/50 rounded-lg p-4">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="font-medium text-zinc-900 dark:text-white">{{ __('admin-scraper.' . $type) }}</h3>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" wire:model="schedule_{{ $type }}_enabled" class="sr-only peer">
-                                <div class="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-accent/20 dark:peer-focus:ring-accent/40 rounded-full peer dark:bg-zinc-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-600 peer-checked:bg-accent"></div>
-                            </label>
+                <div class="bg-zinc-50 dark:bg-zinc-700/50 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-medium text-zinc-900 dark:text-white">{{ __('admin-scraper.monthly_full_export') }}</h3>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" wire:model="schedule_export_enabled" class="sr-only peer">
+                            <div class="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-accent/20 dark:peer-focus:ring-accent/40 rounded-full peer dark:bg-zinc-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-600 peer-checked:bg-accent"></div>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="schedule_export_day" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('admin-scraper.day_of_month') }}</label>
+                            <select
+                                id="schedule_export_day"
+                                wire:model="schedule_export_day"
+                                class="w-full px-3 py-2 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent"
+                            >
+                                @for($i = 1; $i <= 28; $i++)
+                                    <option value="{{ $i }}">{{ $i }}</option>
+                                @endfor
+                            </select>
+                            @error('schedule_export_day')
+                                <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
+                            @enderror
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('admin-scraper.frequency') }}</label>
-                                <select wire:model="schedule_{{ $type }}_frequency" class="w-full px-3 py-2 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
-                                    <option value="daily">{{ __('admin-scraper.daily') }}</option>
-                                    <option value="weekly">{{ __('admin-scraper.weekly') }}</option>
-                                    <option value="monthly">{{ __('admin-scraper.monthly') }}</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('admin-scraper.day') }}</label>
-                                <input type="text" wire:model="schedule_{{ $type }}_day" placeholder="{{ __('admin-scraper.day_placeholder') }}" class="w-full px-3 py-2 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:ring-2 focus:ring-accent focus:border-transparent">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('admin-scraper.time') }}</label>
-                                <input type="time" wire:model="schedule_{{ $type }}_time" class="w-full px-3 py-2 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
-                            </div>
+                        <div>
+                            <label for="schedule_export_time" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('admin-scraper.time') }}</label>
+                            <input
+                                type="time"
+                                id="schedule_export_time"
+                                wire:model="schedule_export_time"
+                                class="w-full px-3 py-2 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent"
+                            >
+                            @error('schedule_export_time')
+                                <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
-                    @endforeach
+                    <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                        {{ __('admin-scraper.export_includes_all') }}
+                    </p>
                 </div>
             </div>
 

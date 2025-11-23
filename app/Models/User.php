@@ -53,10 +53,14 @@ class User extends Authenticatable
         'phone_number',
         'gender',
         'age',
+        'birth_year',
         'password',
         'profile_picture',
         'google_id',
         'apple_id',
+        'sbtf_player_id',
+        'sbtf_synced',
+        'sbtf_synced_at',
         'terms_accepted',
         'terms_accepted_at',
         'verification_code',
@@ -93,6 +97,9 @@ class User extends Authenticatable
             'terms_accepted' => 'boolean',
             'terms_accepted_at' => 'datetime',
             'verification_code_expires_at' => 'datetime',
+            'sbtf_synced' => 'boolean',
+            'sbtf_synced_at' => 'datetime',
+            'birth_year' => 'integer',
         ];
     }
 

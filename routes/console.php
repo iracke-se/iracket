@@ -120,6 +120,29 @@ if (Schema::hasTable('scraper_settings')) {
 
 /*
 |--------------------------------------------------------------------------
+| Monthly Full Scraper Export
+|--------------------------------------------------------------------------
+|
+| Run complete scraper export on configured day of each month
+| This runs all scrapers and saves results to JSON for archival
+|
+*/
+
+if (Schema::hasTable('scraper_settings')) {
+    if (ScraperSetting::get('schedule_export_enabled', true)) {
+        $exportDay = (int) ScraperSetting::get('schedule_export_day', '1');
+        $exportTime = ScraperSetting::get('schedule_export_time', '02:00');
+
+        Schedule::command('scraper:export')
+            ->monthlyOn($exportDay, $exportTime)
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->appendOutputTo(storage_path('logs/scraper-export.log'));
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
 | Scraper Log Cleanup
 |--------------------------------------------------------------------------
 |
