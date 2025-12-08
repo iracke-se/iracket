@@ -30,6 +30,13 @@ class LoginResponse implements LoginResponseContract
                 : redirect()->route('verification.notice');
         }
 
+        // Check if account is not connected
+        if (!$user->is_connected) {
+            return $request->wantsJson()
+                ? new JsonResponse(['two_factor' => false, 'redirect' => route('connect-account')], 200)
+                : redirect()->route('connect-account');
+        }
+
         return $request->wantsJson()
             ? new JsonResponse(['two_factor' => false], 200)
             : redirect()->intended(config('fortify.home'));

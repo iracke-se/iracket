@@ -1,12 +1,12 @@
 <div class="flex flex-col gap-6">
     <x-auth-header
-        :title="__('Verify your email')"
-        :description="__('Enter the 6-digit code we sent to your email address')"
+        :title="__('auth.verify_email_title')"
+        :description="__('auth.verify_email_description')"
     />
 
     <div class="text-center">
         <p class="text-sm text-zinc-600 dark:text-zinc-400">
-            {{ __('We sent a code to') }} <strong>{{ Auth::user()->email }}</strong>
+            {{ __('auth.code_sent_to') }} <strong>{{ Auth::user()->email }}</strong>
         </p>
     </div>
 
@@ -25,7 +25,7 @@
     <form wire:submit="verify" class="flex flex-col gap-6">
         <div class="flex flex-col items-center gap-2">
             <label for="code" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {{ __('Verification Code') }}
+                {{ __('auth.verification_code') }}
             </label>
             <input
                 type="text"
@@ -39,23 +39,23 @@
                 inputmode="numeric"
                 pattern="[0-9]*"
             />
-            <p class="text-xs text-zinc-500">{{ __('Code expires in 15 minutes') }}</p>
+            <p class="text-xs text-zinc-500">{{ __('auth.code_expires') }}</p>
         </div>
 
         <flux:button type="submit" variant="primary" class="w-full">
-            {{ __('Verify Email') }}
+            {{ __('auth.verify_email') }}
         </flux:button>
     </form>
 
     <div class="text-center">
         <p class="text-sm text-zinc-600 dark:text-zinc-400">
-            {{ __("Didn't receive the code?") }}
+            {{ __('auth.didnt_receive_code') }}
             <button
                 type="button"
                 wire:click="resend"
                 class="text-accent hover:underline font-medium"
             >
-                {{ __('Resend code') }}
+                {{ __('auth.resend_code') }}
             </button>
         </p>
     </div>
@@ -64,7 +64,7 @@
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <flux:button variant="ghost" type="submit" class="text-sm cursor-pointer">
-                {{ __('Log out') }}
+                {{ __('auth.log_out') }}
             </flux:button>
         </form>
     </div>

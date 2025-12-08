@@ -8,6 +8,18 @@
         $unreadNotificationsCount = auth()->check()
             ? \App\Models\Notification::where('user_id', auth()->id())->whereNull('read_at')->count()
             : 0;
+
+        // Determine current banner location based on route
+        $bannerLocation = match(true) {
+            request()->routeIs('home') => 'home',
+            request()->routeIs('players.*') => 'players',
+            request()->routeIs('matches.*') => 'matches',
+            request()->routeIs('clubs.*') => 'clubs',
+            request()->routeIs('bubbler.*') => 'bubbler',
+            request()->routeIs('profile.*') => 'profile',
+            request()->routeIs('*.edit'), request()->routeIs('settings.*') => 'settings',
+            default => 'home',
+        };
     @endphp
     <body class="min-h-screen bg-white dark:bg-zinc-900">
         <!-- Top Bar -->
@@ -80,9 +92,18 @@
         </header>
 
         <!-- Main Content -->
-        <main class="pt-14 pb-20">
+        <main class="pt-14 pb-20" style="display: flex; flex-direction: column;">
+            <!-- Top Fixed Banner -->
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'top'], key('banner-top-'.$bannerLocation))
+
             {{ $slot }}
+
+            <!-- Bottom Fixed Banner -->
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'bottom'], key('banner-bottom-'.$bannerLocation))
         </main>
+
+        <!-- Popup Banner -->
+        @livewire('components.banners.popup', ['location' => $bannerLocation], key('banner-popup-'.$bannerLocation))
 
         <!-- Bottom Navigation -->
         <nav class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
@@ -104,7 +125,7 @@
                 </a>
 
                 <!-- My Profile -->
-                <a href="{{ route('profile.edit') }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('profile.*') ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
+                <a href="{{ route('players.show', auth()->user()) }}" class="flex flex-col items-center justify-center gap-1 px-3 py-2 {{ request()->routeIs('players.show') && request()->route('user')?->id === auth()->id() ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                     </svg>

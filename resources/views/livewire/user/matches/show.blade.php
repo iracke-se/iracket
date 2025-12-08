@@ -40,7 +40,7 @@
                 @endif
                 <p class="font-medium text-zinc-900 dark:text-white">{{ $user->name }}</p>
                 @if($user->club)
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $user->club->name }}</p>
+                    <a href="{{ route('clubs.show', $user->club) }}" wire:navigate class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-accent">{{ $user->club->name }}</a>
                 @endif
             </div>
 
@@ -62,7 +62,7 @@
                     {{ $opponent->name }}
                 </a>
                 @if($opponent->club)
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $opponent->club->name }}</p>
+                    <a href="{{ route('clubs.show', $opponent->club) }}" wire:navigate class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-accent">{{ $opponent->club->name }}</a>
                 @endif
             </div>
         </div>

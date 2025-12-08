@@ -52,4 +52,40 @@ class Club extends Model
     {
         return $this->members()->count();
     }
+
+    /**
+     * Get all transitions where players are leaving this club
+     */
+    public function outgoingTransitions(): HasMany
+    {
+        return $this->hasMany(ClubTransition::class, 'from_club_id');
+    }
+
+    /**
+     * Get all transitions where players are joining this club
+     */
+    public function incomingTransitions(): HasMany
+    {
+        return $this->hasMany(ClubTransition::class, 'to_club_id');
+    }
+
+    /**
+     * Get pending incoming players (transitions not yet completed)
+     */
+    public function pendingIncomingPlayers(): HasMany
+    {
+        return $this->hasMany(ClubTransition::class, 'to_club_id')
+            ->where('completion_date', '>', now())
+            ->orderBy('completion_date');
+    }
+
+    /**
+     * Get pending outgoing players (transitions not yet completed)
+     */
+    public function pendingOutgoingPlayers(): HasMany
+    {
+        return $this->hasMany(ClubTransition::class, 'from_club_id')
+            ->where('completion_date', '>', now())
+            ->orderBy('completion_date');
+    }
 }

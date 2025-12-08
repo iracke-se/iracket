@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AppleController;
 use App\Http\Controllers\Auth\GoogleController;
+use App\Livewire\Auth\ConnectAccount;
 use App\Livewire\Auth\VerifyEmail;
 use App\Livewire\Public\Home\Index as PublicHome;
 use App\Livewire\Public\Terms\Show as TermsShow;
@@ -13,13 +14,16 @@ use App\Livewire\Settings\TwoFactor;
 use App\Livewire\User\Bubbler\Index as Bubbler;
 use App\Livewire\User\Clubs\Index as Clubs;
 use App\Livewire\User\Clubs\Show as ClubShow;
+use App\Livewire\User\Clubs\Transitions as ClubTransitions;
 use App\Livewire\User\Information\Index as Information;
 use App\Livewire\User\Matches\Form as MatchForm;
 use App\Livewire\User\Matches\Index as Matches;
 use App\Livewire\User\Matches\Show as MatchShow;
 use App\Livewire\User\Notifications\Index as Notifications;
+use App\Livewire\User\MyMonitored\Index as MyMonitored;
 use App\Livewire\User\Players\Index as Players;
 use App\Livewire\User\Players\Show as PlayerShow;
+use App\Livewire\User\Players\Transitions as PlayerTransitions;
 use App\Livewire\Admin\Terms\Index as AdminTermsIndex;
 use App\Livewire\Admin\Terms\Form as AdminTermsForm;
 use App\Livewire\Admin\Users\Index as AdminUsersIndex;
@@ -38,6 +42,8 @@ use App\Livewire\Admin\Scraper\Settings as AdminScraperSettings;
 use App\Livewire\Admin\Notifications\Send as AdminNotificationsSend;
 use App\Livewire\Admin\Contacts\Index as AdminContactsIndex;
 use App\Livewire\Admin\Contacts\Respond as AdminContactsRespond;
+use App\Livewire\Admin\Banners\Index as AdminBannersIndex;
+use App\Livewire\Admin\Banners\Form as AdminBannersForm;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -67,6 +73,11 @@ Route::get('verify-email', VerifyEmail::class)
     ->middleware(['auth'])
     ->name('verification.notice');
 
+// Connect Account
+Route::get('connect-account', ConnectAccount::class)
+    ->middleware(['auth', 'verified'])
+    ->name('connect-account');
+
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');
 
@@ -82,21 +93,26 @@ Route::middleware(['auth'])->group(function () {
     Route::get('notifications', Notifications::class)->name('notifications');
 
     // Players page
-    Route::get('players', Players::class)->middleware('verified')->name('players.index');
-    Route::get('players/{user}', PlayerShow::class)->middleware('verified')->name('players.show');
+    Route::get('players', Players::class)->middleware(['verified', 'connected'])->name('players.index');
+    Route::get('players/{user}', PlayerShow::class)->middleware(['verified', 'connected'])->name('players.show');
+    Route::get('players/{user}/transitions', PlayerTransitions::class)->middleware(['verified', 'connected'])->name('players.transitions');
+
+    // My Monitored Players
+    Route::get('my-monitored', MyMonitored::class)->middleware(['verified', 'connected'])->name('my-monitored.index');
 
     // Clubs
-    Route::get('clubs', Clubs::class)->middleware('verified')->name('clubs.index');
-    Route::get('clubs/{club:slug}', ClubShow::class)->middleware('verified')->name('clubs.show');
+    Route::get('clubs', Clubs::class)->middleware(['verified', 'connected'])->name('clubs.index');
+    Route::get('clubs/{club:slug}', ClubShow::class)->middleware(['verified', 'connected'])->name('clubs.show');
+    Route::get('clubs/{club:slug}/transitions', ClubTransitions::class)->middleware(['verified', 'connected'])->name('clubs.transitions');
 
     // Matches
-    Route::get('matches', Matches::class)->middleware('verified')->name('matches.index');
-    Route::get('matches/create', MatchForm::class)->middleware('verified')->name('matches.create');
-    Route::get('matches/{match}', MatchShow::class)->middleware('verified')->name('matches.show');
-    Route::get('matches/{match}/edit', MatchForm::class)->middleware('verified')->name('matches.edit');
+    Route::get('matches', Matches::class)->middleware(['verified', 'connected'])->name('matches.index');
+    Route::get('matches/create', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.create');
+    Route::get('matches/{match}', MatchShow::class)->middleware(['verified', 'connected'])->name('matches.show');
+    Route::get('matches/{match}/edit', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.edit');
 
     // Bubbler
-    Route::get('bubbler', Bubbler::class)->middleware('verified')->name('bubbler.index');
+    Route::get('bubbler', Bubbler::class)->middleware(['verified', 'connected'])->name('bubbler.index');
 
     // GET route for logout (convenience)
     Route::get('logout', function () {
@@ -168,4 +184,9 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
     // Contacts
     Route::get('contacts', AdminContactsIndex::class)->name('contacts.index');
     Route::get('contacts/{id}/respond', AdminContactsRespond::class)->name('contacts.respond');
+
+    // Banners
+    Route::get('banners', AdminBannersIndex::class)->name('banners.index');
+    Route::get('banners/create', AdminBannersForm::class)->name('banners.create');
+    Route::get('banners/{id}/edit', AdminBannersForm::class)->name('banners.edit');
 });

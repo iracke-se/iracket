@@ -29,6 +29,12 @@ class VerifyEmail extends Component
 
         if ($user->isVerificationCodeValid($this->code)) {
             $user->markEmailAsVerified();
+
+            // Redirect to connect-account if not connected, otherwise to players
+            if (!$user->is_connected) {
+                return redirect()->route('connect-account');
+            }
+
             return redirect()->intended(route('players.index'));
         }
 

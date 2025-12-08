@@ -3,13 +3,13 @@
     <section wire:ignore class="relative bg-white dark:bg-zinc-900 flex flex-col items-center justify-center px-4 py-16 md:py-24 overflow-hidden">
         <!-- Decorative Elements -->
         <!-- Speech bubble left -->
-        <img src="/assets/images/landing/lefthero-deskt.png" alt="" class="absolute top-16 left-[5%] w-40 md:w-52 hidden md:block" data-aos="fade-up">
+        <img src="/assets/images/landing/lefthero-deskt.png" alt="" class="absolute top-16 left-[5%] w-40 md:w-52 hidden md:block dark:invert" data-aos="fade-up">
 
         <!-- Star burst -->
-        <img src="/assets/images/landing/obj1.png" alt="" class="absolute top-8 left-[18%] w-10 md:w-14" data-aos="fade-up">
+        <img src="/assets/images/landing/obj1.png" alt="" class="absolute top-8 left-[18%] w-10 md:w-14 dark:invert" data-aos="fade-up">
 
         <!-- Squiggly lines top right -->
-        <img src="/assets/images/landing/righthero-deskt.png" alt="" class="absolute top-8 right-[5%] w-44 md:w-60 hidden md:block" data-aos="fade-up">
+        <img src="/assets/images/landing/righthero-deskt.png" alt="" class="absolute top-8 right-[5%] w-44 md:w-60 hidden md:block dark:invert" data-aos="fade-up">
 
         <!-- Main Content -->
         <div class="text-center z-10">

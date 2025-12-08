@@ -197,7 +197,16 @@
 
                     <!-- Player Info -->
                     <div class="flex-1 min-w-0">
-                        <h3 class="text-zinc-900 dark:text-white font-medium truncate">{{ $player->name }}</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-zinc-900 dark:text-white font-medium truncate">{{ $player->name }}</h3>
+                            @if(isset($rankingPositions[$player->id]))
+                                <x-ranking-badge
+                                    :position="$rankingPositions[$player->id]['position']"
+                                    :category="$rankingPositions[$player->id]['category']"
+                                    size="sm"
+                                />
+                            @endif
+                        </div>
                         @if($player->club)
                             <div class="flex items-center gap-2 mt-0.5">
                                 <span class="text-sm text-zinc-500 dark:text-zinc-400 truncate">{{ $player->club->name }}</span>

@@ -38,11 +38,16 @@ class GameMatch extends Model
         'played_at',
         'player1_sets',
         'player2_sets',
+        'player1_points_before',
+        'player2_points_before',
+        'player1_points_change',
+        'player2_points_change',
         'winner_id',
         'player1_comments',
         'player2_comments',
         'description',
         'status',
+        'is_manual',
         'created_by',
     ];
 
@@ -50,6 +55,7 @@ class GameMatch extends Model
         'played_at' => 'date',
         'player1_comments' => 'array',
         'player2_comments' => 'array',
+        'is_manual' => 'boolean',
     ];
 
     public function player1(): BelongsTo

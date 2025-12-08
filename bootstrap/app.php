@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'mobile_app' => \App\Http\Middleware\MobileAppAuth::class,
+            'connected' => \App\Http\Middleware\EnsureAccountConnected::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

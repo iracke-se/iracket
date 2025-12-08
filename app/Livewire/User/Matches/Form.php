@@ -3,8 +3,10 @@
 namespace App\Livewire\User\Matches;
 
 use App\Models\GameMatch;
+use App\Models\MonthlyRanking;
 use App\Models\User;
 use App\Services\AutoNotificationService;
+use App\Services\PointsCalculationService;
 use Livewire\Component;
 
 class Form extends Component
@@ -102,7 +104,36 @@ class Form extends Component
         }
 
         $user = auth()->user();
+        $opponent = User::find($this->opponent_id);
         $winnerId = $this->my_sets > $this->opponent_sets ? $user->id : $this->opponent_id;
+
+        // Get current month/year for ranking
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
+        // Get current points for both players
+        $player1Ranking = MonthlyRanking::where('user_id', $user->id)
+            ->where('month', $currentMonth)
+            ->where('year', $currentYear)
+            ->first();
+
+        $player2Ranking = MonthlyRanking::where('user_id', $this->opponent_id)
+            ->where('month', $currentMonth)
+            ->where('year', $currentYear)
+            ->first();
+
+        $player1Points = $player1Ranking?->points ?? 0;
+        $player2Points = $player2Ranking?->points ?? 0;
+
+        // Calculate points changes
+        $pointsService = app(PointsCalculationService::class);
+        $pointsResult = $pointsService->calculateMatchPoints(
+            $player1Points,
+            $player2Points,
+            $winnerId,
+            $user->id,
+            $this->opponent_id
+        );
 
         $data = [
             'player1_id' => $user->id,
@@ -110,19 +141,30 @@ class Form extends Component
             'played_at' => $this->played_at,
             'player1_sets' => $this->my_sets,
             'player2_sets' => $this->opponent_sets,
+            'player1_points_before' => $player1Points,
+            'player2_points_before' => $player2Points,
+            'player1_points_change' => $pointsResult['player1_change'],
+            'player2_points_change' => $pointsResult['player2_change'],
             'winner_id' => $winnerId,
             'player1_comments' => [],
             'player2_comments' => $this->opponent_comments,
             'description' => $this->description ?: null,
             'status' => 'pending',
+            'is_manual' => true,
             'created_by' => $user->id,
         ];
 
         if ($this->match) {
+            // For updates, we need to reverse old points and apply new ones
+            $this->reverseMatchPoints($this->match);
             $this->match->update($data);
+            $this->applyMatchPoints($this->match);
             session()->flash('message', __('Match updated successfully.'));
         } else {
             $match = GameMatch::create($data);
+
+            // Apply points to rankings
+            $this->applyMatchPoints($match);
 
             // Send notification to opponent
             $notificationService = app(AutoNotificationService::class);
@@ -132,6 +174,74 @@ class Form extends Component
         }
 
         return redirect()->route('matches.index');
+    }
+
+    /**
+     * Apply match points to player rankings
+     */
+    protected function applyMatchPoints(GameMatch $match): void
+    {
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
+        // Update player 1 ranking
+        $player1Ranking = MonthlyRanking::firstOrCreate(
+            [
+                'user_id' => $match->player1_id,
+                'month' => $currentMonth,
+                'year' => $currentYear,
+            ],
+            [
+                'points' => 0,
+                'ranking_class' => 'E',
+                'position' => 0,
+            ]
+        );
+        $player1Ranking->increment('points', $match->player1_points_change);
+
+        // Update player 2 ranking
+        $player2Ranking = MonthlyRanking::firstOrCreate(
+            [
+                'user_id' => $match->player2_id,
+                'month' => $currentMonth,
+                'year' => $currentYear,
+            ],
+            [
+                'points' => 0,
+                'ranking_class' => 'E',
+                'position' => 0,
+            ]
+        );
+        $player2Ranking->increment('points', $match->player2_points_change);
+    }
+
+    /**
+     * Reverse match points from player rankings (for updates/deletes)
+     */
+    protected function reverseMatchPoints(GameMatch $match): void
+    {
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
+        // Reverse player 1 points
+        $player1Ranking = MonthlyRanking::where('user_id', $match->player1_id)
+            ->where('month', $currentMonth)
+            ->where('year', $currentYear)
+            ->first();
+
+        if ($player1Ranking && $match->player1_points_change) {
+            $player1Ranking->decrement('points', $match->player1_points_change);
+        }
+
+        // Reverse player 2 points
+        $player2Ranking = MonthlyRanking::where('user_id', $match->player2_id)
+            ->where('month', $currentMonth)
+            ->where('year', $currentYear)
+            ->first();
+
+        if ($player2Ranking && $match->player2_points_change) {
+            $player2Ranking->decrement('points', $match->player2_points_change);
+        }
     }
 
     public function render()

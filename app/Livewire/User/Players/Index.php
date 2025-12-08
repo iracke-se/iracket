@@ -2,6 +2,7 @@
 
 namespace App\Livewire\User\Players;
 
+use App\Models\MonthlyRanking;
 use App\Models\User;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -143,8 +144,43 @@ class Index extends Component
 
         $players = $query->paginate(20);
 
+        // Get top 3 positions for men and women
+        $topMen = MonthlyRanking::where('year', now()->year)
+            ->where('month', now()->month)
+            ->whereHas('user', function ($q) {
+                $q->where('gender', 'male')
+                  ->where('is_active_player', true)
+                  ->where('visible_in_players', true);
+            })
+            ->orderByDesc('points')
+            ->limit(3)
+            ->pluck('user_id')
+            ->toArray();
+
+        $topWomen = MonthlyRanking::where('year', now()->year)
+            ->where('month', now()->month)
+            ->whereHas('user', function ($q) {
+                $q->where('gender', 'female')
+                  ->where('is_active_player', true)
+                  ->where('visible_in_players', true);
+            })
+            ->orderByDesc('points')
+            ->limit(3)
+            ->pluck('user_id')
+            ->toArray();
+
+        // Create position maps
+        $rankingPositions = [];
+        foreach ($topMen as $index => $userId) {
+            $rankingPositions[$userId] = ['position' => $index + 1, 'category' => 'men'];
+        }
+        foreach ($topWomen as $index => $userId) {
+            $rankingPositions[$userId] = ['position' => $index + 1, 'category' => 'women'];
+        }
+
         return view('livewire.user.players.index', [
             'players' => $players,
+            'rankingPositions' => $rankingPositions,
         ])->layout('components.layouts.app');
     }
 }

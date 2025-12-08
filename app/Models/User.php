@@ -7,6 +7,7 @@ use App\Notifications\ResetPasswordNotification;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -70,6 +71,9 @@ class User extends Authenticatable
         'fcm_token',
         'device_type',
         'fcm_token_updated_at',
+        'is_connected',
+        'is_active_player',
+        'accepts_push_notifications',
     ];
 
     /**
@@ -100,6 +104,9 @@ class User extends Authenticatable
             'sbtf_synced' => 'boolean',
             'sbtf_synced_at' => 'datetime',
             'birth_year' => 'integer',
+            'is_connected' => 'boolean',
+            'is_active_player' => 'boolean',
+            'accepts_push_notifications' => 'boolean',
         ];
     }
 
@@ -226,5 +233,113 @@ class User extends Authenticatable
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
+    }
+
+    /**
+     * Get users that this user is monitoring
+     */
+    public function monitoring(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_monitors', 'user_id', 'monitored_user_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get users who are monitoring this user
+     */
+    public function monitoredBy(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_monitors', 'monitored_user_id', 'user_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if this user is monitoring another user
+     */
+    public function isMonitoring(User $user): bool
+    {
+        return $this->monitoring()->where('monitored_user_id', $user->id)->exists();
+    }
+
+    /**
+     * Toggle monitoring status for a user
+     */
+    public function toggleMonitoring(User $user): bool
+    {
+        if ($this->isMonitoring($user)) {
+            $this->monitoring()->detach($user->id);
+            return false;
+        }
+
+        $this->monitoring()->attach($user->id);
+        return true;
+    }
+
+    /**
+     * Get current ranking position within gender group
+     */
+    public function getCurrentRankingPosition(): ?int
+    {
+        $currentRanking = $this->currentMonthRanking();
+
+        if (!$currentRanking) {
+            return null;
+        }
+
+        // Get position by counting users with more points in the same gender
+        $position = MonthlyRanking::where('year', now()->year)
+            ->where('month', now()->month)
+            ->whereHas('user', function ($query) {
+                $query->where('gender', $this->gender)
+                    ->where('is_active_player', true);
+            })
+            ->where('points', '>', $currentRanking->points)
+            ->count() + 1;
+
+        return $position;
+    }
+
+    /**
+     * Get current points
+     */
+    public function getCurrentPoints(): int
+    {
+        return $this->currentMonthRanking()?->points ?? 0;
+    }
+
+    /**
+     * Get ranking category based on gender
+     */
+    public function getRankingCategory(): string
+    {
+        return $this->gender === 'female' ? 'women' : 'men';
+    }
+
+    /**
+     * Get club transitions for this user
+     */
+    public function clubTransitions(): HasMany
+    {
+        return $this->hasMany(ClubTransition::class);
+    }
+
+    /**
+     * Get upcoming club transitions (pending)
+     */
+    public function pendingTransitions(): HasMany
+    {
+        return $this->hasMany(ClubTransition::class)
+            ->where('completion_date', '>', now())
+            ->orderBy('completion_date');
+    }
+
+    /**
+     * Get completed club transitions
+     */
+    public function completedTransitions(): HasMany
+    {
+        return $this->hasMany(ClubTransition::class)
+            ->where('completion_date', '<=', now())
+            ->orderByDesc('completion_date');
     }
 }

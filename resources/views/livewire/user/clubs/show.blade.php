@@ -96,6 +96,78 @@
         @endif
     </div>
 
+    <!-- Incoming Players (Pending Transfers) -->
+    @if($incomingPlayers->isNotEmpty())
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                <span class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                    {{ __('Incoming Players') }}
+                </span>
+            </h2>
+
+            <div class="space-y-2">
+                @foreach($incomingPlayers as $transition)
+                    <div class="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                        <div class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                            <span class="text-sm font-medium text-green-600 dark:text-green-400">
+                                {{ strtoupper(substr($transition->first_name, 0, 1) . substr($transition->surname, 0, 1)) }}
+                            </span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-zinc-900 dark:text-white font-medium truncate">{{ $transition->player_name }}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                                {{ __('From') }}: {{ $transition->fromClub?->name ?? $transition->from_club_name ?? __('Unknown') }}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-green-600 dark:text-green-400">{{ $transition->completion_date->format('d M') }}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $transition->completion_date->diffForHumans() }}</p>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    <!-- Outgoing Players (Pending Transfers) -->
+    @if($outgoingPlayers->isNotEmpty())
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                <span class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6"/>
+                    </svg>
+                    {{ __('Outgoing Players') }}
+                </span>
+            </h2>
+
+            <div class="space-y-2">
+                @foreach($outgoingPlayers as $transition)
+                    <div class="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+                        <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                            <span class="text-sm font-medium text-red-600 dark:text-red-400">
+                                {{ strtoupper(substr($transition->first_name, 0, 1) . substr($transition->surname, 0, 1)) }}
+                            </span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-zinc-900 dark:text-white font-medium truncate">{{ $transition->player_name }}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                                {{ __('To') }}: {{ $transition->toClub?->name ?? $transition->to_club_name ?? __('Unknown') }}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-red-600 dark:text-red-400">{{ $transition->completion_date->format('d M') }}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $transition->completion_date->diffForHumans() }}</p>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- Club Rankings History -->
     @if($clubRankings->isNotEmpty())
         <div>
@@ -120,6 +192,28 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    @endif
+
+    <!-- Club Transitions Link -->
+    @if($totalTransitions > 0)
+        <div class="mt-6">
+            <a href="{{ route('clubs.transitions', $club) }}" class="flex items-center justify-between p-4 bg-white dark:bg-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-transparent" wire:navigate>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-700">
+                        <svg class="w-5 h-5 text-zinc-600 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="text-zinc-900 dark:text-white font-medium">{{ __('Club Transitions') }}</span>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $totalTransitions }} {{ __('total transitions') }}</p>
+                    </div>
+                </div>
+                <svg class="w-5 h-5 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
         </div>
     @endif
 </div>
