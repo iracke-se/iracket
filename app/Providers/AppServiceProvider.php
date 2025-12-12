@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
+use SocialiteProviders\Apple\Provider as AppleProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +21,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Register Apple Socialite provider
+        $socialite = $this->app->make(SocialiteFactory::class);
+
+        $socialite->extend('apple', function ($app) use ($socialite) {
+            $config = $app['config']['services.apple'];
+            return $socialite->buildProvider(AppleProvider::class, $config);
+        });
     }
 }
