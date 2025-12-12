@@ -13,13 +13,17 @@ class AppleController extends Controller
 {
     public function redirect()
     {
-        return Socialite::driver('apple')->redirect();
+        return Socialite::driver('apple')
+            ->redirectUrl(config('services.apple.redirect'))
+            ->redirect();
     }
 
     public function callback()
     {
         try {
-            $appleUser = Socialite::driver('apple')->user();
+            $appleUser = Socialite::driver('apple')
+                ->redirectUrl(config('services.apple.redirect'))
+                ->user();
 
             $user = User::where('email', $appleUser->email)->first();
             $isNewUser = false;
