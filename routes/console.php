@@ -175,3 +175,19 @@ Schedule::command('backup:clean')
     ->at('01:30')
     ->withoutOverlapping()
     ->onOneServer();
+
+/*
+|--------------------------------------------------------------------------
+| Apple Sign In Secret Regeneration
+|--------------------------------------------------------------------------
+|
+| Automatically regenerate Apple client secret every 5 months
+| The command checks if regeneration is needed before running
+|
+*/
+
+Schedule::command('apple:regenerate-secret')
+    ->daily()
+    ->at('02:30')
+    ->withoutOverlapping()
+    ->onOneServer();
