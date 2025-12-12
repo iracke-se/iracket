@@ -22,6 +22,7 @@ class AppleController extends Controller
             $appleUser = Socialite::driver('apple')->user();
 
             $user = User::where('email', $appleUser->email)->first();
+            $isNewUser = false;
 
             if ($user) {
                 // Update existing user with Apple ID and verify email
@@ -47,6 +48,7 @@ class AppleController extends Controller
                     'terms_accepted' => true,
                     'terms_accepted_at' => now(),
                 ]);
+                $isNewUser = true;
             }
 
             Auth::login($user);
@@ -54,6 +56,11 @@ class AppleController extends Controller
             // Redirect to verification if email not verified
             if (!$user->hasVerifiedEmail()) {
                 return redirect()->route('verification.notice');
+            }
+
+            // Redirect new users to connect account page
+            if ($isNewUser) {
+                return redirect('/connect-account');
             }
 
             return redirect()->intended('dashboard');
