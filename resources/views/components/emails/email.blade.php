@@ -128,7 +128,7 @@
     <div class="email-wrapper">
         <div class="email-container">
             <div class="email-header">
-                <img src="{{ asset('assets/images/icon.png') }}" alt="{{ config('app.name') }}" class="email-logo">
+                <img src="{{ url('assets/images/icon.png') }}" alt="{{ config('app.name') }}" class="email-logo">
                 <h1 class="email-brand">{{ config('app.name') }}</h1>
             </div>
 
