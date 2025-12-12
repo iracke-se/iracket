@@ -24,12 +24,11 @@ class AppleController extends Controller
             $user = User::where('email', $appleUser->email)->first();
 
             if ($user) {
-                // Update existing user with Apple ID if not set
-                if (!$user->apple_id) {
-                    $user->update([
-                        'apple_id' => $appleUser->id,
-                    ]);
-                }
+                // Update existing user with Apple ID and verify email
+                $user->update([
+                    'apple_id' => $appleUser->id,
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                ]);
             } else {
                 // Split name into first and last name
                 $name = $appleUser->name ?? 'Apple User';

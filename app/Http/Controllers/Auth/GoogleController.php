@@ -24,12 +24,11 @@ class GoogleController extends Controller
             $user = User::where('email', $googleUser->email)->first();
 
             if ($user) {
-                // Update existing user with Google ID if not set
-                if (!$user->google_id) {
-                    $user->update([
-                        'google_id' => $googleUser->id,
-                    ]);
-                }
+                // Update existing user with Google ID and verify email
+                $user->update([
+                    'google_id' => $googleUser->id,
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                ]);
             } else {
                 // Split name into first and last name
                 $nameParts = explode(' ', $googleUser->name, 2);
