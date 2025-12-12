@@ -17,3 +17,11 @@ yarn-error.log
 /.idea
 /.vscode
 /.ddev
+
+# macOS
+.DS_Store
+
+# Apple Sign In private keys
+*.p8
+/storage/app/apple/*.p8
+/storage/apple/*.p8
