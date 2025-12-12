@@ -91,9 +91,13 @@ class RegenerateAppleSecret extends Command
             // Update .env file
             $this->updateEnvFile('APPLE_CLIENT_SECRET', $clientSecret);
 
+            // Clear config cache to load new .env value
+            $this->call('config:clear');
+
             $this->newLine();
             $this->info('✓ Apple client secret regenerated successfully!');
             $this->line('New secret has been saved to .env file');
+            $this->line('Config cache cleared - new secret is active');
             $this->line('Token expires in 6 months, will auto-regenerate in 5 months');
 
             Log::info('Apple client secret regenerated successfully', [
