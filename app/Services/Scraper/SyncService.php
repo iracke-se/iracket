@@ -24,7 +24,7 @@ class SyncService
     /**
      * Sync players from scraped data to users table
      */
-    public function syncPlayers(?int $runId = null): array
+    public function syncPlayers(?int $runId = null, ?ScraperRun $run = null): array
     {
         $this->resetStats();
 
@@ -34,19 +34,38 @@ class SyncService
             $query->where('scraper_run_id', $runId);
         }
 
-        $players = $query->get();
+        $totalCount = $query->count();
+        Log::info("Syncing {$totalCount} players");
 
-        Log::info("Syncing {$players->count()} players");
+        if ($run) {
+            $run->log('info', "Starting player sync: {$totalCount} players to process");
+        }
 
-        foreach ($players as $player) {
-            try {
-                $this->syncPlayer($player);
-            } catch (\Exception $e) {
-                $this->stats['errors']++;
-                Log::error("Failed to sync player: {$player->full_name}", [
-                    'error' => $e->getMessage(),
-                ]);
+        $processed = 0;
+        $batchSize = 100;
+
+        // Process in batches for better performance and progress tracking
+        $query->chunk($batchSize, function ($players) use (&$processed, $totalCount, $run) {
+            foreach ($players as $player) {
+                try {
+                    $this->syncPlayer($player);
+                    $processed++;
+                } catch (\Exception $e) {
+                    $this->stats['errors']++;
+                    Log::error("Failed to sync player: {$player->full_name}", [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
+
+            // Log progress after each batch
+            if ($run) {
+                $run->log('info', "Synced players: {$processed}/{$totalCount} (Created: {$this->stats['created']}, Updated: {$this->stats['updated']}, Errors: {$this->stats['errors']})");
+            }
+        });
+
+        if ($run) {
+            $run->log('info', "Player sync completed: {$this->stats['created']} created, {$this->stats['updated']} updated, {$this->stats['errors']} errors");
         }
 
         return $this->stats;
@@ -55,7 +74,7 @@ class SyncService
     /**
      * Sync rankings from scraped data to users table
      */
-    public function syncRankings(?int $runId = null): array
+    public function syncRankings(?int $runId = null, ?ScraperRun $run = null): array
     {
         $this->resetStats();
 
@@ -65,19 +84,38 @@ class SyncService
             $query->where('scraper_run_id', $runId);
         }
 
-        $rankings = $query->get();
+        $totalCount = $query->count();
+        Log::info("Syncing {$totalCount} rankings");
 
-        Log::info("Syncing {$rankings->count()} rankings");
+        if ($run) {
+            $run->log('info', "Starting rankings sync: {$totalCount} rankings to process");
+        }
 
-        foreach ($rankings as $ranking) {
-            try {
-                $this->syncRanking($ranking);
-            } catch (\Exception $e) {
-                $this->stats['errors']++;
-                Log::error("Failed to sync ranking: {$ranking->name}", [
-                    'error' => $e->getMessage(),
-                ]);
+        $processed = 0;
+        $batchSize = 100;
+
+        // Process in batches for better performance and progress tracking
+        $query->chunk($batchSize, function ($rankings) use (&$processed, $totalCount, $run) {
+            foreach ($rankings as $ranking) {
+                try {
+                    $this->syncRanking($ranking);
+                    $processed++;
+                } catch (\Exception $e) {
+                    $this->stats['errors']++;
+                    Log::error("Failed to sync ranking: {$ranking->name}", [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
+
+            // Log progress after each batch
+            if ($run) {
+                $run->log('info', "Synced rankings: {$processed}/{$totalCount} (Created: {$this->stats['created']}, Updated: {$this->stats['updated']}, Errors: {$this->stats['errors']})");
+            }
+        });
+
+        if ($run) {
+            $run->log('info', "Rankings sync completed: {$this->stats['created']} created, {$this->stats['updated']} updated, {$this->stats['errors']} errors");
         }
 
         return $this->stats;

@@ -5,6 +5,7 @@ namespace App\Services\Scraper;
 use App\Models\GameMatch;
 use App\Models\User;
 use App\Models\Scraper\ScrapedMatch;
+use App\Models\Scraper\ScraperRun;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -21,7 +22,7 @@ class MatchSyncService
     /**
      * Sync matches from scraped data
      */
-    public function syncMatches(?int $runId = null): array
+    public function syncMatches(?int $runId = null, ?ScraperRun $run = null): array
     {
         $this->resetStats();
 
@@ -31,24 +32,46 @@ class MatchSyncService
             $query->where('scraper_run_id', $runId);
         }
 
-        $scrapedMatches = $query->get();
+        $totalCount = $query->count();
+        Log::info("Syncing {$totalCount} matches");
 
-        Log::info("Syncing {$scrapedMatches->count()} matches");
-
-        foreach ($scrapedMatches as $scrapedMatch) {
-            try {
-                $this->syncMatch($scrapedMatch);
-            } catch (\Exception $e) {
-                $this->stats['errors']++;
-                Log::error("Failed to sync match", [
-                    'scraped_match_id' => $scrapedMatch->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        if ($run) {
+            $run->log('info', "Starting match sync: {$totalCount} matches to process");
         }
 
+        $processed = 0;
+        $batchSize = 100;
+
+        // Process in batches for better performance and progress tracking
+        $query->chunk($batchSize, function ($scrapedMatches) use (&$processed, $totalCount, $run) {
+            foreach ($scrapedMatches as $scrapedMatch) {
+                try {
+                    $this->syncMatch($scrapedMatch);
+                    $processed++;
+                } catch (\Exception $e) {
+                    $this->stats['errors']++;
+                    Log::error("Failed to sync match", [
+                        'scraped_match_id' => $scrapedMatch->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Log progress after each batch
+            if ($run) {
+                $run->log('info', "Synced matches: {$processed}/{$totalCount} (Created: {$this->stats['created']}, Comments migrated: {$this->stats['comments_migrated']}, Errors: {$this->stats['errors']})");
+            }
+        });
+
         // After syncing all scraped matches, mark remaining manual matches as unofficial
+        if ($run) {
+            $run->log('info', "Marking unofficial matches...");
+        }
         $this->markUnofficialMatches();
+
+        if ($run) {
+            $run->log('info', "Match sync completed: {$this->stats['created']} created, {$this->stats['comments_migrated']} comments migrated, {$this->stats['manual_matches_marked_unofficial']} marked unofficial");
+        }
 
         return $this->stats;
     }

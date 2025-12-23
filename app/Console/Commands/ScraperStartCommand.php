@@ -25,6 +25,7 @@ class ScraperStartCommand extends Command
     protected array $executionLog = [];
     protected ?string $failedStep = null;
     protected ?\Exception $failureException = null;
+    protected ?int $latestRunId = null;
 
     public function handle(SyncService $syncService, MatchSyncService $matchSyncService): int
     {
@@ -97,9 +98,10 @@ class ScraperStartCommand extends Command
             }
 
             // Step 1: Scrape Players
-            $this->runStep('Scraping Players', function () use ($month, $scrapeAll) {
+            $result = $this->runStep('Scraping Players', function () use ($month, $scrapeAll) {
                 return $this->scrapePlayers($month, $scrapeAll);
             });
+            $this->latestRunId = $result['run_id'] ?? null;
 
             // Step 2: Sync Players
             $this->runStep('Syncing Players → Users & Clubs', function () use ($syncService) {
@@ -107,14 +109,16 @@ class ScraperStartCommand extends Command
             });
 
             // Step 3: Scrape Rankings (Male)
-            $this->runStep('Scraping Rankings (Male)', function () use ($month, $scrapeAll) {
+            $result = $this->runStep('Scraping Rankings (Male)', function () use ($month, $scrapeAll) {
                 return $this->scrapeRankings('male', $month, $scrapeAll);
             });
+            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
             // Step 4: Scrape Rankings (Female)
-            $this->runStep('Scraping Rankings (Female)', function () use ($month, $scrapeAll) {
+            $result = $this->runStep('Scraping Rankings (Female)', function () use ($month, $scrapeAll) {
                 return $this->scrapeRankings('female', $month, $scrapeAll);
             });
+            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
             // Step 5: Sync Rankings
             $this->runStep('Syncing All Rankings', function () use ($syncService) {
@@ -122,9 +126,10 @@ class ScraperStartCommand extends Command
             });
 
             // Step 6: Scrape Matches (LiveCenter)
-            $this->runStep('Scraping Matches (LiveCenter)', function () use ($month, $scrapeAll) {
+            $result = $this->runStep('Scraping Matches (LiveCenter)', function () use ($month, $scrapeAll) {
                 return $this->scrapeMatches($month, $scrapeAll);
             });
+            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
             // Step 7: Sync Matches
             $this->runStep('Syncing Matches', function () use ($matchSyncService) {
@@ -592,10 +597,13 @@ class ScraperStartCommand extends Command
     {
         $this->line("  🔄 Syncing {$type}...");
 
+        // Get the latest scraper run to log progress
+        $run = $this->latestRunId ? ScraperRun::find($this->latestRunId) : null;
+
         if ($type === 'players') {
-            $stats = $syncService->syncPlayers();
+            $stats = $syncService->syncPlayers(null, $run);
         } elseif ($type === 'rankings') {
-            $stats = $syncService->syncRankings();
+            $stats = $syncService->syncRankings(null, $run);
         } else {
             throw new \Exception("Unknown sync type: {$type}");
         }
@@ -610,7 +618,10 @@ class ScraperStartCommand extends Command
     {
         $this->line("  🔄 Syncing matches...");
 
-        $stats = $matchSyncService->syncMatches();
+        // Get the latest scraper run to log progress
+        $run = $this->latestRunId ? ScraperRun::find($this->latestRunId) : null;
+
+        $stats = $matchSyncService->syncMatches(null, $run);
 
         $this->displayMatchSyncStats($stats);
         $this->stats['matches'] = $stats;
