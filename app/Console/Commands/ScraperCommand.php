@@ -58,6 +58,10 @@ class ScraperCommand extends Command
         }
 
         if ($type === 'players') {
+            if ($this->option('period')) {
+                $parameters['period'] = $this->option('period');
+                $parameters['direction'] = $this->option('direction');
+            }
             if ($this->option('limit-periods')) {
                 $parameters['limit_periods'] = (int) $this->option('limit-periods');
             }
@@ -73,6 +77,10 @@ class ScraperCommand extends Command
         }
 
         if ($type === 'live_center') {
+            if ($this->option('period')) {
+                $parameters['period'] = $this->option('period');
+                $parameters['direction'] = $this->option('direction');
+            }
             if ($this->option('limit-periods')) {
                 $parameters['limit_periods'] = (int) $this->option('limit-periods');
             }
