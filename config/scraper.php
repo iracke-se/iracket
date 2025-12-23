@@ -62,6 +62,9 @@ return [
         'max_instances' => env('SCRAPER_MAX_INSTANCES', 4),
     ],
 
+    // Batch processing - number of clubs to scrape in parallel per batch
+    'batch_size' => env('SCRAPER_BATCH_SIZE', 5),
+
     // Logging
     'logging' => [
         'channel' => env('SCRAPER_LOG_CHANNEL', 'scraper'),
