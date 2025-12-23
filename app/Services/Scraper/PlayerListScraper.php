@@ -15,6 +15,9 @@ class PlayerListScraper extends BaseScraperService
 
     protected function execute(): void
     {
+        $periodFilter = $this->getParameter('period');
+        $direction = $this->getParameter('direction', 'gte');
+
         $this->info("Starting player list scrape");
 
         // Navigate to SBTF portal and get players in a single browser session
@@ -122,6 +125,21 @@ class PlayerListScraper extends BaseScraperService
         foreach ($periods as $period) {
             if (!$this->shouldContinue()) {
                 break;
+            }
+
+            // Apply period filter if specified
+            if ($periodFilter) {
+                $periodYear = $this->extractYearFromPeriod($period['text']);
+                if ($periodYear) {
+                    $filterYear = (int)date('Y', strtotime($periodFilter));
+                    if ($direction === 'gte' && $periodYear < $filterYear) {
+                        $this->info("Skipping period {$period['text']} (year {$periodYear} < {$filterYear})");
+                        continue;
+                    } elseif ($direction === 'lte' && $periodYear > $filterYear) {
+                        $this->info("Skipping period {$period['text']} (year {$periodYear} > {$filterYear})");
+                        continue;
+                    }
+                }
             }
 
             // Process clubs in batches
@@ -391,5 +409,28 @@ JS;
     private function joinJsArrayItems(array $items): string
     {
         return implode(",\n                    ", $items);
+    }
+
+    /**
+     * Extract year from period text like "Licens 2025-26" or "2024.01.01"
+     */
+    protected function extractYearFromPeriod(string $periodText): ?int
+    {
+        // Extract year from period text like "Licens 2025-26" (get first year)
+        if (preg_match('/(\d{4})-\d{2}/', $periodText, $matches)) {
+            return (int)$matches[1];
+        }
+
+        // Extract year from date like "2024.01.01"
+        if (preg_match('/(\d{4})\.(\d{2})\.(\d{2})/', $periodText, $matches)) {
+            return (int)$matches[1];
+        }
+
+        // Extract just year from text
+        if (preg_match('/(\d{4})/', $periodText, $matches)) {
+            return (int)$matches[1];
+        }
+
+        return null;
     }
 }
