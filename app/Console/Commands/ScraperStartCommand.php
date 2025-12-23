@@ -26,6 +26,7 @@ class ScraperStartCommand extends Command
     protected ?string $failedStep = null;
     protected ?\Exception $failureException = null;
     protected ?int $latestRunId = null;
+    protected ?ScraperRun $parentRun = null;
 
     public function handle(SyncService $syncService, MatchSyncService $matchSyncService): int
     {
@@ -86,6 +87,21 @@ class ScraperStartCommand extends Command
 
         $this->displayHeader($month, $scrapeAll);
 
+        // Create parent scraper run to track the entire process
+        $this->parentRun = ScraperRun::create([
+            'type' => ScraperRun::TYPE_FULL_SCRAPE,
+            'status' => ScraperRun::STATUS_RUNNING,
+            'parameters' => [
+                'month' => $scrapeAll ? 'all' : $month,
+                'all' => $scrapeAll,
+                'no_backup' => $skipBackup,
+            ],
+            'started_at' => now(),
+        ]);
+
+        $this->line("  <fg=cyan>Scraper Run ID: #{$this->parentRun->id}</>");
+        $this->newLine();
+
         try {
             // Step 0: Create backup (unless skipped)
             if (!$skipBackup) {
@@ -144,6 +160,12 @@ class ScraperStartCommand extends Command
             // Display final summary
             $this->displaySummary();
 
+            // Mark parent run as completed
+            if ($this->parentRun) {
+                $this->parentRun->markAsCompleted();
+                $this->parentRun->log('info', 'Full scrape completed successfully');
+            }
+
             // Cleanup backup on success
             if ($this->backupFile && !$skipBackup) {
                 $this->cleanupBackup();
@@ -153,6 +175,12 @@ class ScraperStartCommand extends Command
 
         } catch (\Exception $e) {
             $this->failureException = $e;
+
+            // Mark parent run as failed
+            if ($this->parentRun) {
+                $this->parentRun->markAsFailed($e->getMessage());
+            }
+
             $this->handleFailure();
             return self::FAILURE;
         }
@@ -395,6 +423,12 @@ class ScraperStartCommand extends Command
         $this->currentStep++;
         $this->failedStep = $description;
 
+        // Update parent run with current step
+        if ($this->parentRun) {
+            $this->parentRun->updateCurrentStep("Step {$this->currentStep}/{$this->totalSteps}: {$description}");
+            $this->parentRun->log('info', "Starting: {$description}");
+        }
+
         $this->line(str_repeat('─', 60));
         $this->info("Step {$this->currentStep}/{$this->totalSteps}: {$description}");
         $this->line(str_repeat('─', 60));
@@ -422,6 +456,18 @@ class ScraperStartCommand extends Command
 
             $this->executionLog[] = $logEntry;
 
+            // Update parent run with step completion data
+            if ($this->parentRun) {
+                $this->parentRun->updateStepData("step_{$this->currentStep}", [
+                    'description' => $description,
+                    'duration' => $duration,
+                    'success' => true,
+                    'details' => $logEntry['details'] ?? [],
+                    'completed_at' => now()->toDateTimeString(),
+                ]);
+                $this->parentRun->log('info', "Completed: {$description} (in " . number_format($duration, 2) . "s)");
+            }
+
             $this->newLine();
             $this->line("  ✅ <fg=green>Completed</> in <fg=yellow>" . number_format($duration, 2) . "s</>");
             $this->newLine();
@@ -437,6 +483,18 @@ class ScraperStartCommand extends Command
             $logEntry['error'] = $e->getMessage();
 
             $this->executionLog[] = $logEntry;
+
+            // Update parent run with step failure data
+            if ($this->parentRun) {
+                $this->parentRun->updateStepData("step_{$this->currentStep}", [
+                    'description' => $description,
+                    'duration' => $duration,
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                    'failed_at' => now()->toDateTimeString(),
+                ]);
+                $this->parentRun->log('error', "Failed: {$description} - {$e->getMessage()}");
+            }
 
             $this->newLine();
             $this->error("  ❌ Failed after " . number_format($duration, 2) . "s");
@@ -596,14 +654,27 @@ class ScraperStartCommand extends Command
     protected function syncData(SyncService $syncService, string $type): array
     {
         $this->line("  🔄 Syncing {$type}...");
+        $this->newLine();
 
-        // Get the latest scraper run to log progress
-        $run = $this->latestRunId ? ScraperRun::find($this->latestRunId) : null;
+        // Use parent run for logging
+        $run = $this->parentRun;
 
+        $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
+
+        // Start sync in a way that allows us to poll for logs
         if ($type === 'players') {
-            $stats = $syncService->syncPlayers(null, $run);
+            // Poll for new logs while syncing
+            $this->syncWithProgress(function() use ($syncService, $run) {
+                return $syncService->syncPlayers(null, $run);
+            }, $run, $lastLogId);
+
+            $stats = $syncService->getStats();
         } elseif ($type === 'rankings') {
-            $stats = $syncService->syncRankings(null, $run);
+            $this->syncWithProgress(function() use ($syncService, $run) {
+                return $syncService->syncRankings(null, $run);
+            }, $run, $lastLogId);
+
+            $stats = $syncService->getStats();
         } else {
             throw new \Exception("Unknown sync type: {$type}");
         }
@@ -617,16 +688,58 @@ class ScraperStartCommand extends Command
     protected function syncMatches(MatchSyncService $matchSyncService): array
     {
         $this->line("  🔄 Syncing matches...");
+        $this->newLine();
 
-        // Get the latest scraper run to log progress
-        $run = $this->latestRunId ? ScraperRun::find($this->latestRunId) : null;
+        // Use parent run for logging
+        $run = $this->parentRun;
 
-        $stats = $matchSyncService->syncMatches(null, $run);
+        $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
+
+        $this->syncWithProgress(function() use ($matchSyncService, $run) {
+            return $matchSyncService->syncMatches(null, $run);
+        }, $run, $lastLogId);
+
+        $stats = $matchSyncService->getStats();
 
         $this->displayMatchSyncStats($stats);
         $this->stats['matches'] = $stats;
 
         return $stats;
+    }
+
+    /**
+     * Execute sync operation and display progress logs in real-time
+     */
+    protected function syncWithProgress(callable $syncCallback, ?ScraperRun $run, int $lastLogId): void
+    {
+        if (!$run) {
+            // If no run, just execute synchronously
+            $syncCallback();
+            return;
+        }
+
+        // Since sync operations are fast, we'll just display logs after completion
+        // In the future, this could be threaded for true real-time progress
+        $syncCallback();
+
+        // Display all new logs that were created during sync
+        $newLogs = $run->logs()
+            ->where('id', '>', $lastLogId)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        foreach ($newLogs as $log) {
+            $icon = match($log->level) {
+                'error' => '<fg=red>✗</>',
+                'warning' => '<fg=yellow>⚠</>',
+                default => '<fg=blue>ℹ</>',
+            };
+            $this->line("  {$icon} {$log->message}");
+        }
+
+        if ($newLogs->isNotEmpty()) {
+            $this->newLine();
+        }
     }
 
     protected function displaySyncStats(array $stats): void

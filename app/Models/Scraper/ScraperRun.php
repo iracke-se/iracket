@@ -10,7 +10,9 @@ class ScraperRun extends Model
     protected $fillable = [
         'type',
         'status',
+        'current_step',
         'parameters',
+        'steps_data',
         'items_scraped',
         'items_failed',
         'error_message',
@@ -20,6 +22,7 @@ class ScraperRun extends Model
 
     protected $casts = [
         'parameters' => 'array',
+        'steps_data' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
@@ -36,6 +39,7 @@ class ScraperRun extends Model
     const TYPE_TRANSITIONS = 'transitions';
     const TYPE_SERIES = 'series';
     const TYPE_LIVE_CENTER = 'live_center';
+    const TYPE_FULL_SCRAPE = 'full_scrape';
 
     public function logs(): HasMany
     {
@@ -152,5 +156,22 @@ class ScraperRun extends Model
         }
 
         return (int) (($this->items_scraped / $total) * 100);
+    }
+
+    public function updateCurrentStep(string $step): void
+    {
+        $this->update(['current_step' => $step]);
+    }
+
+    public function updateStepData(string $step, array $data): void
+    {
+        $stepsData = $this->steps_data ?? [];
+        $stepsData[$step] = $data;
+        $this->update(['steps_data' => $stepsData]);
+    }
+
+    public function getStepData(string $step): ?array
+    {
+        return $this->steps_data[$step] ?? null;
     }
 }
