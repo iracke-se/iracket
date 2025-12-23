@@ -77,6 +77,21 @@
         </div>
     </div>
 
+    <!-- Current Step (if running) -->
+    @if($run->current_step && $isRunning)
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <div>
+                    <p class="text-xs font-medium text-blue-700 dark:text-blue-300">Currently Running</p>
+                    <p class="text-sm font-semibold text-blue-900 dark:text-blue-100">{{ $run->current_step }}</p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <!-- Items Scraped -->
@@ -194,6 +209,76 @@
             @endif
         </div>
     </div>
+
+    <!-- Steps Breakdown (for full_scrape runs) -->
+    @if($run->type === 'full_scrape' && !empty($run->steps_data))
+        <div class="mt-6 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+            <div class="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
+                <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Step-by-Step Breakdown</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Step</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Description</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Duration</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                        @php
+                            $sortedSteps = collect($run->steps_data)->sortKeys();
+                        @endphp
+                        @foreach($sortedSteps as $stepKey => $stepData)
+                            <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
+                                <td class="px-4 py-3 text-zinc-900 dark:text-white font-mono">
+                                    {{ str_replace('step_', '', $stepKey) }}
+                                </td>
+                                <td class="px-4 py-3 text-zinc-900 dark:text-white">
+                                    {{ $stepData['description'] ?? 'N/A' }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    @if($stepData['success'] ?? false)
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-medium">
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                            </svg>
+                                            Success
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-xs font-medium">
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                            </svg>
+                                            Failed
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400 font-mono text-xs">
+                                    {{ isset($stepData['duration']) ? number_format($stepData['duration'], 2) . 's' : 'N/A' }}
+                                </td>
+                                <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                                    @if(isset($stepData['error']))
+                                        <span class="text-red-600 dark:text-red-400">{{ $stepData['error'] }}</span>
+                                    @elseif(!empty($stepData['details']))
+                                        <div class="space-y-0.5">
+                                            @foreach($stepData['details'] as $key => $value)
+                                                <div>{{ $key }}: {{ $value }}</div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 
     <!-- Parameters -->
     @if(!empty($run->parameters))
