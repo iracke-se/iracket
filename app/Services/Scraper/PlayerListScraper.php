@@ -19,6 +19,8 @@ class PlayerListScraper extends BaseScraperService
         $direction = $this->getParameter('direction', 'gte');
 
         $this->info("Starting player list scrape");
+        $this->info("Period filter: " . ($periodFilter ?? 'NONE'));
+        $this->info("Direction: " . $direction);
 
         // Navigate to SBTF portal and get players in a single browser session
         // We'll do everything in one evaluate call since we can't persist sessions between Browsershot instances
@@ -118,6 +120,11 @@ class PlayerListScraper extends BaseScraperService
 
         $this->info("Found periods: " . count($periods) . ", clubs: " . count($clubs));
 
+        // Log all available periods
+        foreach ($periods as $idx => $p) {
+            $this->info("Period {$idx}: {$p['text']} (value: {$p['value']})");
+        }
+
         // Process clubs in parallel batches for better performance
         $batchSize = config('scraper.batch_size', 5); // Process 5 clubs at once by default
 
@@ -130,16 +137,24 @@ class PlayerListScraper extends BaseScraperService
             // Apply period filter if specified
             if ($periodFilter) {
                 $periodYear = $this->extractYearFromPeriod($period['text']);
+                $this->info("Evaluating period {$period['text']}: extracted year = " . ($periodYear ?? 'NULL'));
+
                 if ($periodYear) {
                     $filterYear = (int)date('Y', strtotime($periodFilter));
+                    $this->info("Filter year: {$filterYear}, Period year: {$periodYear}, Direction: {$direction}");
+
                     if ($direction === 'gte' && $periodYear < $filterYear) {
-                        $this->info("Skipping period {$period['text']} (year {$periodYear} < {$filterYear})");
+                        $this->info("✗ Skipping period {$period['text']} (year {$periodYear} < {$filterYear})");
                         continue;
                     } elseif ($direction === 'lte' && $periodYear > $filterYear) {
-                        $this->info("Skipping period {$period['text']} (year {$periodYear} > {$filterYear})");
+                        $this->info("✗ Skipping period {$period['text']} (year {$periodYear} > {$filterYear})");
                         continue;
                     }
+
+                    $this->info("✓ Processing period {$period['text']}");
                 }
+            } else {
+                $this->info("No period filter - processing {$period['text']}");
             }
 
             // Process clubs in batches
