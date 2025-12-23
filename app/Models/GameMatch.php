@@ -4,10 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class GameMatch extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'matches';
 
     /**
@@ -33,6 +36,9 @@ class GameMatch extends Model
     }
 
     protected $fillable = [
+        'source',
+        'is_unofficial',
+        'replaced_by_match_id',
         'player1_id',
         'player2_id',
         'played_at',
@@ -56,6 +62,7 @@ class GameMatch extends Model
         'player1_comments' => 'array',
         'player2_comments' => 'array',
         'is_manual' => 'boolean',
+        'is_unofficial' => 'boolean',
     ];
 
     public function player1(): BelongsTo
@@ -124,5 +131,40 @@ class GameMatch extends Model
             return $this->player1_sets;
         }
         return 0;
+    }
+
+    /**
+     * Scope to only official matches (counted in rankings)
+     */
+    public function scopeOfficial($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('source', 'scraped')
+              ->orWhere(function ($subQ) {
+                  $subQ->where('source', 'player_added')
+                       ->where('is_unofficial', false);
+              });
+        })->whereNull('deleted_at');
+    }
+
+    /**
+     * Scope to unofficial matches (not counted)
+     */
+    public function scopeUnofficial($query)
+    {
+        return $query->where('source', 'player_added')
+            ->where('is_unofficial', true)
+            ->whereNull('deleted_at');
+    }
+
+    /**
+     * Scope for player's own view (includes unofficial)
+     */
+    public function scopeForPlayer($query, $playerId)
+    {
+        return $query->where(function ($q) use ($playerId) {
+            $q->where('player1_id', $playerId)
+              ->orWhere('player2_id', $playerId);
+        })->whereNull('deleted_at');
     }
 }

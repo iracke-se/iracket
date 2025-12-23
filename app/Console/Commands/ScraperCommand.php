@@ -15,6 +15,11 @@ class ScraperCommand extends Command
                             {--gender=male : Gender for rankings (male/female)}
                             {--period= : Period filter (e.g., 2024.01.01)}
                             {--direction=gte : Direction for period filter (gte/lte)}
+                            {--limit-periods= : Limit number of periods to scrape (for testing)}
+                            {--limit-clubs= : Limit number of clubs to scrape (for testing, players only)}
+                            {--limit-divisions= : Limit number of divisions to scrape (for testing, rankings/live_center)}
+                            {--limit-seasons= : Limit number of seasons to scrape (for testing, series only)}
+                            {--limit-series= : Limit number of series per season to scrape (for testing, series only)}
                             {--queue : Queue the job instead of running synchronously}';
 
     /**
@@ -43,6 +48,49 @@ class ScraperCommand extends Command
             if ($this->option('period')) {
                 $parameters['period'] = $this->option('period');
                 $parameters['direction'] = $this->option('direction');
+            }
+            if ($this->option('limit-periods')) {
+                $parameters['limit_periods'] = (int) $this->option('limit-periods');
+            }
+            if ($this->option('limit-divisions')) {
+                $parameters['limit_divisions'] = (int) $this->option('limit-divisions');
+            }
+        }
+
+        if ($type === 'players') {
+            if ($this->option('limit-periods')) {
+                $parameters['limit_periods'] = (int) $this->option('limit-periods');
+            }
+            if ($this->option('limit-clubs')) {
+                $parameters['limit_clubs'] = (int) $this->option('limit-clubs');
+            }
+        }
+
+        if ($type === 'transitions') {
+            if ($this->option('limit-periods')) {
+                $parameters['limit_periods'] = (int) $this->option('limit-periods');
+            }
+        }
+
+        if ($type === 'live_center') {
+            if ($this->option('limit-periods')) {
+                $parameters['limit_periods'] = (int) $this->option('limit-periods');
+            }
+            if ($this->option('limit-divisions')) {
+                $parameters['limit_divisions'] = (int) $this->option('limit-divisions');
+            }
+        }
+
+        if ($type === 'series') {
+            if ($this->option('period')) {
+                $parameters['period'] = $this->option('period');
+                $parameters['direction'] = $this->option('direction');
+            }
+            if ($this->option('limit-seasons')) {
+                $parameters['limit_seasons'] = (int) $this->option('limit-seasons');
+            }
+            if ($this->option('limit-series')) {
+                $parameters['limit_series'] = (int) $this->option('limit-series');
             }
         }
 

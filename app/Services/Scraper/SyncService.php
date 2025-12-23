@@ -110,7 +110,7 @@ class SyncService
             // Update existing user
             $updateData = [
                 'club_id' => $club?->id,
-                'gender' => $player->sex === 'M' ? 'male' : ($player->sex === 'K' ? 'female' : null),
+                'gender' => $this->mapGender($player->sex),
             ];
 
             // Set birth_year if not already set
@@ -135,7 +135,7 @@ class SyncService
                 'email' => $this->generateEmail($player->first_name, $player->surname),
                 'password' => Hash::make(Str::random(16)),
                 'club_id' => $club?->id,
-                'gender' => $player->sex === 'M' ? 'male' : ($player->sex === 'K' ? 'female' : null),
+                'gender' => $this->mapGender($player->sex),
                 'birth_year' => $birthYear,
                 'visible_in_players' => true,
                 'sbtf_synced' => true,
@@ -232,15 +232,31 @@ class SyncService
             return null;
         }
 
+        // Normalize club name: trim and remove trailing asterisks
         $clubName = trim($clubName);
+        $clubName = rtrim($clubName, '*');
+        $clubName = trim($clubName); // Trim again after removing asterisk
 
-        return Club::firstOrCreate(
-            ['name' => $clubName],
-            [
-                'slug' => Str::slug($clubName),
-                'description' => null,
-            ]
-        );
+        if (empty($clubName)) {
+            return null;
+        }
+
+        // Generate slug for matching
+        $slug = Str::slug($clubName);
+
+        // Try to find existing club by slug to avoid duplicates
+        $club = Club::where('slug', $slug)->first();
+
+        if ($club) {
+            return $club;
+        }
+
+        // Create new club if it doesn't exist
+        return Club::create([
+            'name' => $clubName,
+            'slug' => $slug,
+            'description' => null,
+        ]);
     }
 
     /**
@@ -336,6 +352,25 @@ class SyncService
         }
 
         return $email;
+    }
+
+    /**
+     * Map Swedish sex/gender values to database format
+     */
+    protected function mapGender(?string $sex): ?string
+    {
+        if (empty($sex)) {
+            return null;
+        }
+
+        $sex = trim($sex);
+
+        // Handle both short and long Swedish formats
+        return match (strtoupper($sex)) {
+            'M', 'MAN', 'MALE' => 'male',
+            'K', 'KVINNA', 'FEMALE' => 'female',
+            default => null,
+        };
     }
 
     /**
