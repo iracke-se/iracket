@@ -144,11 +144,11 @@ class PlayerListScraper extends BaseScraperService
                     $this->info("Filter year: {$filterYear}, Period year: {$periodYear}, Direction: {$direction}");
 
                     if ($direction === 'gte' && $periodYear < $filterYear) {
-                        $this->info("✗ Skipping period {$period['text']} (year {$periodYear} < {$filterYear})");
-                        continue;
+                        $this->info("✗ Stopping at period {$period['text']} (year {$periodYear} < {$filterYear}) - older periods will not be processed");
+                        break;
                     } elseif ($direction === 'lte' && $periodYear > $filterYear) {
-                        $this->info("✗ Skipping period {$period['text']} (year {$periodYear} > {$filterYear})");
-                        continue;
+                        $this->info("✗ Stopping at period {$period['text']} (year {$periodYear} > {$filterYear}) - newer periods will not be processed");
+                        break;
                     }
 
                     $this->info("✓ Processing period {$period['text']}");
