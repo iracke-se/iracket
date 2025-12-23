@@ -152,150 +152,216 @@ class LiveCenterScraper extends BaseScraperService
             return;
         }
 
-        // Process each division/period - need to scrape in a single evaluate call
-        // because each Browsershot evaluate creates a fresh page
+        // Process division/period combinations in parallel batches for better performance
+        $batchSize = config('scraper.batch_size', 5);
+
+        // Create all division/period combinations
+        $combinations = [];
         foreach ($divisions as $division) {
+            foreach ($periods as $period) {
+                $combinations[] = [
+                    'division' => $division,
+                    'period' => $period,
+                ];
+            }
+        }
+
+        $this->info("Total combinations to process: " . count($combinations));
+
+        // Process combinations in batches
+        $combinationBatches = array_chunk($combinations, $batchSize);
+
+        foreach ($combinationBatches as $batch) {
             if (!$this->shouldContinue()) {
                 break;
             }
 
-            foreach ($periods as $period) {
-                if (!$this->shouldContinue()) {
-                    break;
-                }
-
-                try {
-                    $divisionValue = $division['value'];
-                    $divisionName = $division['text'];
-                    $periodValue = $period['value'];
-                    $periodName = $period['text'];
-
-                    // Call the AJAX endpoint directly to get matches
-                    $scrapeJs = <<<JS
-                    (async function() {
-                        try {
-                            // Call the callback.php API directly
-                            const params = {
-                                organisasjon: 'SBTF.SE.BT',
-                                dato: '{$periodValue}',
-                                turn_id: '{$divisionValue}',
-                                match_id: 0,
-                                refresh: 0,
-                                selected_date: 1
-                            };
-
-                            // Format: metode=<method>&data=<URL encoded JSON>
-                            const paramStr = 'metode=get_match_list&data=' + encodeURIComponent(JSON.stringify(params));
-
-                            const response = await fetch('https://www.profixio.com/fx/livecenter/callback.php', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: paramStr,
-                                credentials: 'include'
-                            });
-
-                            const jsonText = await response.text();
-                            const json = JSON.parse(jsonText);
-
-                            if (json.feilmelding && json.feilmelding !== '') {
-                                return JSON.stringify({ error: json.feilmelding });
-                            }
-
-                            // The data contains HTML with matches
-                            const html = json.data?.output || json.data || '';
-
-                            // Parse the returned HTML
-                            const parser = new DOMParser();
-                            const doc = parser.parseFromString(html, 'text/html');
-
-                            const rows = doc.querySelectorAll('table tr');
-                            let matches = [];
-
-                            for (let i = 0; i < rows.length; i++) {
-                                const cells = rows[i].querySelectorAll('td');
-                                if (cells.length >= 2) {
-                                    const teamsCell = cells[0]?.innerText.trim() || '';
-                                    const scoreCell = cells[1]?.innerText.trim() || '';
-
-                                    if (teamsCell.includes('Uppdaterad') || teamsCell.includes('Inga matcher')) {
-                                        continue;
-                                    }
-
-                                    const teamParts = teamsCell.split(' - ');
-                                    if (teamParts.length === 2) {
-                                        matches.push({
-                                            team1: teamParts[0].trim(),
-                                            team2: teamParts[1].trim(),
-                                            player1: teamParts[0].trim(),
-                                            player2: teamParts[1].trim(),
-                                            score: scoreCell,
-                                            date: '{$periodValue}'
-                                        });
-                                    }
-                                }
-                            }
-
-                            return JSON.stringify(matches);
-                        } catch (e) {
-                            return JSON.stringify({ error: e.message });
-                        }
-                    })();
-                    JS;
-
-                    $matchesJson = $this->withRetry(function () use ($browser, $scrapeJs) {
-                        return $browser->evaluate($scrapeJs);
-                    }, "Get matches for {$divisionName} - {$periodName}");
-
-                    $matches = json_decode($matchesJson, true) ?? [];
-
-                    if (isset($matches['error'])) {
-                        $this->warning("Error fetching matches: " . $matches['error']);
-                        continue;
-                    }
-
-                    if (empty($matches)) {
-                        continue;
-                    }
-
-                    // Save matches to database
-                    foreach ($matches as $match) {
-                        if (empty(trim($match['player1'] ?? '')) || empty(trim($match['player2'] ?? ''))) {
-                            continue;
-                        }
-
-                        ScrapedMatch::create([
-                            'scraper_run_id' => $this->run->id,
-                            'source' => 'live_center',
-                            'period' => $periodName,
-                            'division' => $divisionName,
-                            'series_name' => null,
-                            'team1_name' => trim($match['team1'] ?? ''),
-                            'team2_name' => trim($match['team2'] ?? ''),
-                            'player1_name' => trim($match['player1'] ?? ''),
-                            'player2_name' => trim($match['player2'] ?? ''),
-                            'score' => trim($match['score'] ?? ''),
-                            'sets' => null,
-                            'played_at' => trim($match['date'] ?? ''),
-                            'winner' => $this->determineWinner($match),
-                        ]);
-
-                        $this->run->incrementScraped();
-                    }
-
-                    $this->info("Scraped {$divisionName} - {$periodName}: " . count($matches) . " matches");
-
-                } catch (\Exception $e) {
-                    $this->warning("Failed to scrape division/period", [
-                        'division' => $division['text'],
-                        'period' => $period['text'],
-                        'error' => $e->getMessage(),
-                    ]);
-                    $this->run->incrementFailed();
-                }
+            try {
+                $this->scrapeMatchesForBatch($browser, $batch);
+            } catch (\Exception $e) {
+                $this->warning("Failed to scrape batch", [
+                    'error' => $e->getMessage(),
+                ]);
+                $this->run->incrementFailed();
             }
         }
+    }
+
+    /**
+     * Scrape matches for multiple division/period combinations in parallel
+     */
+    protected function scrapeMatchesForBatch(Browsershot $browser, array $batch): void
+    {
+        // Build JavaScript to fetch all combinations in parallel
+        $fetches = [];
+        foreach ($batch as $index => $combination) {
+            $division = $combination['division'];
+            $period = $combination['period'];
+
+            $divisionValue = $division['value'];
+            $divisionName = addslashes($division['text']);
+            $periodValue = $period['value'];
+            $periodName = addslashes($period['text']);
+
+            $fetches[] = <<<JS
+            (async () => {
+                try {
+                    const params = {
+                        organisasjon: 'SBTF.SE.BT',
+                        dato: '{$periodValue}',
+                        turn_id: '{$divisionValue}',
+                        match_id: 0,
+                        refresh: 0,
+                        selected_date: 1
+                    };
+
+                    const paramStr = 'metode=get_match_list&data=' + encodeURIComponent(JSON.stringify(params));
+
+                    const response = await fetch('https://www.profixio.com/fx/livecenter/callback.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: paramStr,
+                        credentials: 'include'
+                    });
+
+                    const jsonText = await response.text();
+                    const json = JSON.parse(jsonText);
+
+                    if (json.feilmelding && json.feilmelding !== '') {
+                        return {
+                            divisionName: '{$divisionName}',
+                            periodName: '{$periodName}',
+                            error: json.feilmelding,
+                            success: false
+                        };
+                    }
+
+                    const html = json.data?.output || json.data || '';
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+
+                    const rows = doc.querySelectorAll('table tr');
+                    let matches = [];
+
+                    for (let i = 0; i < rows.length; i++) {
+                        const cells = rows[i].querySelectorAll('td');
+                        if (cells.length >= 2) {
+                            const teamsCell = cells[0]?.innerText.trim() || '';
+                            const scoreCell = cells[1]?.innerText.trim() || '';
+
+                            if (teamsCell.includes('Uppdaterad') || teamsCell.includes('Inga matcher')) {
+                                continue;
+                            }
+
+                            const teamParts = teamsCell.split(' - ');
+                            if (teamParts.length === 2) {
+                                matches.push({
+                                    team1: teamParts[0].trim(),
+                                    team2: teamParts[1].trim(),
+                                    player1: teamParts[0].trim(),
+                                    player2: teamParts[1].trim(),
+                                    score: scoreCell,
+                                    date: '{$periodValue}'
+                                });
+                            }
+                        }
+                    }
+
+                    return {
+                        divisionName: '{$divisionName}',
+                        periodName: '{$periodName}',
+                        matches: matches,
+                        success: true
+                    };
+                } catch (e) {
+                    return {
+                        divisionName: '{$divisionName}',
+                        periodName: '{$periodName}',
+                        error: e.message,
+                        success: false
+                    };
+                }
+            })()
+JS;
+        }
+
+        $batchJs = <<<JS
+        (async function() {
+            try {
+                const results = await Promise.all([
+                    {$this->joinJsArrayItems($fetches)}
+                ]);
+                return JSON.stringify(results);
+            } catch (e) {
+                return JSON.stringify({ error: e.message });
+            }
+        })();
+        JS;
+
+        $resultsJson = $this->withRetry(function () use ($browser, $batchJs) {
+            return $browser->evaluate($batchJs);
+        }, "Get matches for batch of " . count($batch) . " division/period combinations");
+
+        $results = json_decode($resultsJson, true) ?? [];
+
+        if (isset($results['error'])) {
+            $this->warning("Error fetching batch: " . $results['error']);
+            return;
+        }
+
+        // Process results for each combination
+        foreach ($results as $result) {
+            if (!$result['success']) {
+                $this->warning("Failed to scrape {$result['divisionName']} - {$result['periodName']}: " . ($result['error'] ?? 'unknown error'));
+                $this->run->incrementFailed();
+                continue;
+            }
+
+            $divisionName = $result['divisionName'];
+            $periodName = $result['periodName'];
+            $matches = $result['matches'] ?? [];
+
+            if (empty($matches)) {
+                continue;
+            }
+
+            // Save matches to database
+            foreach ($matches as $match) {
+                if (empty(trim($match['player1'] ?? '')) || empty(trim($match['player2'] ?? ''))) {
+                    continue;
+                }
+
+                ScrapedMatch::create([
+                    'scraper_run_id' => $this->run->id,
+                    'source' => 'live_center',
+                    'period' => $periodName,
+                    'division' => $divisionName,
+                    'series_name' => null,
+                    'team1_name' => trim($match['team1'] ?? ''),
+                    'team2_name' => trim($match['team2'] ?? ''),
+                    'player1_name' => trim($match['player1'] ?? ''),
+                    'player2_name' => trim($match['player2'] ?? ''),
+                    'score' => trim($match['score'] ?? ''),
+                    'sets' => null,
+                    'played_at' => trim($match['date'] ?? ''),
+                    'winner' => $this->determineWinner($match),
+                ]);
+
+                $this->run->incrementScraped();
+            }
+
+            $this->info("Scraped {$divisionName} - {$periodName}: " . count($matches) . " matches");
+        }
+    }
+
+    /**
+     * Helper to join JavaScript array items with commas
+     */
+    private function joinJsArrayItems(array $items): string
+    {
+        return implode(",\n                    ", $items);
     }
 
     protected function scrapeMatchesForDivisionPeriod(
