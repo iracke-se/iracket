@@ -4,12 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class GameMatch extends Model
 {
-    use SoftDeletes;
 
     protected $table = 'matches';
 
@@ -144,7 +142,7 @@ class GameMatch extends Model
                   $subQ->where('source', 'player_added')
                        ->where('is_unofficial', false);
               });
-        })->whereNull('deleted_at');
+        });
     }
 
     /**
@@ -153,8 +151,7 @@ class GameMatch extends Model
     public function scopeUnofficial($query)
     {
         return $query->where('source', 'player_added')
-            ->where('is_unofficial', true)
-            ->whereNull('deleted_at');
+            ->where('is_unofficial', true);
     }
 
     /**
@@ -165,6 +162,6 @@ class GameMatch extends Model
         return $query->where(function ($q) use ($playerId) {
             $q->where('player1_id', $playerId)
               ->orWhere('player2_id', $playerId);
-        })->whereNull('deleted_at');
+        });
     }
 }

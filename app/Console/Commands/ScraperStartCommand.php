@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Scraper\ScraperRun;
-use App\Services\Scraper\MatchSyncService;
 use App\Services\Scraper\SyncService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +18,7 @@ class ScraperStartCommand extends Command
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
     protected array $stats = [];
-    protected int $totalSteps = 9; // Added backup step
+    protected int $totalSteps = 12; // Full pipeline with Bubbler and club rankings
     protected int $currentStep = 0;
     protected ?string $backupFile = null;
     protected array $executionLog = [];
@@ -28,7 +27,7 @@ class ScraperStartCommand extends Command
     protected ?int $latestRunId = null;
     protected ?ScraperRun $parentRun = null;
 
-    public function handle(SyncService $syncService, MatchSyncService $matchSyncService): int
+    public function handle(SyncService $syncService): int
     {
         $month = $this->argument('month');
         $scrapeAll = $this->option('all');
@@ -124,35 +123,49 @@ class ScraperStartCommand extends Command
                 return $this->syncData($syncService, 'players');
             });
 
-            // Step 3: Scrape Rankings (Male)
-            $result = $this->runStep('Scraping Rankings (Male)', function () use ($month, $scrapeAll) {
-                return $this->scrapeRankings('male', $month, $scrapeAll);
+            // Step 3: Scrape Series Matches
+            $result = $this->runStep('Scraping Series Matches', function () use ($month, $scrapeAll) {
+                return $this->scrapeSeriesMatches($month, $scrapeAll);
             });
             $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
-            // Step 4: Scrape Rankings (Female)
-            $result = $this->runStep('Scraping Rankings (Female)', function () use ($month, $scrapeAll) {
-                return $this->scrapeRankings('female', $month, $scrapeAll);
+            // Step 4: Sync Matches
+            $this->runStep('Syncing Matches', function () {
+                return $this->syncMatches();
             });
-            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
-            // Step 5: Sync Rankings
+            // Step 5: Scrape Rankings (Male) - Parallel Processing
+            $this->runStep('Scraping Rankings (Male) - 3 Parallel Processes', function () {
+                return $this->scrapeRankingsParallel('male');
+            });
+
+            // Step 6: Scrape Rankings (Female) - Parallel Processing
+            $this->runStep('Scraping Rankings (Female) - 3 Parallel Processes', function () {
+                return $this->scrapeRankingsParallel('female');
+            });
+
+            // Step 7: Sync Rankings
             $this->runStep('Syncing All Rankings', function () use ($syncService) {
                 return $this->syncData($syncService, 'rankings');
             });
 
-            // Step 6: Scrape Matches (LiveCenter)
-            $result = $this->runStep('Scraping Matches (LiveCenter)', function () use ($month, $scrapeAll) {
-                return $this->scrapeMatches($month, $scrapeAll);
+            // Step 8: Scrape Series Standings
+            $result = $this->runStep('Scraping Series Standings', function () use ($month, $scrapeAll) {
+                return $this->scrapeSeries($month, $scrapeAll);
             });
             $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
-            // Step 7: Sync Matches
-            $this->runStep('Syncing Matches', function () use ($matchSyncService) {
-                return $this->syncMatches($matchSyncService);
+            // Step 9: Calculate Bubbler Points
+            $this->runStep('Calculating Bubbler Points', function () use ($month) {
+                return $this->calculateBubblerPoints($month);
             });
 
-            // Step 8: Verify Data
+            // Step 10: Aggregate Club Rankings
+            $this->runStep('Aggregating Club Rankings', function () use ($month) {
+                return $this->aggregateClubRankings($month);
+            });
+
+            // Step 11: Verify Data
             $this->runStep('Verifying Data Integrity', function () {
                 return $this->verifyData();
             });
@@ -627,6 +640,79 @@ class ScraperStartCommand extends Command
         return $this->runScraperWithProgress($command, 'Players');
     }
 
+    protected function scrapeSeriesMatches(string $month, bool $scrapeAll): array
+    {
+        $command = 'php artisan scraper:run series_matches';
+
+        if (!$scrapeAll) {
+            $command .= " --period=" . escapeshellarg($month . '-01');
+            $command .= " --direction=gte";
+        }
+
+        return $this->runScraperWithProgress($command, 'Series Matches');
+    }
+
+    protected function scrapeSeries(string $month, bool $scrapeAll): array
+    {
+        $command = 'php artisan scraper:run series';
+
+        if (!$scrapeAll) {
+            $command .= " --period=" . escapeshellarg($month . '-01');
+            $command .= " --direction=gte";
+        }
+
+        return $this->runScraperWithProgress($command, 'Series Standings');
+    }
+
+    protected function calculateBubblerPoints(string $month): array
+    {
+        $this->line("  🎯 Calculating Bubbler points for matches...");
+        $this->newLine();
+
+        $period = \Carbon\Carbon::parse($month . '-01');
+        $bubblerService = app(\App\Services\BubblerService::class);
+
+        $stats = $bubblerService->calculateMatchPoints($period, $this->parentRun);
+
+        $this->newLine();
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Matches Processed', "<fg=cyan>{$stats['matches_processed']}</>"],
+                ['Points Calculated', "<fg=yellow>{$stats['points_calculated']}</>"],
+                ['Rankings Updated', "<fg=green>{$stats['rankings_updated']}</>"],
+                ['Errors', $stats['errors'] > 0 ? "<fg=red>{$stats['errors']}</>" : "<fg=green>0</>"],
+            ]
+        );
+
+        $this->stats['bubbler'] = $stats;
+        return $stats;
+    }
+
+    protected function aggregateClubRankings(string $month): array
+    {
+        $this->line("  🏆 Aggregating club rankings...");
+        $this->newLine();
+
+        $period = \Carbon\Carbon::parse($month . '-01');
+        $clubRankingService = app(\App\Services\ClubRankingService::class);
+
+        $stats = $clubRankingService->aggregateClubRankings($period, $this->parentRun);
+
+        $this->newLine();
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Clubs Processed', "<fg=cyan>{$stats['clubs_processed']}</>"],
+                ['Rankings Created', "<fg=green>{$stats['rankings_created']}</>"],
+                ['Rankings Updated', "<fg=yellow>{$stats['rankings_updated']}</>"],
+            ]
+        );
+
+        $this->stats['club_rankings'] = $stats;
+        return $stats;
+    }
+
     protected function scrapeRankings(string $gender, string $month, bool $scrapeAll): array
     {
         $command = "php artisan scraper:run rankings --gender={$gender}";
@@ -637,6 +723,113 @@ class ScraperStartCommand extends Command
         }
 
         return $this->runScraperWithProgress($command, "Rankings ({$gender})");
+    }
+
+    protected function scrapeRankingsParallel(string $gender): array
+    {
+        $this->line("  🚀 Starting parallel rankings scrape for {$gender}...");
+        $this->line("  Running 3 period chunks in parallel");
+        $this->newLine();
+
+        // Split ~195 periods into 3 chunks of 65 each
+        $chunks = [
+            ['skip' => 0, 'take' => 65, 'label' => 'Chunk 1/3 (periods 1-65)'],
+            ['skip' => 65, 'take' => 65, 'label' => 'Chunk 2/3 (periods 66-130)'],
+            ['skip' => 130, 'take' => 65, 'label' => 'Chunk 3/3 (periods 131-195)'],
+        ];
+
+        $processes = [];
+        $runIds = [];
+
+        // Start all 3 processes
+        foreach ($chunks as $index => $chunk) {
+            $command = "php artisan scraper:run rankings --gender={$gender} --period-skip={$chunk['skip']} --period-take={$chunk['take']}";
+
+            $process = \Symfony\Component\Process\Process::fromShellCommandline($command);
+            $process->setTimeout(null);
+            $process->start();
+
+            $processes[$index] = $process;
+            $this->line("  <fg=cyan>→</> Started {$chunk['label']}");
+
+            // Give each process time to create its database entry
+            sleep(2);
+        }
+
+        $this->newLine();
+        $this->line("  <fg=yellow>⏳</> Monitoring 3 parallel processes...");
+        $this->newLine();
+
+        // Get the latest 3 scraper runs (one for each process)
+        sleep(1);
+        $runs = ScraperRun::where('type', ScraperRun::TYPE_RANKINGS)
+            ->where('created_at', '>=', now()->subMinutes(1))
+            ->latest('id')
+            ->limit(3)
+            ->get();
+
+        $lastItemCounts = array_fill(0, 3, 0);
+        $totalScraped = 0;
+
+        // Monitor all processes
+        while (true) {
+            $allFinished = true;
+            $currentTotal = 0;
+
+            foreach ($processes as $index => $process) {
+                if ($process->isRunning()) {
+                    $allFinished = false;
+                }
+
+                // Update progress for this chunk
+                if (isset($runs[$index])) {
+                    $run = $runs[$index];
+                    $run->refresh();
+
+                    if ($run->items_scraped > $lastItemCounts[$index]) {
+                        $this->line("  <fg=green>✓</> {$chunks[$index]['label']}: {$run->items_scraped} items");
+                        $lastItemCounts[$index] = $run->items_scraped;
+                    }
+
+                    $currentTotal += $run->items_scraped;
+                }
+            }
+
+            // Show total progress
+            if ($currentTotal > $totalScraped) {
+                $this->line("  <fg=yellow>Total scraped:</> {$currentTotal} items");
+                $totalScraped = $currentTotal;
+            }
+
+            if ($allFinished) {
+                break;
+            }
+
+            sleep(5);
+        }
+
+        // Wait for all processes to complete
+        foreach ($processes as $process) {
+            $process->wait();
+        }
+
+        $this->newLine();
+        $this->line("  <fg=green>✓</> All 3 parallel processes completed!");
+
+        // Calculate final totals
+        $finalTotal = 0;
+        foreach ($runs as $run) {
+            $run->refresh();
+            $finalTotal += $run->items_scraped;
+        }
+
+        $this->line("  <fg=yellow>Final count:</> {$finalTotal} items scraped");
+        $this->newLine();
+
+        return [
+            'total_scraped' => $finalTotal,
+            'chunks' => 3,
+        ];
     }
 
     protected function scrapeMatches(string $month, bool $scrapeAll): array
@@ -685,7 +878,7 @@ class ScraperStartCommand extends Command
         return $stats;
     }
 
-    protected function syncMatches(MatchSyncService $matchSyncService): array
+    protected function syncMatches(): array
     {
         $this->line("  🔄 Syncing matches...");
         $this->newLine();
@@ -694,6 +887,9 @@ class ScraperStartCommand extends Command
         $run = $this->parentRun;
 
         $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
+
+        // Create MatchSyncService instance
+        $matchSyncService = app(\App\Services\Scraper\MatchSyncService::class);
 
         $this->syncWithProgress(function() use ($matchSyncService, $run) {
             return $matchSyncService->syncMatches(null, $run);
@@ -785,9 +981,11 @@ class ScraperStartCommand extends Command
                 ->whereNull('deleted_at')
                 ->count(),
             'rankings' => DB::table('monthly_rankings')->count(),
+            'club_rankings' => DB::table('club_monthly_rankings')->count(),
             'scraped_players' => DB::table('scraped_players')->where('is_synced', true)->count(),
             'scraped_rankings' => DB::table('scraped_rankings')->where('is_synced', true)->count(),
             'scraped_matches' => DB::table('scraped_matches')->where('is_synced', true)->count(),
+            'scraped_standings' => DB::table('scraped_standings')->count(),
         ];
 
         $this->table(
@@ -798,9 +996,11 @@ class ScraperStartCommand extends Command
                 ['Total Matches', "<fg=cyan>{$counts['matches']}</>"],
                 ['Official Matches', "<fg=green>{$counts['official_matches']}</>"],
                 ['Monthly Rankings', "<fg=cyan>{$counts['rankings']}</>"],
+                ['Club Rankings', "<fg=cyan>{$counts['club_rankings']}</>"],
                 ['Synced Players', "<fg=green>{$counts['scraped_players']}</>"],
                 ['Synced Rankings', "<fg=green>{$counts['scraped_rankings']}</>"],
                 ['Synced Matches', "<fg=green>{$counts['scraped_matches']}</>"],
+                ['Scraped Standings', "<fg=yellow>{$counts['scraped_standings']}</>"],
             ]
         );
 

@@ -38,6 +38,7 @@ class ScraperRun extends Model
     const TYPE_PLAYERS = 'players';
     const TYPE_TRANSITIONS = 'transitions';
     const TYPE_SERIES = 'series';
+    const TYPE_SERIES_MATCHES = 'series_matches';
     const TYPE_LIVE_CENTER = 'live_center';
     const TYPE_FULL_SCRAPE = 'full_scrape';
 

@@ -127,6 +127,30 @@ class LiveCenterScraper extends BaseScraperService
             return;
         }
 
+        // Apply period filter if specified
+        $periodFilter = $this->getParameter('period');
+        $direction = $this->getParameter('direction', 'gte');
+
+        if ($periodFilter) {
+            $filterDate = strtotime($periodFilter);
+            $periods = array_filter($periods, function($period) use ($filterDate, $direction) {
+                // Period value is in format YYYY-MM-DD
+                $periodDate = strtotime($period['value'] ?? '');
+                if (!$periodDate) {
+                    return false;
+                }
+
+                if ($direction === 'gte') {
+                    return $periodDate >= $filterDate;
+                } elseif ($direction === 'lte') {
+                    return $periodDate <= $filterDate;
+                }
+
+                return true;
+            });
+            $periods = array_values($periods); // Re-index array
+        }
+
         // Apply limits for testing
         $limitPeriods = $this->getParameter('limit_periods');
         if ($limitPeriods && $limitPeriods > 0) {

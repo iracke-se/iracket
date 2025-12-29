@@ -19,9 +19,7 @@ class ConnectAccount extends Component
     public $players = [];
 
     // Modal states
-    public bool $showClubModal = false;
     public bool $showPlayerModal = false;
-    public string $clubSearch = '';
     public string $playerSearch = '';
 
     // Selected names for display
@@ -37,50 +35,15 @@ class ConnectAccount extends Component
             return redirect()->route('players.index');
         }
 
-        // Pre-fill with user's current club if set
-        $this->clubId = $user->club_id;
         $this->isActivePlayer = $user->is_active_player ?? true;
         $this->acceptsPushNotifications = $user->accepts_push_notifications ?? false;
 
-        // Set selected club name if club is set
-        if ($this->clubId) {
-            $club = Club::find($this->clubId);
-            $this->selectedClubName = $club?->name;
-            $this->loadPlayers();
-        }
-    }
-
-    public function openClubModal()
-    {
-        $this->clubSearch = '';
-        $this->showClubModal = true;
-    }
-
-    public function closeClubModal()
-    {
-        $this->showClubModal = false;
-        $this->clubSearch = '';
-    }
-
-    public function selectClub($clubId)
-    {
-        $this->clubId = $clubId;
-        $club = Club::find($clubId);
-        $this->selectedClubName = $club?->name;
-        $this->showClubModal = false;
-        $this->clubSearch = '';
-
-        // Reset player selection when club changes
-        $this->playerId = null;
-        $this->selectedPlayerName = null;
+        // Load all available players
         $this->loadPlayers();
     }
 
     public function openPlayerModal()
     {
-        if (!$this->clubId) {
-            return;
-        }
         $this->playerSearch = '';
         $this->showPlayerModal = true;
     }
@@ -95,52 +58,61 @@ class ConnectAccount extends Component
     {
         $this->playerId = $playerId;
         $player = User::find($playerId);
-        $this->selectedPlayerName = $player ? $player->first_name . ' ' . $player->last_name : null;
+
+        if ($player) {
+            $this->selectedPlayerName = $player->first_name . ' ' . $player->last_name;
+
+            // Auto-select club from player's profile
+            $this->clubId = $player->club_id;
+            if ($this->clubId) {
+                $club = Club::find($this->clubId);
+                $this->selectedClubName = $club?->name;
+            }
+        }
+
         $this->showPlayerModal = false;
         $this->playerSearch = '';
     }
 
-    public function updatedClubId($value)
-    {
-        $this->playerId = null;
-        $this->players = [];
-
-        if ($value) {
-            $this->loadPlayers();
-        }
-    }
-
     public function loadPlayers()
     {
-        if (!$this->clubId) {
-            $this->players = [];
-            return;
-        }
-
-        // Get players from the selected club that are synced from SBTF
+        // Get all players that are synced from SBTF
         // and not already connected to another account
-        $this->players = User::where('club_id', $this->clubId)
-            ->where('sbtf_synced', true)
+        $this->players = User::where('sbtf_synced', true)
             ->where(function ($query) {
                 $query->where('is_connected', false)
                     ->orWhereNull('is_connected');
             })
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name']);
+            ->get(['id', 'first_name', 'last_name', 'club_id']);
+    }
+
+    public function continueAsGuest()
+    {
+        $user = Auth::user();
+
+        // Mark as connected without linking to SBTF player
+        $user->update([
+            'is_connected' => true,
+            'is_active_player' => false,
+            'club_id' => null,
+            'accepts_push_notifications' => $this->acceptsPushNotifications,
+        ]);
+
+        return redirect()->route('players.index');
     }
 
     public function connect()
     {
         $user = Auth::user();
 
-        // Validate if active player
-        if ($this->isActivePlayer) {
+        // Validate if active player and no player selected
+        if ($this->isActivePlayer && !$this->playerId) {
             $this->validate([
-                'clubId' => 'required|exists:clubs,id',
+                'playerId' => 'required',
             ], [
-                'clubId.required' => __('connect.club_required'),
-                'clubId.exists' => __('connect.club_invalid'),
+                'playerId.required' => __('connect.player_required'),
             ]);
         }
 
@@ -179,41 +151,27 @@ class ConnectAccount extends Component
 
     public function render()
     {
-        // Get filtered clubs for modal
-        $clubsQuery = Club::orderBy('name');
-        if ($this->clubSearch) {
-            $clubsQuery->where('name', 'like', '%' . $this->clubSearch . '%');
-        }
-        $clubs = $clubsQuery->get()->groupBy(function ($club) {
-            return strtoupper(substr($club->name, 0, 1));
-        });
-
         // Get filtered players for modal
-        $playersGrouped = collect();
-        if ($this->clubId) {
-            $playersQuery = User::where('club_id', $this->clubId)
-                ->where('sbtf_synced', true)
-                ->where(function ($query) {
-                    $query->where('is_connected', false)
-                        ->orWhereNull('is_connected');
-                })
-                ->orderBy('first_name')
-                ->orderBy('last_name');
+        $playersQuery = User::where('sbtf_synced', true)
+            ->where(function ($query) {
+                $query->where('is_connected', false)
+                    ->orWhereNull('is_connected');
+            })
+            ->orderBy('first_name')
+            ->orderBy('last_name');
 
-            if ($this->playerSearch) {
-                $playersQuery->where(function ($query) {
-                    $query->where('first_name', 'like', '%' . $this->playerSearch . '%')
-                        ->orWhere('last_name', 'like', '%' . $this->playerSearch . '%');
-                });
-            }
-
-            $playersGrouped = $playersQuery->get()->groupBy(function ($player) {
-                return strtoupper(substr($player->first_name, 0, 1));
+        if ($this->playerSearch) {
+            $playersQuery->where(function ($query) {
+                $query->where('first_name', 'like', '%' . $this->playerSearch . '%')
+                    ->orWhere('last_name', 'like', '%' . $this->playerSearch . '%');
             });
         }
 
+        $playersGrouped = $playersQuery->get()->groupBy(function ($player) {
+            return strtoupper(substr($player->first_name, 0, 1));
+        });
+
         return view('livewire.auth.connect-account', [
-            'clubsGrouped' => $clubs,
             'playersGrouped' => $playersGrouped,
         ]);
     }

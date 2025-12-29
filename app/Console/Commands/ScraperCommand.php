@@ -11,15 +11,18 @@ class ScraperCommand extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'scraper:run
-                            {type : The type of scrape (rankings, players, transitions, series, live_center)}
+                            {type : The type of scrape (rankings, players, transitions, series, series_matches, live_center)}
                             {--gender=male : Gender for rankings (male/female)}
                             {--period= : Period filter (e.g., 2024.01.01)}
                             {--direction=gte : Direction for period filter (gte/lte)}
+                            {--period-skip= : Skip first N periods (for parallel processing)}
+                            {--period-take= : Take only N periods after skip (for parallel processing)}
                             {--limit-periods= : Limit number of periods to scrape (for testing)}
                             {--limit-clubs= : Limit number of clubs to scrape (for testing, players only)}
                             {--limit-divisions= : Limit number of divisions to scrape (for testing, rankings/live_center)}
-                            {--limit-seasons= : Limit number of seasons to scrape (for testing, series only)}
-                            {--limit-series= : Limit number of series per season to scrape (for testing, series only)}
+                            {--limit-seasons= : Limit number of seasons to scrape (for testing, series/series_matches)}
+                            {--limit-series= : Limit number of series per season to scrape (for testing, series/series_matches)}
+                            {--limit-matches= : Limit number of matches per series to scrape (for testing, series_matches only)}
                             {--queue : Queue the job instead of running synchronously}';
 
     /**
@@ -33,7 +36,7 @@ class ScraperCommand extends Command
     public function handle(): int
     {
         $type = $this->argument('type');
-        $validTypes = ['rankings', 'players', 'transitions', 'series', 'live_center'];
+        $validTypes = ['rankings', 'players', 'transitions', 'series', 'series_matches', 'live_center'];
 
         if (!in_array($type, $validTypes)) {
             $this->error("Invalid type. Must be one of: " . implode(', ', $validTypes));
@@ -48,6 +51,12 @@ class ScraperCommand extends Command
             if ($this->option('period')) {
                 $parameters['period'] = $this->option('period');
                 $parameters['direction'] = $this->option('direction');
+            }
+            if ($this->option('period-skip')) {
+                $parameters['period_skip'] = (int) $this->option('period-skip');
+            }
+            if ($this->option('period-take')) {
+                $parameters['period_take'] = (int) $this->option('period-take');
             }
             if ($this->option('limit-periods')) {
                 $parameters['limit_periods'] = (int) $this->option('limit-periods');
@@ -99,6 +108,22 @@ class ScraperCommand extends Command
             }
             if ($this->option('limit-series')) {
                 $parameters['limit_series'] = (int) $this->option('limit-series');
+            }
+        }
+
+        if ($type === 'series_matches') {
+            if ($this->option('period')) {
+                $parameters['period'] = $this->option('period');
+                $parameters['direction'] = $this->option('direction');
+            }
+            if ($this->option('limit-seasons')) {
+                $parameters['limit_seasons'] = (int) $this->option('limit-seasons');
+            }
+            if ($this->option('limit-series')) {
+                $parameters['limit_series'] = (int) $this->option('limit-series');
+            }
+            if ($this->option('limit-matches')) {
+                $parameters['limit_matches'] = (int) $this->option('limit-matches');
             }
         }
 
@@ -156,6 +181,7 @@ class ScraperCommand extends Command
             'players' => \App\Services\Scraper\PlayerListScraper::class,
             'transitions' => \App\Services\Scraper\TransitionsScraper::class,
             'series' => \App\Services\Scraper\SeriesScraper::class,
+            'series_matches' => \App\Services\Scraper\SeriesMatchScraper::class,
             'live_center' => \App\Services\Scraper\LiveCenterScraper::class,
             default => null,
         };

@@ -15,6 +15,7 @@ class Index extends Component
     public string $gender = '';
     public string $club = '';
     public string $verified = '';
+    public string $connectionStatus = '';
     public array $selectedUsers = [];
     public bool $selectAll = false;
 
@@ -23,6 +24,7 @@ class Index extends Component
         'gender' => ['except' => ''],
         'club' => ['except' => ''],
         'verified' => ['except' => ''],
+        'connectionStatus' => ['except' => ''],
     ];
 
     public function updatingSearch()
@@ -41,6 +43,11 @@ class Index extends Component
     }
 
     public function updatingVerified()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingConnectionStatus()
     {
         $this->resetPage();
     }
@@ -75,6 +82,16 @@ class Index extends Component
                     $query->whereNotNull('email_verified_at');
                 } else {
                     $query->whereNull('email_verified_at');
+                }
+            })
+            ->when($this->connectionStatus !== '', function ($query) {
+                if ($this->connectionStatus === 'connected') {
+                    $query->where('is_connected', true);
+                } else {
+                    $query->where(function ($q) {
+                        $q->where('is_connected', false)
+                          ->orWhereNull('is_connected');
+                    });
                 }
             })
             ->pluck('id')
@@ -134,6 +151,16 @@ class Index extends Component
                     $query->whereNull('email_verified_at');
                 }
             })
+            ->when($this->connectionStatus !== '', function ($query) {
+                if ($this->connectionStatus === 'connected') {
+                    $query->where('is_connected', true);
+                } else {
+                    $query->where(function ($q) {
+                        $q->where('is_connected', false)
+                          ->orWhereNull('is_connected');
+                    });
+                }
+            })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
@@ -141,6 +168,11 @@ class Index extends Component
         $totalUsers = User::count();
         $verifiedUsers = User::whereNotNull('email_verified_at')->count();
         $unverifiedUsers = User::whereNull('email_verified_at')->count();
+        $connectedUsers = User::where('is_connected', true)->count();
+        $guestUsers = User::where(function ($q) {
+            $q->where('is_connected', false)
+              ->orWhereNull('is_connected');
+        })->count();
         $usersThisMonth = User::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->count();
@@ -153,6 +185,8 @@ class Index extends Component
             'totalUsers' => $totalUsers,
             'verifiedUsers' => $verifiedUsers,
             'unverifiedUsers' => $unverifiedUsers,
+            'connectedUsers' => $connectedUsers,
+            'guestUsers' => $guestUsers,
             'usersThisMonth' => $usersThisMonth,
             'clubs' => $clubs,
         ])->layout('components.layouts.admin');

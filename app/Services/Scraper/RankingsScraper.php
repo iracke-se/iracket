@@ -79,6 +79,17 @@ class RankingsScraper extends BaseScraperService
         // Filter out empty values
         $divisions = array_filter($divisions, fn($d) => !empty($d['value']));
 
+        // Apply period chunking for parallel processing
+        $periodSkip = $this->getParameter('period_skip');
+        $periodTake = $this->getParameter('period_take');
+
+        if ($periodSkip !== null || $periodTake !== null) {
+            $skip = $periodSkip ?? 0;
+            $take = $periodTake ?? count($periods);
+            $periods = array_slice($periods, $skip, $take);
+            $this->info("Processing period chunk: skip={$skip}, take={$take}");
+        }
+
         // Apply limits for testing
         $limitPeriods = $this->getParameter('limit_periods');
         $limitDivisions = $this->getParameter('limit_divisions');
@@ -91,9 +102,6 @@ class RankingsScraper extends BaseScraperService
         }
 
         $this->info("Found periods: " . count($periods) . ", divisions: " . count($divisions));
-
-        // Process divisions in parallel batches for better performance
-        $batchSize = config('scraper.batch_size', 5);
 
         // Process each period
         foreach ($periods as $period) {
@@ -114,23 +122,30 @@ class RankingsScraper extends BaseScraperService
                 }
             }
 
-            // Process divisions in batches
-            $divisionBatches = array_chunk($divisions, $batchSize);
+            // Select period
+            $selectPeriodJs = $this->browserService->jsSelectOption('rid', $period['value']);
+            $this->withRetry(function () use ($browser, $selectPeriodJs) {
+                $browser->evaluate($selectPeriodJs);
+            }, "Select period: {$period['text']}");
 
-            foreach ($divisionBatches as $divisionBatch) {
+            $this->delay('after_select');
+
+            // Process each division
+            foreach ($divisions as $division) {
                 if (!$this->shouldContinue()) {
                     break;
                 }
 
                 try {
-                    $this->scrapeRankingsForDivisionBatch(
+                    $this->scrapeRankingsForDivision(
                         $browser,
-                        $period,
-                        $divisionBatch,
+                        $period['text'],
+                        $division,
                         $gender
                     );
                 } catch (\Exception $e) {
-                    $this->warning("Failed to scrape division batch", [
+                    $this->warning("Failed to scrape division: {$division['text']}", [
+                        'period' => $period['text'],
                         'error' => $e->getMessage(),
                     ]);
                     $this->run->incrementFailed();
@@ -194,162 +209,6 @@ class RankingsScraper extends BaseScraperService
         }
 
         $this->info("Scraped {$period} - {$division['text']}: " . count($rankings) . " rankings");
-    }
-
-    /**
-     * Scrape rankings for multiple divisions in parallel
-     */
-    protected function scrapeRankingsForDivisionBatch(
-        Browsershot $browser,
-        array $period,
-        array $divisionBatch,
-        string $gender
-    ): void {
-        $periodValue = $period['value'];
-        $periodText = $period['text'];
-        $rankingsSelector = '#main-col > div.maincontent > table.table.table-condensed.table-hover.table-striped > tbody tr';
-
-        // Build JavaScript to fetch all divisions in parallel
-        $divisionFetches = [];
-        foreach ($divisionBatch as $division) {
-            $divisionValue = $division['value'];
-            $divisionText = addslashes($division['text']);
-
-            $divisionFetches[] = <<<JS
-            (async () => {
-                try {
-                    // Fetch the rankings page with period and division parameters
-                    const genderParam = '{$gender}' === 'female' ? 'k' : 'm';
-                    const url = new URL(window.location.origin + '/fx/sbtf/rankning/');
-                    url.searchParams.set('gender', genderParam);
-
-                    const formData = new URLSearchParams();
-                    formData.append('rid', '{$periodValue}');
-                    formData.append('distr', '{$divisionValue}');
-
-                    const response = await fetch(url.toString(), {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: formData.toString(),
-                        credentials: 'include'
-                    });
-
-                    const html = await response.text();
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-
-                    const rows = doc.querySelectorAll('{$rankingsSelector}');
-                    let rankings = [];
-
-                    for (let i = 0; i < rows.length; i++) {
-                        const cells = rows[i].querySelectorAll('td');
-                        if (cells.length > 0) {
-                            rankings.push({
-                                position: cells[0]?.innerText.trim() || '',
-                                positionChange: cells[1]?.innerText.trim() || '',
-                                name: cells[2]?.innerText.trim() || '',
-                                born: cells[3]?.innerText.trim() || '',
-                                club: cells[4]?.innerText.trim() || '',
-                                points: cells[5]?.innerText.trim() || '',
-                                pointsChange: cells[6]?.innerText.trim() || ''
-                            });
-                        }
-                    }
-
-                    return {
-                        divisionText: '{$divisionText}',
-                        rankings: rankings,
-                        success: true
-                    };
-                } catch (e) {
-                    return {
-                        divisionText: '{$divisionText}',
-                        error: e.message,
-                        success: false
-                    };
-                }
-            })()
-JS;
-        }
-
-        $batchJs = <<<JS
-        (async function() {
-            try {
-                const results = await Promise.all([
-                    {$this->joinJsArrayItems($divisionFetches)}
-                ]);
-                return JSON.stringify(results);
-            } catch (e) {
-                return JSON.stringify({ error: e.message });
-            }
-        })();
-        JS;
-
-        $resultsJson = $this->withRetry(function () use ($browser, $batchJs) {
-            return $browser->evaluate($batchJs);
-        }, "Get rankings for batch of " . count($divisionBatch) . " divisions");
-
-        $results = json_decode($resultsJson, true) ?? [];
-
-        if (isset($results['error'])) {
-            $this->warning("Error fetching batch: " . $results['error']);
-            return;
-        }
-
-        // Process results for each division
-        foreach ($results as $result) {
-            if (!$result['success']) {
-                $this->warning("Failed to scrape {$result['divisionText']}: " . ($result['error'] ?? 'unknown error'));
-                $this->run->incrementFailed();
-                continue;
-            }
-
-            $divisionText = $result['divisionText'];
-            $rankings = $result['rankings'] ?? [];
-
-            if (empty($rankings)) {
-                continue;
-            }
-
-            // Save rankings to database
-            foreach ($rankings as $ranking) {
-                // Parse position and change (format is "WR05 1" - take the last part)
-                $positionParts = explode(' ', trim($ranking['position'] ?? ''));
-                $position = (int) (end($positionParts) ?: 0);
-
-                // Parse points and change
-                $pointsParts = explode(' ', trim($ranking['points'] ?? ''));
-                $points = (int) str_replace(['.', ','], '', $pointsParts[0] ?? '0');
-
-                ScrapedRanking::create([
-                    'scraper_run_id' => $this->run->id,
-                    'period' => $periodText,
-                    'division' => $divisionText,
-                    'gender' => $gender,
-                    'position' => $position,
-                    'position_change' => trim($ranking['positionChange'] ?? ''),
-                    'name' => trim($ranking['name'] ?? ''),
-                    'born' => trim($ranking['born'] ?? ''),
-                    'club' => trim($ranking['club'] ?? ''),
-                    'points' => $points,
-                    'points_change' => trim($ranking['pointsChange'] ?? ''),
-                ]);
-
-                $this->run->incrementScraped();
-            }
-
-            $this->info("Scraped {$periodText} - {$divisionText}: " . count($rankings) . " rankings");
-        }
-    }
-
-    /**
-     * Helper to join JavaScript array items with commas
-     */
-    private function joinJsArrayItems(array $items): string
-    {
-        return implode(",\n                    ", $items);
     }
 
     protected function extractDateFromPeriod(string $periodText): ?int

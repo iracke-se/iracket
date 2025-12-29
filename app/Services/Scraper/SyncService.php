@@ -21,12 +21,18 @@ class SyncService
         'errors' => 0,
     ];
 
+    // Performance optimization: Cache clubs and emails in memory
+    protected array $clubsCache = [];
+    protected array $existingEmails = [];
+    protected bool $cacheInitialized = false;
+
     /**
      * Sync players from scraped data to users table
      */
     public function syncPlayers(?int $runId = null, ?ScraperRun $run = null): array
     {
         $this->resetStats();
+        $this->initializeCache();
 
         $query = ScrapedPlayer::where('is_synced', false);
 
@@ -72,11 +78,35 @@ class SyncService
     }
 
     /**
+     * Initialize performance caches
+     */
+    protected function initializeCache(): void
+    {
+        if ($this->cacheInitialized) {
+            return;
+        }
+
+        // Load all clubs into memory indexed by slug
+        $this->clubsCache = Club::all()->keyBy('slug')->toArray();
+
+        // Load all existing emails into a set for fast lookups
+        $this->existingEmails = User::pluck('email')->flip()->toArray();
+
+        $this->cacheInitialized = true;
+
+        Log::info('Performance cache initialized', [
+            'clubs' => count($this->clubsCache),
+            'emails' => count($this->existingEmails),
+        ]);
+    }
+
+    /**
      * Sync rankings from scraped data to users table
      */
     public function syncRankings(?int $runId = null, ?ScraperRun $run = null): array
     {
         $this->resetStats();
+        $this->initializeCache();
 
         $query = ScrapedRanking::where('is_synced', false);
 
@@ -262,7 +292,7 @@ class SyncService
     }
 
     /**
-     * Find or create a club by name
+     * Find or create a club by name (with caching)
      */
     protected function findOrCreateClub(?string $clubName): ?Club
     {
@@ -282,19 +312,22 @@ class SyncService
         // Generate slug for matching
         $slug = Str::slug($clubName);
 
-        // Try to find existing club by slug to avoid duplicates
-        $club = Club::where('slug', $slug)->first();
-
-        if ($club) {
-            return $club;
+        // Check cache first
+        if (isset($this->clubsCache[$slug])) {
+            return new Club($this->clubsCache[$slug]);
         }
 
         // Create new club if it doesn't exist
-        return Club::create([
+        $club = Club::create([
             'name' => $clubName,
             'slug' => $slug,
             'description' => null,
         ]);
+
+        // Add to cache
+        $this->clubsCache[$slug] = $club->toArray();
+
+        return $club;
     }
 
     /**
@@ -376,7 +409,7 @@ class SyncService
     }
 
     /**
-     * Generate a unique email for a new user
+     * Generate a unique email for a new user (with caching)
      */
     protected function generateEmail(string $firstName, string $lastName): string
     {
@@ -384,10 +417,14 @@ class SyncService
         $email = $baseEmail;
         $counter = 1;
 
-        while (User::where('email', $email)->exists()) {
+        // Check cache instead of database
+        while (isset($this->existingEmails[$email])) {
             $email = Str::slug($firstName . '.' . $lastName . '.' . $counter) . '@iracket.local';
             $counter++;
         }
+
+        // Add to cache so next check knows this email will be taken
+        $this->existingEmails[$email] = true;
 
         return $email;
     }
@@ -422,6 +459,11 @@ class SyncService
             'skipped' => 0,
             'errors' => 0,
         ];
+
+        // Reset cache so it gets reinitialized on next sync
+        $this->cacheInitialized = false;
+        $this->clubsCache = [];
+        $this->existingEmails = [];
     }
 
     /**

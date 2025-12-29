@@ -19,7 +19,7 @@
     @endif
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <!-- Total Users -->
         <div class="bg-white dark:bg-zinc-800 rounded-xl p-4 border border-zinc-200 dark:border-zinc-700">
             <div class="flex items-center justify-between">
@@ -30,6 +30,36 @@
                 <div class="p-3 bg-accent/10 rounded-lg">
                     <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connected Users -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-4 border border-zinc-200 dark:border-zinc-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Connected</p>
+                    <p class="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{{ $connectedUsers }}</p>
+                </div>
+                <div class="p-3 bg-blue-500/10 rounded-lg">
+                    <svg class="w-5 h-5 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guest Users -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-4 border border-zinc-200 dark:border-zinc-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Guests</p>
+                    <p class="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{{ $guestUsers }}</p>
+                </div>
+                <div class="p-3 bg-purple-500/10 rounded-lg">
+                    <svg class="w-5 h-5 text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                     </svg>
                 </div>
             </div>
@@ -72,8 +102,8 @@
                     <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('admin-users.this_month') }}</p>
                     <p class="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{{ $usersThisMonth }}</p>
                 </div>
-                <div class="p-3 bg-blue-500/10 rounded-lg">
-                    <svg class="w-5 h-5 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="p-3 bg-orange-500/10 rounded-lg">
+                    <svg class="w-5 h-5 text-orange-500 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                 </div>
@@ -102,7 +132,7 @@
     @endif
 
     <!-- Filters -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div class="md:col-span-1">
             <input
                 type="text"
@@ -128,6 +158,14 @@
             @foreach($clubs as $clubOption)
                 <option value="{{ $clubOption->id }}">{{ $clubOption->name }}</option>
             @endforeach
+        </select>
+        <select
+            wire:model.live="connectionStatus"
+            class="px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        >
+            <option value="">All Account Types</option>
+            <option value="connected">Connected Accounts</option>
+            <option value="guest">Guest Accounts</option>
         </select>
         <select
             wire:model.live="verified"

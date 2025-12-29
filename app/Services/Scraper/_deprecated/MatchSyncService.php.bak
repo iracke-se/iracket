@@ -311,8 +311,8 @@ class MatchSyncService
     }
 
     /**
-     * Parse score string to count game wins
-     * Examples: "9-11, 13-11, 9-11, 11-8, 11-13" or "3-1" (match result)
+     * Parse score string to extract sets
+     * Examples: "3 - 2", "6 - 3", "00:00"
      */
     protected function parseScore(string $score): array
     {
@@ -322,35 +322,13 @@ class MatchSyncService
             'player2_sets' => 0,
         ];
 
-        // Clean up score
+        // Clean up score and try to parse
         $score = trim($score);
-        if (empty($score)) {
-            return $result;
-        }
 
-        // If score contains commas, it's individual game scores like "9-11, 13-11, 9-11"
-        if (str_contains($score, ',')) {
-            $games = explode(',', $score);
-
-            foreach ($games as $game) {
-                $game = trim($game);
-                if (preg_match('/(\d+)-(\d+)/', $game, $matches)) {
-                    $score1 = (int) $matches[1];
-                    $score2 = (int) $matches[2];
-
-                    if ($score1 > $score2) {
-                        $result['player1_sets']++;
-                    } elseif ($score2 > $score1) {
-                        $result['player2_sets']++;
-                    }
-                }
-            }
-        } else {
-            // Handle simple match result formats like "3 - 2" or "6-3"
-            if (preg_match('/(\d+)\s*-\s*(\d+)/', $score, $matches)) {
-                $result['player1_sets'] = (int) $matches[1];
-                $result['player2_sets'] = (int) $matches[2];
-            }
+        // Handle formats like "3 - 2" or "6-3"
+        if (preg_match('/(\d+)\s*-\s*(\d+)/', $score, $matches)) {
+            $result['player1_sets'] = (int) $matches[1];
+            $result['player2_sets'] = (int) $matches[2];
         }
 
         return $result;
