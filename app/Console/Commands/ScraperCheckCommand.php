@@ -11,8 +11,7 @@ use Spatie\Browsershot\Browsershot;
 class ScraperCheckCommand extends Command
 {
     protected $signature = 'scraper:check
-                            {--fix : Attempt to fix issues automatically}
-                            {--verbose : Show detailed diagnostic information}';
+                            {--fix : Attempt to fix issues automatically}';
 
     protected $description = 'Check if scraper has all required tools and configuration';
 
