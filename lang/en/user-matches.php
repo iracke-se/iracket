@@ -10,6 +10,7 @@ return [
     // Show Page
     'victory' => 'Victory',
     'defeat' => 'Defeat',
+    'winner' => 'Winner',
     'comments_on_opponent' => 'Comments on Opponent',
     'match_notes' => 'Match Notes',
     'status' => 'Status',

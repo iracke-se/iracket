@@ -10,6 +10,7 @@ return [
     // Show Page
     'victory' => 'Seger',
     'defeat' => 'Förlust',
+    'winner' => 'Vinnare',
     'comments_on_opponent' => 'Kommentarer om motståndare',
     'match_notes' => 'Matchanteckningar',
     'status' => 'Status',

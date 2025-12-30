@@ -1,13 +1,9 @@
 <div class="max-w-2xl mx-auto">
     @php
         $user = auth()->user();
-        $isPlayer1 = $match->player1_id === $user->id;
-        $opponent = $isPlayer1 ? $match->player2 : $match->player1;
-        $mySets = $isPlayer1 ? $match->player1_sets : $match->player2_sets;
-        $opponentSets = $isPlayer1 ? $match->player2_sets : $match->player1_sets;
-        $won = $match->winner_id === $user->id;
-        $myComments = $isPlayer1 ? $match->player1_comments : $match->player2_comments;
-        $opponentComments = $isPlayer1 ? $match->player2_comments : $match->player1_comments;
+        $isParticipant = $match->player1_id === $user->id || $match->player2_id === $user->id;
+        $player1 = $match->player1;
+        $player2 = $match->player2;
     @endphp
 
     <!-- Match Header -->
@@ -19,28 +15,32 @@
 
         <!-- Result -->
         <div class="text-center mb-6">
-            <div class="text-4xl font-bold {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">
-                {{ $mySets }} - {{ $opponentSets }}
+            <div class="text-4xl font-bold text-zinc-900 dark:text-white">
+                {{ $match->player1_sets }} - {{ $match->player2_sets }}
             </div>
-            <p class="text-sm {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }} mt-1">
-                {{ $won ? __('user-matches.victory') : __('user-matches.defeat') }}
-            </p>
+            @if($match->winner)
+                <p class="text-sm text-accent mt-1">
+                    {{ __('user-matches.winner') }}: {{ $match->winner->name }}
+                </p>
+            @endif
         </div>
 
         <!-- Players -->
         <div class="flex items-start justify-between">
-            <!-- Me -->
+            <!-- Player 1 -->
             <div class="flex-1 text-center">
-                @if($user->profile_picture)
-                    <img src="{{ Storage::url($user->profile_picture) }}" alt="{{ $user->name }}" class="w-16 h-16 rounded-full object-cover mx-auto mb-2">
+                @if($player1->profile_picture)
+                    <img src="{{ Storage::url($player1->profile_picture) }}" alt="{{ $player1->name }}" class="w-16 h-16 rounded-full object-cover mx-auto mb-2">
                 @else
                     <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mx-auto mb-2">
-                        <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $user->initials() }}</span>
+                        <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player1->initials() }}</span>
                     </div>
                 @endif
-                <p class="font-medium text-zinc-900 dark:text-white">{{ $user->name }}</p>
-                @if($user->club)
-                    <a href="{{ route('clubs.show', $user->club) }}" wire:navigate class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-accent">{{ $user->club->name }}</a>
+                <a href="{{ route('players.show', $player1) }}" wire:navigate class="font-medium text-zinc-900 dark:text-white hover:text-accent">
+                    {{ $player1->name }}
+                </a>
+                @if($player1->club)
+                    <a href="{{ route('clubs.show', $player1->club) }}" wire:navigate class="block text-xs text-zinc-500 dark:text-zinc-400 hover:text-accent">{{ $player1->club->name }}</a>
                 @endif
             </div>
 
@@ -49,38 +49,24 @@
                 <span class="text-zinc-400 dark:text-zinc-500 font-medium">VS</span>
             </div>
 
-            <!-- Opponent -->
+            <!-- Player 2 -->
             <div class="flex-1 text-center">
-                @if($opponent->profile_picture)
-                    <img src="{{ Storage::url($opponent->profile_picture) }}" alt="{{ $opponent->name }}" class="w-16 h-16 rounded-full object-cover mx-auto mb-2">
+                @if($player2->profile_picture)
+                    <img src="{{ Storage::url($player2->profile_picture) }}" alt="{{ $player2->name }}" class="w-16 h-16 rounded-full object-cover mx-auto mb-2">
                 @else
                     <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mx-auto mb-2">
-                        <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $opponent->initials() }}</span>
+                        <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player2->initials() }}</span>
                     </div>
                 @endif
-                <a href="{{ route('players.show', $opponent) }}" wire:navigate class="font-medium text-zinc-900 dark:text-white hover:text-accent">
-                    {{ $opponent->name }}
+                <a href="{{ route('players.show', $player2) }}" wire:navigate class="font-medium text-zinc-900 dark:text-white hover:text-accent">
+                    {{ $player2->name }}
                 </a>
-                @if($opponent->club)
-                    <a href="{{ route('clubs.show', $opponent->club) }}" wire:navigate class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-accent">{{ $opponent->club->name }}</a>
+                @if($player2->club)
+                    <a href="{{ route('clubs.show', $player2->club) }}" wire:navigate class="block text-xs text-zinc-500 dark:text-zinc-400 hover:text-accent">{{ $player2->club->name }}</a>
                 @endif
             </div>
         </div>
     </div>
-
-    <!-- Comments on Opponent -->
-    @if(!empty($opponentComments))
-        <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
-            <h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">{{ __('user-matches.comments_on_opponent') }}</h3>
-            <div class="flex flex-wrap gap-2">
-                @foreach($opponentComments as $comment)
-                    <span class="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg text-sm text-zinc-700 dark:text-zinc-200">
-                        {{ $comment }}
-                    </span>
-                @endforeach
-            </div>
-        </div>
-    @endif
 
     <!-- Description -->
     @if($match->description)
