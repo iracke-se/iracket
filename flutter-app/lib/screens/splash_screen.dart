@@ -5,26 +5,26 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.sports_tennis,
-              size: 80,
-              color: Colors.blue,
+            Image.asset(
+              'assets/images/splash.png',
+              width: 200,
+              height: 200,
             ),
-            SizedBox(height: 24),
-            Text(
+            const SizedBox(height: 24),
+            const Text(
               'iRacket',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 24),
-            CircularProgressIndicator(),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
           ],
         ),
       ),

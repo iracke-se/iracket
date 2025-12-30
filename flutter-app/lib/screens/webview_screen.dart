@@ -23,6 +23,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _initWebView() {
+    // Detect system theme mode
+    final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final isDarkMode = brightness == Brightness.dark;
+    final themeMode = isDarkMode ? 'dark' : 'light';
+
+    // Build URL with theme parameter
+    final uri = Uri.parse(Environment.laravelBaseUrl);
+    final urlWithTheme = uri.replace(
+      queryParameters: {
+        ...uri.queryParameters,
+        'app_theme': themeMode,
+      },
+    ).toString();
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
@@ -42,8 +56,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
               _isLoading = false;
             });
 
-            // Inject FCM token into JavaScript context
+            // Inject FCM token and theme mode into JavaScript context
             await _injectFcmToken();
+            await _injectThemeMode(themeMode);
           },
           onNavigationRequest: (NavigationRequest request) {
             // Handle external links
@@ -64,7 +79,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           _handleJavaScriptMessage(message.message);
         },
       )
-      ..loadRequest(Uri.parse(Environment.laravelBaseUrl));
+      ..loadRequest(Uri.parse(urlWithTheme));
   }
 
   Future<void> _injectFcmToken() async {
@@ -83,6 +98,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
         }));
       ''');
     }
+  }
+
+  Future<void> _injectThemeMode(String themeMode) async {
+    await _controller.runJavaScript('''
+      window.flutterThemeMode = "$themeMode";
+      window.dispatchEvent(new CustomEvent('themeModeReady', {
+        detail: {
+          themeMode: '$themeMode'
+        }
+      }));
+    ''');
   }
 
   void _handleJavaScriptMessage(String message) {

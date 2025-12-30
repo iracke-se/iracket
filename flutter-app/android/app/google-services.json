@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "473107196258",
+    "project_id": "iracket-se",
+    "storage_bucket": "iracket-se.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:473107196258:android:ce50323b4e37f7f588e43b",
+        "android_client_info": {
+          "package_name": "com.iracket.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByBDqubVveIYyas9K_9kQ_Ba8Y6_uP4z8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

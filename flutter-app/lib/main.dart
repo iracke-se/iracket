@@ -1,16 +1,21 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/webview_screen.dart';
+import 'screens/web_redirect_screen.dart';
 import 'services/fcm_service.dart';
 import 'services/notification_service.dart';
 
 // Handle background messages
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   print('Handling a background message: ${message.messageId}');
 }
 
@@ -56,18 +61,28 @@ class _AppInitializerState extends State<AppInitializer> {
 
   Future<void> _initializeApp() async {
     try {
-      // Initialize Firebase
-      await Firebase.initializeApp();
+      // Initialize Firebase with platform-specific options
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
 
-      // Set up background message handler
-      FirebaseMessaging.onBackgroundMessage(
-          _firebaseMessagingBackgroundHandler);
+      // Try to initialize FCM and notifications (optional for development)
+      try {
+        // Set up background message handler
+        FirebaseMessaging.onBackgroundMessage(
+            _firebaseMessagingBackgroundHandler);
 
-      // Initialize FCM
-      await FcmService.initialize();
+        // Initialize FCM
+        await FcmService.initialize();
 
-      // Initialize notifications
-      await NotificationService.initialize();
+        // Initialize notifications
+        await NotificationService.initialize();
+
+        print('FCM initialized successfully');
+      } catch (fcmError) {
+        // FCM failed (likely APNS not configured), but continue anyway
+        print('FCM initialization failed (continuing without notifications): $fcmError');
+      }
 
       setState(() {
         _isInitialized = true;
@@ -127,6 +142,12 @@ class _AppInitializerState extends State<AppInitializer> {
       return const SplashScreen();
     }
 
-    return const WebViewScreen();
+    // On web, redirect to Laravel app directly
+    // On mobile, use WebView
+    if (kIsWeb) {
+      return const WebRedirectScreen();
+    } else {
+      return const WebViewScreen();
+    }
   }
 }
