@@ -135,13 +135,13 @@ class ScraperStartCommand extends Command
             });
 
             // Step 5: Scrape Rankings (Male) - Parallel Processing
-            $this->runStep('Scraping Rankings (Male) - 3 Parallel Processes', function () {
-                return $this->scrapeRankingsParallel('male');
+            $this->runStep('Scraping Rankings (Male) - 3 Parallel Processes', function () use ($month, $scrapeAll) {
+                return $this->scrapeRankingsParallel('male', $month, $scrapeAll);
             });
 
             // Step 6: Scrape Rankings (Female) - Parallel Processing
-            $this->runStep('Scraping Rankings (Female) - 3 Parallel Processes', function () {
-                return $this->scrapeRankingsParallel('female');
+            $this->runStep('Scraping Rankings (Female) - 3 Parallel Processes', function () use ($month, $scrapeAll) {
+                return $this->scrapeRankingsParallel('female', $month, $scrapeAll);
             });
 
             // Step 7: Sync Rankings
@@ -725,7 +725,7 @@ class ScraperStartCommand extends Command
         return $this->runScraperWithProgress($command, "Rankings ({$gender})");
     }
 
-    protected function scrapeRankingsParallel(string $gender): array
+    protected function scrapeRankingsParallel(string $gender, string $month, bool $scrapeAll): array
     {
         $this->line("  🚀 Starting parallel rankings scrape for {$gender}...");
         $this->line("  Running 3 period chunks in parallel");
@@ -744,6 +744,12 @@ class ScraperStartCommand extends Command
         // Start all 3 processes
         foreach ($chunks as $index => $chunk) {
             $command = "php artisan scraper:run rankings --gender={$gender} --period-skip={$chunk['skip']} --period-take={$chunk['take']}";
+
+            // Pass period filter to each parallel job
+            if (!$scrapeAll) {
+                $command .= " --period=" . escapeshellarg($month . '-01');
+                $command .= " --direction=gte";
+            }
 
             $process = \Symfony\Component\Process\Process::fromShellCommandline($command);
             $process->setTimeout(null);

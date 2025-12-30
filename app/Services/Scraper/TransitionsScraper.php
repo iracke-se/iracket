@@ -86,7 +86,10 @@ class TransitionsScraper extends BaseScraperService
         $periods = array_filter($periods, fn($p) => $p['value'] !== '0');
 
         // Apply limits for testing
+        $periodFilter = $this->getParameter('period');
+        $direction = $this->getParameter('direction', 'gte');
         $limitPeriods = $this->getParameter('limit_periods');
+
         if ($limitPeriods && $limitPeriods > 0) {
             $periods = array_slice(array_values($periods), 0, $limitPeriods);
         }
@@ -97,6 +100,30 @@ class TransitionsScraper extends BaseScraperService
         foreach ($periods as $period) {
             if (!$this->shouldContinue()) {
                 break;
+            }
+
+            // Apply period filter if specified
+            if ($periodFilter) {
+                $periodYear = $this->extractYearFromPeriod($period['text']);
+
+                $this->info("Evaluating period {$period['text']}: extracted year = " . ($periodYear ?? 'NULL'));
+
+                if ($periodYear) {
+                    // Convert "2024-12-01" → 2024 (extract year from filter)
+                    $filterYear = (int)date('Y', strtotime($periodFilter));
+
+                    $this->info("Filter year: {$filterYear}, Period year: {$periodYear}");
+
+                    if ($periodYear > $filterYear) {
+                        $this->info("⊘ Skipping period {$period['text']} (year {$periodYear} > {$filterYear}) - newer than target year");
+                        continue; // Skip newer periods
+                    } elseif ($periodYear < $filterYear) {
+                        $this->info("✗ Stopping at period {$period['text']} (year {$periodYear} < {$filterYear}) - older than target year, stopping");
+                        break; // Stop at older periods
+                    }
+
+                    $this->info("✓ Processing period {$period['text']} (matches target year {$filterYear})");
+                }
             }
 
             try {

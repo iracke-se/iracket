@@ -107,14 +107,25 @@ class SeriesMatchScraper extends BaseScraperService
 
             // Apply period filter if specified
             if ($periodFilter) {
-                $seasonYear = $this->extractYearFromSeason($season['label'] ?? '');
+                $seasonYear = $this->extractYearFromPeriod($season['label'] ?? '');
+
+                $this->info("Evaluating season {$season['label']}: extracted year = " . ($seasonYear ?? 'NULL'));
+
                 if ($seasonYear) {
-                    $filterYear = (int) $periodFilter;
-                    if ($direction === 'gte' && $seasonYear < $filterYear) {
-                        continue;
-                    } elseif ($direction === 'lte' && $seasonYear > $filterYear) {
-                        continue;
+                    // Convert "2024-12-01" → 2024 (extract year from filter)
+                    $filterYear = (int)date('Y', strtotime($periodFilter));
+
+                    $this->info("Filter year: {$filterYear}, Season year: {$seasonYear}");
+
+                    if ($seasonYear > $filterYear) {
+                        $this->info("⊘ Skipping season {$season['label']} (year {$seasonYear} > {$filterYear}) - newer than target year");
+                        continue; // Skip newer seasons
+                    } elseif ($seasonYear < $filterYear) {
+                        $this->info("✗ Stopping at season {$season['label']} (year {$seasonYear} < {$filterYear}) - older than target year, stopping");
+                        break; // Stop at older seasons
                     }
+
+                    $this->info("✓ Processing season {$season['label']} (matches target year {$filterYear})");
                 }
             }
 
@@ -440,15 +451,6 @@ class SeriesMatchScraper extends BaseScraperService
         }
 
         $this->info("Scraped {$seriesName}: " . count($matches) . " player matches");
-    }
-
-    protected function extractYearFromSeason(string $seasonLabel): ?int
-    {
-        // Extract year from "Säsongen 2024/2025" or similar formats
-        if (preg_match('/(\d{4})/', $seasonLabel, $matches)) {
-            return (int) $matches[1];
-        }
-        return null;
     }
 
     protected function parseDate(string $dateStr): ?string

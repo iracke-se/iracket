@@ -111,14 +111,25 @@ class RankingsScraper extends BaseScraperService
 
             // Apply period filter if specified
             if ($periodFilter) {
-                $periodDate = $this->extractDateFromPeriod($period['text']);
-                if ($periodDate) {
-                    $filterDate = strtotime($periodFilter);
-                    if ($direction === 'gte' && $periodDate < $filterDate) {
-                        continue;
-                    } elseif ($direction === 'lte' && $periodDate > $filterDate) {
-                        continue;
+                $periodYear = $this->extractYearFromPeriod($period['text']);
+
+                $this->info("Evaluating period {$period['text']}: extracted year = " . ($periodYear ?? 'NULL'));
+
+                if ($periodYear) {
+                    // Convert "2024-12-01" → 2024 (extract year from filter)
+                    $filterYear = (int)date('Y', strtotime($periodFilter));
+
+                    $this->info("Filter year: {$filterYear}, Period year: {$periodYear}");
+
+                    if ($periodYear > $filterYear) {
+                        $this->info("⊘ Skipping period {$period['text']} (year {$periodYear} > {$filterYear}) - newer than target year");
+                        continue; // Skip newer periods
+                    } elseif ($periodYear < $filterYear) {
+                        $this->info("✗ Stopping at period {$period['text']} (year {$periodYear} < {$filterYear}) - older than target year, stopping");
+                        break; // Stop at older periods
                     }
+
+                    $this->info("✓ Processing period {$period['text']} (matches target year {$filterYear})");
                 }
             }
 
@@ -209,19 +220,5 @@ class RankingsScraper extends BaseScraperService
         }
 
         $this->info("Scraped {$period} - {$division['text']}: " . count($rankings) . " rankings");
-    }
-
-    protected function extractDateFromPeriod(string $periodText): ?int
-    {
-        // Extract date from period text like "2024.01.01" or "January 2024"
-        if (preg_match('/(\d{4})\.(\d{2})\.(\d{2})/', $periodText, $matches)) {
-            return strtotime("{$matches[1]}-{$matches[2]}-{$matches[3]}");
-        }
-
-        if (preg_match('/(\d{4})/', $periodText, $matches)) {
-            return strtotime("{$matches[1]}-01-01");
-        }
-
-        return null;
     }
 }

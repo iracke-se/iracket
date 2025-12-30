@@ -179,4 +179,37 @@ abstract class BaseScraperService
     {
         return $this->run;
     }
+
+    /**
+     * Extract year from period text (standardized across all scrapers)
+     *
+     * Handles formats:
+     * - "Licens 2024-25" → 2024
+     * - "Licens 2024/25" → 2024
+     * - "2024.01.01" → 2024
+     * - "January 2024" → 2024
+     * - "2024" → 2024
+     *
+     * @param string $periodText The period text from profixio.com
+     * @return int|null The extracted year as integer, or null if not found
+     */
+    protected function extractYearFromPeriod(string $periodText): ?int
+    {
+        // Pattern 1: "Licens 2024-25" or "Licens 2024/25"
+        if (preg_match('/(\d{4})[-\/]\d{2}/', $periodText, $matches)) {
+            return (int)$matches[1];
+        }
+
+        // Pattern 2: "2024.01.01" (dot-separated date)
+        if (preg_match('/(\d{4})\.(\d{2})\.(\d{2})/', $periodText, $matches)) {
+            return (int)$matches[1];
+        }
+
+        // Pattern 3: Any 4-digit year in text
+        if (preg_match('/(\d{4})/', $periodText, $matches)) {
+            return (int)$matches[1];
+        }
+
+        return null;
+    }
 }
