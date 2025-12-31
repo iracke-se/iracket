@@ -7,6 +7,7 @@ use App\Services\Scraper\SyncService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class ScraperStartCommand extends Command
 {
@@ -208,19 +209,49 @@ class ScraperStartCommand extends Command
     protected function createBackup(string $month): array
     {
         $timestamp = now()->format('YmdHis');
-        $this->backupFile = "backup-scraper-{$month}-{$timestamp}.sql.gz";
+        $backupName = "scraper-{$month}-{$timestamp}";
 
-        $this->line("  📦 Creating backup: <fg=yellow>{$this->backupFile}</>");
+        $this->line("  📦 Creating database backup: <fg=yellow>{$backupName}</>");
 
-        $result = Process::run("ddev export-db --file={$this->backupFile}");
+        try {
+            // Run Spatie backup for database only
+            $exitCode = \Illuminate\Support\Facades\Artisan::call('backup:run', [
+                '--only-db' => true,
+                '--disable-notifications' => true,
+            ]);
 
-        if (!$result->successful()) {
-            throw new \Exception("Failed to create backup: " . $result->errorOutput());
+            if ($exitCode !== 0) {
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                throw new \Exception("Backup command failed: " . $output);
+            }
+
+            // Get the latest backup file from configured backup destination
+            $backupDestination = config('backup.backup.destination.disks')[0] ?? 'local';
+            $disk = \Storage::disk($backupDestination);
+
+            // Get backup directory path
+            $backupName = config('backup.backup.name');
+            $files = collect($disk->files($backupName))
+                ->filter(fn($file) => str_ends_with($file, '.zip'))
+                ->sortByDesc(fn($file) => $disk->lastModified($file))
+                ->first();
+
+            if (!$files) {
+                throw new \Exception("No backup file found after backup:run completed");
+            }
+
+            $this->backupFile = $disk->path($files);
+
+            $this->line("  ✓ Backup created successfully");
+            $this->line("  📍 Location: <fg=cyan>{$this->backupFile}</>");
+
+            return [
+                'backup_file' => $this->backupFile,
+                'backup_name' => $backupName,
+            ];
+        } catch (\Exception $e) {
+            throw new \Exception("Failed to create backup: " . $e->getMessage());
         }
-
-        $this->line("  ✓ Backup created successfully");
-
-        return ['backup_file' => $this->backupFile];
     }
 
     protected function cleanupBackup(): void
