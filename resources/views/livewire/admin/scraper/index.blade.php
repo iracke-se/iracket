@@ -136,31 +136,22 @@
                 </button>
             @endif
         </div>
-        <div class="flex items-end gap-4">
-            <div class="flex-1">
-                <label for="month" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                    Select Month
-                </label>
-                <input type="month"
-                       wire:model="month"
-                       id="month"
-                       class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent"
-                       :disabled="$wire.isScraperRunning">
-            </div>
-            <button wire:click="startScraper"
-                    wire:loading.attr="disabled"
-                    :disabled="$wire.isScraperRunning"
-                    class="px-6 py-2 bg-accent hover:bg-accent/90 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2">
-                <svg wire:loading.remove wire:target="startScraper" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <svg wire:loading wire:target="startScraper" class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                <span wire:loading.remove wire:target="startScraper">Start Scraper</span>
-                <span wire:loading wire:target="startScraper">Starting...</span>
-            </button>
+        <div class="flex items-center gap-4">
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+                Configure scraper options and dispatch to queue for background processing
+            </p>
+            <flux:modal.trigger name="scraper-options">
+                <button x-data=""
+                        x-on:click.prevent="$dispatch('open-modal', 'scraper-options')"
+                        :disabled="$wire.isScraperRunning"
+                        class="px-6 py-2.5 bg-accent hover:bg-accent/90 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2 ml-auto">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Start Scraper
+                </button>
+            </flux:modal.trigger>
         </div>
         @if($isScraperRunning)
             <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -174,6 +165,151 @@
         @endif
     </div>
 
+    <!-- Scraper Options Modal -->
+    <flux:modal name="scraper-options" class="max-w-2xl">
+        <div class="p-6">
+            <h2 class="text-xl font-bold text-zinc-900 dark:text-white mb-6">Configure Scraper Options</h2>
+
+            <form wire:submit.prevent="startScraper" class="space-y-6">
+                <!-- Scraper Type -->
+                <div>
+                    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Scraper Type
+                    </label>
+                    <select wire:model.live="scraperType"
+                            class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
+                        @foreach($scraperTypes as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Month Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Month (YYYY-MM)
+                    </label>
+                    <input type="month"
+                           wire:model="month"
+                           :disabled="$wire.scrapeAll"
+                           class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent disabled:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:cursor-not-allowed">
+                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Leave empty and enable "Scrape All" to scrape all historical data</p>
+                </div>
+
+                <!-- Scrape All Checkbox -->
+                <div class="flex items-center gap-3">
+                    <input type="checkbox"
+                           wire:model.live="scrapeAll"
+                           id="scrapeAll"
+                           class="w-4 h-4 text-accent bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-600 rounded focus:ring-accent">
+                    <label for="scrapeAll" class="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                        Scrape All Data (no month filter)
+                    </label>
+                </div>
+
+                <!-- Gender Selection (for rankings) -->
+                @if($scraperType === 'rankings')
+                <div>
+                    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Gender <span class="text-red-500">*</span>
+                    </label>
+                    <select wire:model="gender"
+                            class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
+                        <option value="">Select Gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                    </select>
+                </div>
+                @endif
+
+                <!-- Testing Limits -->
+                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-white mb-3">Testing Limits (Optional)</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                                Limit Periods
+                            </label>
+                            <input type="number"
+                                   wire:model="limitPeriods"
+                                   placeholder="e.g., 2"
+                                   min="1"
+                                   class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                                Limit Divisions
+                            </label>
+                            <input type="number"
+                                   wire:model="limitDivisions"
+                                   placeholder="e.g., 2"
+                                   min="1"
+                                   class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Use these to limit the scrape for testing purposes</p>
+                </div>
+
+                <!-- Advanced Options -->
+                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-white mb-3">Advanced Options</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox"
+                                   wire:model="skipSync"
+                                   id="skipSync"
+                                   class="w-4 h-4 text-accent bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-600 rounded focus:ring-accent">
+                            <label for="skipSync" class="text-sm text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                                Skip automatic sync to production tables
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox"
+                                   wire:model="skipBubbler"
+                                   id="skipBubbler"
+                                   class="w-4 h-4 text-accent bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-600 rounded focus:ring-accent">
+                            <label for="skipBubbler" class="text-sm text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                                Skip Bubbler recalculation
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox"
+                                   wire:model="noBackup"
+                                   id="noBackup"
+                                   class="w-4 h-4 text-accent bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-600 rounded focus:ring-accent">
+                            <label for="noBackup" class="text-sm text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                                Skip automatic database backup
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <flux:modal.close>
+                        <button type="button"
+                                class="px-4 py-2 border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 font-medium transition-colors">
+                            Cancel
+                        </button>
+                    </flux:modal.close>
+                    <button type="submit"
+                            wire:loading.attr="disabled"
+                            class="px-6 py-2 bg-accent hover:bg-accent/90 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+                        <svg wire:loading.remove wire:target="startScraper" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <svg wire:loading wire:target="startScraper" class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span wire:loading.remove wire:target="startScraper">Start Scraper</span>
+                        <span wire:loading wire:target="startScraper">Starting...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
     <!-- Scraper Runs Table -->
     <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
         <!-- Table Header -->
@@ -185,7 +321,7 @@
                     <select wire:model.live="typeFilter"
                             class="px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
                         <option value="">All Types</option>
-                        @foreach($types as $value => $label)
+                        @foreach($runTypes as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
@@ -222,7 +358,7 @@
                             <td class="px-6 py-4 text-sm text-zinc-900 dark:text-white font-medium">#{{ $run->id }}</td>
                             <td class="px-6 py-4 text-sm">
                                 <span class="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded text-xs font-medium">
-                                    {{ $types[$run->type] ?? $run->type }}
+                                    {{ $runTypes[$run->type] ?? $run->type }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-sm">
