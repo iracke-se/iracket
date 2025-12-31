@@ -90,7 +90,35 @@ class RankingsScraper extends BaseScraperService
             $this->info("Processing period chunk: skip={$skip}, take={$take}");
         }
 
-        // Apply limits for testing
+        // Apply year filter FIRST (before limiting) so limits apply to filtered data
+        if ($periodFilter) {
+            $filterYear = (int)date('Y', strtotime($periodFilter));
+            $this->info("Applying year filter: {$filterYear}");
+
+            $periods = array_filter($periods, function($period) use ($filterYear) {
+                $periodYear = $this->extractYearFromPeriod($period['text']);
+
+                if (!$periodYear) {
+                    return false; // Skip periods where year can't be extracted
+                }
+
+                // Keep only periods matching the filter year
+                $matches = ($periodYear === $filterYear);
+
+                if (!$matches) {
+                    $this->info("⊘ Filtered out period {$period['text']} (year {$periodYear} != {$filterYear})");
+                } else {
+                    $this->info("✓ Keeping period {$period['text']} (year {$periodYear} matches {$filterYear})");
+                }
+
+                return $matches;
+            });
+
+            // Re-index array after filtering
+            $periods = array_values($periods);
+        }
+
+        // Apply limits for testing (after year filtering)
         $limitPeriods = $this->getParameter('limit_periods');
         $limitDivisions = $this->getParameter('limit_divisions');
 
@@ -109,29 +137,8 @@ class RankingsScraper extends BaseScraperService
                 break;
             }
 
-            // Apply period filter if specified
-            if ($periodFilter) {
-                $periodYear = $this->extractYearFromPeriod($period['text']);
-
-                $this->info("Evaluating period {$period['text']}: extracted year = " . ($periodYear ?? 'NULL'));
-
-                if ($periodYear) {
-                    // Convert "2024-12-01" → 2024 (extract year from filter)
-                    $filterYear = (int)date('Y', strtotime($periodFilter));
-
-                    $this->info("Filter year: {$filterYear}, Period year: {$periodYear}");
-
-                    if ($periodYear > $filterYear) {
-                        $this->info("⊘ Skipping period {$period['text']} (year {$periodYear} > {$filterYear}) - newer than target year");
-                        continue; // Skip newer periods
-                    } elseif ($periodYear < $filterYear) {
-                        $this->info("✗ Stopping at period {$period['text']} (year {$periodYear} < {$filterYear}) - older than target year, stopping");
-                        break; // Stop at older periods
-                    }
-
-                    $this->info("✓ Processing period {$period['text']} (matches target year {$filterYear})");
-                }
-            }
+            // Period already filtered above, just log what we're processing
+            $this->info("Processing period {$period['text']}");
 
             // Select period
             $selectPeriodJs = $this->browserService->jsSelectOption('rid', $period['value']);
