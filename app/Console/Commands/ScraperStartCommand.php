@@ -13,7 +13,13 @@ class ScraperStartCommand extends Command
     protected $signature = 'scraper:start
                             {month : The month to scrape (e.g., 2025-09, 2025-10)}
                             {--all : Scrape all data without month filter}
-                            {--no-backup : Skip automatic backup before starting}';
+                            {--no-backup : Skip automatic backup before starting}
+                            {--skip-sync : Skip automatic sync to production tables}
+                            {--skip-bubbler : Skip Bubbler recalculation}
+                            {--limit-periods= : Limit number of periods to scrape (for testing)}
+                            {--limit-divisions= : Limit number of divisions to scrape (for testing)}
+                            {--limit-clubs= : Limit number of clubs to scrape (for testing)}
+                            {--limit-seasons= : Limit number of seasons to scrape (for testing)}';
 
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
@@ -407,6 +413,29 @@ class ScraperStartCommand extends Command
         }
     }
 
+    protected function buildLimitOptions(): string
+    {
+        $options = '';
+
+        if ($this->option('limit-periods')) {
+            $options .= ' --limit-periods=' . escapeshellarg($this->option('limit-periods'));
+        }
+
+        if ($this->option('limit-divisions')) {
+            $options .= ' --limit-divisions=' . escapeshellarg($this->option('limit-divisions'));
+        }
+
+        if ($this->option('limit-clubs')) {
+            $options .= ' --limit-clubs=' . escapeshellarg($this->option('limit-clubs'));
+        }
+
+        if ($this->option('limit-seasons')) {
+            $options .= ' --limit-seasons=' . escapeshellarg($this->option('limit-seasons'));
+        }
+
+        return $options;
+    }
+
     protected function validateMonth(string $month): bool
     {
         return (bool) preg_match('/^\d{4}-\d{2}$/', $month);
@@ -637,6 +666,8 @@ class ScraperStartCommand extends Command
             $command .= " --direction=gte";
         }
 
+        $command .= $this->buildLimitOptions();
+
         return $this->runScraperWithProgress($command, 'Players');
     }
 
@@ -649,6 +680,8 @@ class ScraperStartCommand extends Command
             $command .= " --direction=gte";
         }
 
+        $command .= $this->buildLimitOptions();
+
         return $this->runScraperWithProgress($command, 'Series Matches');
     }
 
@@ -660,6 +693,8 @@ class ScraperStartCommand extends Command
             $command .= " --period=" . escapeshellarg($month . '-01');
             $command .= " --direction=gte";
         }
+
+        $command .= $this->buildLimitOptions();
 
         return $this->runScraperWithProgress($command, 'Series Standings');
     }
@@ -722,6 +757,8 @@ class ScraperStartCommand extends Command
             $command .= " --direction=gte";
         }
 
+        $command .= $this->buildLimitOptions();
+
         return $this->runScraperWithProgress($command, "Rankings ({$gender})");
     }
 
@@ -750,6 +787,9 @@ class ScraperStartCommand extends Command
                 $command .= " --period=" . escapeshellarg($month . '-01');
                 $command .= " --direction=gte";
             }
+
+            // Add limit options
+            $command .= $this->buildLimitOptions();
 
             $process = \Symfony\Component\Process\Process::fromShellCommandline($command);
             $process->setTimeout(null);
@@ -846,6 +886,8 @@ class ScraperStartCommand extends Command
             $command .= " --period=" . escapeshellarg($month . '-01');
             $command .= " --direction=gte";
         }
+
+        $command .= $this->buildLimitOptions();
 
         return $this->runScraperWithProgress($command, 'Matches');
     }
