@@ -17,6 +17,7 @@ class ScraperStartCommand extends Command
                             {--no-backup : Skip automatic backup before starting}
                             {--skip-sync : Skip automatic sync to production tables}
                             {--skip-bubbler : Skip Bubbler recalculation}
+                            {--force : Force execution without confirmation (for queue jobs)}
                             {--limit-periods= : Limit number of periods to scrape (for testing)}
                             {--limit-divisions= : Limit number of divisions to scrape (for testing)}
                             {--limit-clubs= : Limit number of clubs to scrape (for testing)}
@@ -49,45 +50,59 @@ class ScraperStartCommand extends Command
         $runningScrapers = ScraperRun::where('status', ScraperRun::STATUS_RUNNING)->get();
 
         if ($runningScrapers->isNotEmpty()) {
-            $this->newLine();
-            $this->error("╔════════════════════════════════════════════════════════╗");
-            $this->error("║       SCRAPER ALREADY RUNNING                          ║");
-            $this->error("╚════════════════════════════════════════════════════════╝");
-            $this->newLine();
-
-            $this->warn("Cannot start a new scraper while another is running.");
-            $this->newLine();
-
-            $this->info("Currently running scrapers:");
-            foreach ($runningScrapers as $run) {
-                $duration = $run->started_at ? $run->started_at->diffForHumans() : 'just now';
-                $this->line("  • Run #{$run->id} - {$run->type} (started {$duration})");
-                $this->line("    Items scraped: {$run->items_scraped}, Failed: {$run->items_failed}");
-            }
-
-            $this->newLine();
-            $this->info("💡 To monitor progress:");
-            $this->line("  • CLI: Check the running terminal");
-            $this->line("  • Web: https://iracket.ddev.site/admin/scraper");
-            $this->newLine();
-
-            if ($this->confirm("Do you want to wait for the current scraper to finish?", false)) {
-                $this->info("Waiting for scraper to complete...");
-                $this->newLine();
+            // If --force flag is used (e.g., from queue), wait automatically without confirmation
+            if ($this->option('force')) {
+                $this->info("Waiting for running scraper to complete (forced mode)...");
 
                 // Wait for all running scrapers to finish
                 while (ScraperRun::where('status', ScraperRun::STATUS_RUNNING)->exists()) {
                     sleep(2);
-                    $this->output->write('.');
+                }
+
+                $this->info("✓ Running scraper completed. Starting new scraper...");
+                $this->newLine();
+            } else {
+                // Interactive mode - show details and ask for confirmation
+                $this->newLine();
+                $this->error("╔════════════════════════════════════════════════════════╗");
+                $this->error("║       SCRAPER ALREADY RUNNING                          ║");
+                $this->error("╚════════════════════════════════════════════════════════╝");
+                $this->newLine();
+
+                $this->warn("Cannot start a new scraper while another is running.");
+                $this->newLine();
+
+                $this->info("Currently running scrapers:");
+                foreach ($runningScrapers as $run) {
+                    $duration = $run->started_at ? $run->started_at->diffForHumans() : 'just now';
+                    $this->line("  • Run #{$run->id} - {$run->type} (started {$duration})");
+                    $this->line("    Items scraped: {$run->items_scraped}, Failed: {$run->items_failed}");
                 }
 
                 $this->newLine();
+                $this->info("💡 To monitor progress:");
+                $this->line("  • CLI: Check the running terminal");
+                $this->line("  • Web: https://iracket.ddev.site/admin/scraper");
                 $this->newLine();
-                $this->info("✓ All scrapers have finished. Starting new scraper...");
-                $this->newLine();
-            } else {
-                $this->warn("Scraper start cancelled.");
-                return self::FAILURE;
+
+                if ($this->confirm("Do you want to wait for the current scraper to finish?", false)) {
+                    $this->info("Waiting for scraper to complete...");
+                    $this->newLine();
+
+                    // Wait for all running scrapers to finish
+                    while (ScraperRun::where('status', ScraperRun::STATUS_RUNNING)->exists()) {
+                        sleep(2);
+                        $this->output->write('.');
+                    }
+
+                    $this->newLine();
+                    $this->newLine();
+                    $this->info("✓ All scrapers have finished. Starting new scraper...");
+                    $this->newLine();
+                } else {
+                    $this->warn("Scraper start cancelled.");
+                    return self::FAILURE;
+                }
             }
         }
 

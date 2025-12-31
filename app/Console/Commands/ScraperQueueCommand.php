@@ -110,6 +110,9 @@ class ScraperQueueCommand extends Command
             $options['--no-backup'] = true;
         }
 
+        // Always add --force flag for queue jobs to avoid interactive prompts
+        $options['--force'] = true;
+
         // Dispatch job to queue
         $this->newLine();
         $this->info("╔════════════════════════════════════════════════════════╗");
