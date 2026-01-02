@@ -183,80 +183,89 @@
                     $currentRanking = $player->monthlyRankings->first();
                     $clubRanking = $player->club?->monthlyRankings->first();
                 @endphp
-                <a href="{{ route('players.show', $player) }}" wire:navigate class="flex flex-nowrap items-center gap-2 sm:gap-4 p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200/80 dark:hover:bg-zinc-700/80 transition-colors">
-                    <!-- Avatar -->
-                    @if($player->profile_picture)
-                        <img src="{{ Storage::url($player->profile_picture) }}" alt="{{ $player->name }}" class="w-12 h-12 rounded-full object-cover">
-                    @else
-                        <div class="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-                            <span class="text-lg font-medium text-zinc-600 dark:text-zinc-300">
-                                {{ $player->initials() }}
-                            </span>
-                        </div>
-                    @endif
-
-                    <!-- Player Info -->
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-zinc-900 dark:text-white font-medium truncate">{{ $player->name }}</h3>
-                            @if(isset($rankingPositions[$player->id]))
-                                <x-ranking-badge
-                                    :position="$rankingPositions[$player->id]['position']"
-                                    :category="$rankingPositions[$player->id]['category']"
-                                    size="sm"
-                                />
-                            @endif
-                        </div>
-                        @if($player->club)
-                            <div class="flex items-center gap-2 mt-0.5">
-                                <span class="text-sm text-zinc-500 dark:text-zinc-400 truncate">{{ $player->club->name }}</span>
-                                @if($clubRanking)
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-accent/20 text-accent">
-                                        #{{ $clubRanking->rank }}
-                                    </span>
-                                @endif
+                <div class="flex flex-nowrap items-center gap-2 sm:gap-4 p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                    <a href="{{ route('players.show', $player) }}" wire:navigate class="flex flex-nowrap items-center gap-2 sm:gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                        <!-- Avatar -->
+                        @if($player->profile_picture)
+                            <img src="{{ Storage::url($player->profile_picture) }}" alt="{{ $player->name }}" class="w-12 h-12 rounded-full object-cover">
+                        @else
+                            <div class="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                <span class="text-lg font-medium text-zinc-600 dark:text-zinc-300">
+                                    {{ $player->initials() }}
+                                </span>
                             </div>
                         @endif
-                        <div class="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
-                            @if($player->age)
-                                <span>{{ $player->age }} {{ __('user-players.years') }}</span>
+
+                        <!-- Player Info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-zinc-900 dark:text-white font-medium truncate">{{ $player->name }}</h3>
+                                @if(isset($rankingPositions[$player->id]))
+                                    <x-ranking-badge
+                                        :position="$rankingPositions[$player->id]['position']"
+                                        :category="$rankingPositions[$player->id]['category']"
+                                        size="sm"
+                                    />
+                                @endif
+                            </div>
+                            @if($player->club)
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <span class="text-sm text-zinc-500 dark:text-zinc-400 truncate">{{ $player->club->name }}</span>
+                                    @if($clubRanking)
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-accent/20 text-accent">
+                                            #{{ $clubRanking->rank }}
+                                        </span>
+                                    @endif
+                                </div>
                             @endif
-                            @if($player->gender && $player->age)
-                                <span>•</span>
-                            @endif
-                            @if($player->gender)
-                                <span class="capitalize">{{ __('user-players.' . $player->gender) }}</span>
+                            <div class="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
+                                @if($player->age)
+                                    <span>{{ $player->age }} {{ __('user-players.years') }}</span>
+                                @endif
+                                @if($player->gender && $player->age)
+                                    <span>•</span>
+                                @endif
+                                @if($player->gender)
+                                    <span class="capitalize">{{ __('user-players.' . $player->gender) }}</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <!-- Points -->
+                        <div class="text-right flex-shrink-0 min-w-[60px]">
+                            @if($currentRanking)
+                                <div class="text-lg font-bold text-zinc-900 dark:text-white">{{ number_format($currentRanking->points) }}</div>
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('user-players.points') }}</div>
+                            @else
+                                <div class="text-lg font-bold text-zinc-500">--</div>
+                                <div class="text-xs text-zinc-500">{{ __('user-players.points') }}</div>
                             @endif
                         </div>
-                    </div>
-
-                    <!-- Points -->
-                    <div class="text-right flex-shrink-0 min-w-[60px]">
-                        @if($currentRanking)
-                            <div class="text-lg font-bold text-zinc-900 dark:text-white">{{ number_format($currentRanking->points) }}</div>
-                            <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('user-players.points') }}</div>
-                        @else
-                            <div class="text-lg font-bold text-zinc-500">--</div>
-                            <div class="text-xs text-zinc-500">{{ __('user-players.points') }}</div>
-                        @endif
-                    </div>
+                    </a>
 
                     <!-- Club Button -->
-                    <button
-                        @if($player->club)
-                            onclick="event.stopPropagation(); window.location.href='{{ route('clubs.show', $player->club) }}'"
+                    @if($player->club)
+                        <a
+                            href="{{ route('clubs.show', $player->club) }}"
+                            wire:navigate
                             title="View {{ $player->club->name }}"
-                        @else
-                            disabled
+                            class="flex items-center justify-center w-10 h-10 flex-shrink-0 rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-accent hover:text-white dark:hover:bg-accent transition-colors"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            </svg>
+                        </a>
+                    @else
+                        <div
                             title="No club"
-                        @endif
-                        class="flex items-center justify-center w-10 h-10 flex-shrink-0 rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-accent hover:text-white dark:hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-zinc-200 dark:disabled:hover:bg-zinc-700"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                    </button>
-                </a>
+                            class="flex items-center justify-center w-10 h-10 flex-shrink-0 rounded-lg bg-zinc-200 dark:bg-zinc-700 opacity-50 cursor-not-allowed"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            </svg>
+                        </div>
+                    @endif
+                </div>
             @endforeach
         </div>
 

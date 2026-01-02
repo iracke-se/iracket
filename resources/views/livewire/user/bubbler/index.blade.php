@@ -82,9 +82,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($ladiesRankings[0]->points) }}</div>
-                                <div class="text-xs {{ $ladiesRankings[0]->points_change > 0 ? 'text-green-500' : ($ladiesRankings[0]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($ladiesRankings[0]->points_change > 0)+@endif{{ number_format($ladiesRankings[0]->points_change) }}
-                                </div>
+                                @if($ladiesRankings[0]->points_change != 0)
+                                    <div class="text-xs {{ $ladiesRankings[0]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($ladiesRankings[0]->points_change > 0)+@endif{{ number_format($ladiesRankings[0]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
 
@@ -106,9 +108,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($ladiesRankings[1]->points) }}</div>
-                                <div class="text-xs {{ $ladiesRankings[1]->points_change > 0 ? 'text-green-500' : ($ladiesRankings[1]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($ladiesRankings[1]->points_change > 0)+@endif{{ number_format($ladiesRankings[1]->points_change) }}
-                                </div>
+                                @if($ladiesRankings[1]->points_change != 0)
+                                    <div class="text-xs {{ $ladiesRankings[1]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($ladiesRankings[1]->points_change > 0)+@endif{{ number_format($ladiesRankings[1]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
 
@@ -130,9 +134,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($ladiesRankings[2]->points) }}</div>
-                                <div class="text-xs {{ $ladiesRankings[2]->points_change > 0 ? 'text-green-500' : ($ladiesRankings[2]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($ladiesRankings[2]->points_change > 0)+@endif{{ number_format($ladiesRankings[2]->points_change) }}
-                                </div>
+                                @if($ladiesRankings[2]->points_change != 0)
+                                    <div class="text-xs {{ $ladiesRankings[2]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($ladiesRankings[2]->points_change > 0)+@endif{{ number_format($ladiesRankings[2]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
                     </div>
@@ -144,7 +150,6 @@
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-zinc-500 dark:text-zinc-400 w-12">#</th>
                                     <th class="px-4 py-3 text-left text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-bubbler.player') }}</th>
                                     <th class="px-4 py-3 text-right text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-bubbler.points') }}</th>
                                     <th class="px-4 py-3 text-right text-sm font-medium text-zinc-500 dark:text-zinc-400 w-20">+/-</th>
@@ -153,7 +158,6 @@
                             <tbody>
                                 @foreach($ladiesRankings->skip(3) as $ranking)
                                     <tr class="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
-                                        <td class="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">{{ $ranking->rank }}</td>
                                         <td class="px-4 py-3">
                                             <a href="{{ route('players.show', $ranking->user) }}" wire:navigate class="flex items-center gap-3 hover:text-accent">
                                                 @if($ranking->user->profile_picture)
@@ -222,9 +226,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($menRankings[0]->points) }}</div>
-                                <div class="text-xs {{ $menRankings[0]->points_change > 0 ? 'text-green-500' : ($menRankings[0]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($menRankings[0]->points_change > 0)+@endif{{ number_format($menRankings[0]->points_change) }}
-                                </div>
+                                @if($menRankings[0]->points_change != 0)
+                                    <div class="text-xs {{ $menRankings[0]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($menRankings[0]->points_change > 0)+@endif{{ number_format($menRankings[0]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
 
@@ -246,9 +252,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($menRankings[1]->points) }}</div>
-                                <div class="text-xs {{ $menRankings[1]->points_change > 0 ? 'text-green-500' : ($menRankings[1]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($menRankings[1]->points_change > 0)+@endif{{ number_format($menRankings[1]->points_change) }}
-                                </div>
+                                @if($menRankings[1]->points_change != 0)
+                                    <div class="text-xs {{ $menRankings[1]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($menRankings[1]->points_change > 0)+@endif{{ number_format($menRankings[1]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
 
@@ -270,9 +278,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($menRankings[2]->points) }}</div>
-                                <div class="text-xs {{ $menRankings[2]->points_change > 0 ? 'text-green-500' : ($menRankings[2]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($menRankings[2]->points_change > 0)+@endif{{ number_format($menRankings[2]->points_change) }}
-                                </div>
+                                @if($menRankings[2]->points_change != 0)
+                                    <div class="text-xs {{ $menRankings[2]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($menRankings[2]->points_change > 0)+@endif{{ number_format($menRankings[2]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
                     </div>
@@ -284,7 +294,6 @@
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-zinc-500 dark:text-zinc-400 w-12">#</th>
                                     <th class="px-4 py-3 text-left text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-bubbler.player') }}</th>
                                     <th class="px-4 py-3 text-right text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-bubbler.points') }}</th>
                                     <th class="px-4 py-3 text-right text-sm font-medium text-zinc-500 dark:text-zinc-400 w-20">+/-</th>
@@ -293,7 +302,6 @@
                             <tbody>
                                 @foreach($menRankings->skip(3) as $ranking)
                                     <tr class="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
-                                        <td class="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">{{ $ranking->rank }}</td>
                                         <td class="px-4 py-3">
                                             <a href="{{ route('players.show', $ranking->user) }}" wire:navigate class="flex items-center gap-3 hover:text-accent">
                                                 @if($ranking->user->profile_picture)
@@ -362,9 +370,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($clubRankings[0]->total_points) }}</div>
-                                <div class="text-xs {{ $clubRankings[0]->points_change > 0 ? 'text-green-500' : ($clubRankings[0]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($clubRankings[0]->points_change > 0)+@endif{{ number_format($clubRankings[0]->points_change) }}
-                                </div>
+                                @if($clubRankings[0]->points_change != 0)
+                                    <div class="text-xs {{ $clubRankings[0]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($clubRankings[0]->points_change > 0)+@endif{{ number_format($clubRankings[0]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
 
@@ -386,9 +396,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($clubRankings[1]->total_points) }}</div>
-                                <div class="text-xs {{ $clubRankings[1]->points_change > 0 ? 'text-green-500' : ($clubRankings[1]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($clubRankings[1]->points_change > 0)+@endif{{ number_format($clubRankings[1]->points_change) }}
-                                </div>
+                                @if($clubRankings[1]->points_change != 0)
+                                    <div class="text-xs {{ $clubRankings[1]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($clubRankings[1]->points_change > 0)+@endif{{ number_format($clubRankings[1]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
 
@@ -410,9 +422,11 @@
                             </div>
                             <div class="text-right">
                                 <div class="font-bold text-zinc-900 dark:text-white">{{ number_format($clubRankings[2]->total_points) }}</div>
-                                <div class="text-xs {{ $clubRankings[2]->points_change > 0 ? 'text-green-500' : ($clubRankings[2]->points_change < 0 ? 'text-red-500' : 'text-zinc-500') }}">
-                                    @if($clubRankings[2]->points_change > 0)+@endif{{ number_format($clubRankings[2]->points_change) }}
-                                </div>
+                                @if($clubRankings[2]->points_change != 0)
+                                    <div class="text-xs {{ $clubRankings[2]->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
+                                        @if($clubRankings[2]->points_change > 0)+@endif{{ number_format($clubRankings[2]->points_change) }}
+                                    </div>
+                                @endif
                             </div>
                         </a>
                     </div>
@@ -424,7 +438,6 @@
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                                    <th class="px-4 py-3 text-left text-sm font-medium text-zinc-500 dark:text-zinc-400 w-16">#</th>
                                     <th class="px-4 py-3 text-left text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-bubbler.club') }}</th>
                                     <th class="px-4 py-3 text-right text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-bubbler.points') }}</th>
                                     <th class="px-4 py-3 text-right text-sm font-medium text-zinc-500 dark:text-zinc-400 w-20">+/-</th>
@@ -433,7 +446,6 @@
                             <tbody>
                                 @foreach($clubRankings->skip(3) as $ranking)
                                     <tr class="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
-                                        <td class="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">{{ $ranking->rank }}</td>
                                         <td class="px-4 py-3">
                                             <a href="{{ route('clubs.show', $ranking->club) }}" wire:navigate class="flex items-center gap-3 hover:text-accent">
                                                 @if($ranking->club->logo)

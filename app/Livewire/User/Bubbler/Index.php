@@ -101,7 +101,8 @@ class Index extends Component
             })
             ->with('user.club')
             ->orderBy('rank')
-            ->get();
+            ->get()
+            ->filter(fn ($ranking) => $ranking->user !== null);
 
         $menRankings = MonthlyRanking::where('year', $this->selectedYear)
             ->where('month', $this->selectedMonth)
@@ -110,20 +111,20 @@ class Index extends Component
             })
             ->with('user.club')
             ->orderBy('rank')
-            ->get();
+            ->get()
+            ->filter(fn ($ranking) => $ranking->user !== null);
 
         $clubRankings = ClubMonthlyRanking::where('year', $this->selectedYear)
             ->where('month', $this->selectedMonth)
+            ->whereHas('club')
             ->with('club')
             ->orderBy('rank')
-            ->get();
+            ->get()
+            ->filter(fn ($ranking) => $ranking->club !== null);
 
         // Load member counts for clubs
-        $clubRankings->load('club');
         $clubRankings->each(function ($ranking) {
-            if ($ranking->club) {
-                $ranking->club->loadCount('members');
-            }
+            $ranking->club->loadCount('members');
         });
 
         return view('livewire.user.bubbler.index', [
