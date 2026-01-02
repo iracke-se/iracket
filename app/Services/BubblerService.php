@@ -186,4 +186,77 @@ class BubblerService
     {
         return $this->stats;
     }
+
+    /**
+     * Assign proper rank numbers to all players for a given period
+     * Handles ties: Same points = same rank, next rank skips
+     * Example: 1050pts=#1, 1050pts=#1, 1040pts=#3
+     */
+    public function assignPlayerRanks(int $year, int $month, ?ScraperRun $run = null): array
+    {
+        $stats = [
+            'male_players_ranked' => 0,
+            'female_players_ranked' => 0,
+            'total_ties' => 0,
+        ];
+
+        if ($run) {
+            $run->log('info', "Starting rank assignment for {$year}-{$month}");
+        }
+
+        // Process male and female rankings separately
+        $genders = ['male', 'female'];
+
+        foreach ($genders as $gender) {
+            // Get all rankings for this gender, sorted by points descending
+            $rankings = MonthlyRanking::where('year', $year)
+                ->where('month', $month)
+                ->whereHas('user', function ($query) use ($gender) {
+                    $query->where('gender', $gender);
+                })
+                ->with('user')
+                ->orderByDesc('points')
+                ->orderBy('user_id') // Stable sort for same points
+                ->get();
+
+            if ($rankings->isEmpty()) {
+                continue;
+            }
+
+            // Assign ranks with tie handling
+            $currentRank = 1;
+            $previousPoints = null;
+            $playersAtCurrentRank = 0;
+
+            foreach ($rankings as $ranking) {
+                if ($previousPoints === null || $ranking->points < $previousPoints) {
+                    // New points value - assign new rank
+                    if ($playersAtCurrentRank > 1) {
+                        $stats['total_ties'] += $playersAtCurrentRank;
+                    }
+                    $currentRank += $playersAtCurrentRank;
+                    $playersAtCurrentRank = 0;
+                }
+
+                // Assign rank
+                $ranking->rank = $currentRank;
+                $ranking->save();
+
+                $previousPoints = $ranking->points;
+                $playersAtCurrentRank++;
+                $stats[$gender . '_players_ranked']++;
+            }
+
+            // Account for final tie if exists
+            if ($playersAtCurrentRank > 1) {
+                $stats['total_ties'] += $playersAtCurrentRank;
+            }
+        }
+
+        if ($run) {
+            $run->log('info', "Rank assignment completed: {$stats['male_players_ranked']} male, {$stats['female_players_ranked']} female players ranked ({$stats['total_ties']} players in ties)");
+        }
+
+        return $stats;
+    }
 }

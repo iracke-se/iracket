@@ -1,6 +1,6 @@
 <div>
     @if($banner)
-        <div class="max-w-2xl mx-auto px-4 my-4">
+        <div class="max-w-2xl mx-auto my-4">
             <a
                 href="{{ $banner->link }}"
                 target="_blank"

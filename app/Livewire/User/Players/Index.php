@@ -66,12 +66,14 @@ class Index extends Component
         $query = User::query()
             ->where('visible_in_players', true)
             ->with(['club.monthlyRankings' => function ($q) {
-                $q->where('year', now()->year)
-                  ->where('month', now()->month);
+                $q->orderBy('year', 'desc')
+                  ->orderBy('month', 'desc')
+                  ->limit(1);
             }])
             ->with(['monthlyRankings' => function ($q) {
-                $q->where('year', now()->year)
-                  ->where('month', now()->month);
+                $q->orderBy('year', 'desc')
+                  ->orderBy('month', 'desc')
+                  ->limit(1);
             }]);
 
         // Search by name or email
@@ -97,11 +99,17 @@ class Index extends Component
             $query->where('age', '<=', $this->ageTo);
         }
 
-        // Filter by ranking range
+        // Filter by ranking range (using most recent ranking)
         if ($this->rankingFrom || $this->rankingTo) {
             $query->whereHas('monthlyRankings', function ($q) {
-                $q->where('year', now()->year)
-                  ->where('month', now()->month);
+                // Get the most recent year/month combination for filtering
+                $q->whereRaw('(year, month) = (
+                    SELECT year, month
+                    FROM monthly_rankings mr2
+                    WHERE mr2.user_id = monthly_rankings.user_id
+                    ORDER BY year DESC, month DESC
+                    LIMIT 1
+                )');
 
                 if ($this->rankingFrom) {
                     $q->where('points', '>=', $this->rankingFrom);
@@ -115,21 +123,33 @@ class Index extends Component
         // Sort by points or name
         switch ($this->sortBy) {
             case 'points_desc':
-                $query->leftJoin('monthly_rankings', function ($join) {
-                    $join->on('users.id', '=', 'monthly_rankings.user_id')
-                         ->where('monthly_rankings.year', '=', now()->year)
-                         ->where('monthly_rankings.month', '=', now()->month);
-                })
-                ->orderByDesc('monthly_rankings.points')
+                // Use a derived table to get latest rankings efficiently
+                $query->leftJoin(\DB::raw('(
+                    SELECT mr1.*
+                    FROM monthly_rankings mr1
+                    INNER JOIN (
+                        SELECT user_id, MAX(year * 100 + month) as max_period
+                        FROM monthly_rankings
+                        GROUP BY user_id
+                    ) mr2 ON mr1.user_id = mr2.user_id
+                        AND (mr1.year * 100 + mr1.month) = mr2.max_period
+                ) as latest_rankings'), 'users.id', '=', 'latest_rankings.user_id')
+                ->orderByRaw('latest_rankings.points IS NULL, latest_rankings.points DESC')
                 ->select('users.*');
                 break;
             case 'points_asc':
-                $query->leftJoin('monthly_rankings', function ($join) {
-                    $join->on('users.id', '=', 'monthly_rankings.user_id')
-                         ->where('monthly_rankings.year', '=', now()->year)
-                         ->where('monthly_rankings.month', '=', now()->month);
-                })
-                ->orderBy('monthly_rankings.points')
+                // Use a derived table to get latest rankings efficiently
+                $query->leftJoin(\DB::raw('(
+                    SELECT mr1.*
+                    FROM monthly_rankings mr1
+                    INNER JOIN (
+                        SELECT user_id, MAX(year * 100 + month) as max_period
+                        FROM monthly_rankings
+                        GROUP BY user_id
+                    ) mr2 ON mr1.user_id = mr2.user_id
+                        AND (mr1.year * 100 + mr1.month) = mr2.max_period
+                ) as latest_rankings'), 'users.id', '=', 'latest_rankings.user_id')
+                ->orderByRaw('latest_rankings.points IS NULL DESC, latest_rankings.points ASC')
                 ->select('users.*');
                 break;
             case 'name_asc':
@@ -144,30 +164,39 @@ class Index extends Component
 
         $players = $query->paginate(20);
 
-        // Get top 3 positions for men and women
-        $topMen = MonthlyRanking::where('year', now()->year)
-            ->where('month', now()->month)
-            ->whereHas('user', function ($q) {
-                $q->where('gender', 'male')
-                  ->where('is_active_player', true)
-                  ->where('visible_in_players', true);
-            })
-            ->orderByDesc('points')
-            ->limit(3)
-            ->pluck('user_id')
-            ->toArray();
+        // Get top 3 positions for men and women (from most recent rankings)
+        $latestRanking = MonthlyRanking::orderBy('year', 'desc')
+            ->orderBy('month', 'desc')
+            ->first();
 
-        $topWomen = MonthlyRanking::where('year', now()->year)
-            ->where('month', now()->month)
-            ->whereHas('user', function ($q) {
-                $q->where('gender', 'female')
-                  ->where('is_active_player', true)
-                  ->where('visible_in_players', true);
-            })
-            ->orderByDesc('points')
-            ->limit(3)
-            ->pluck('user_id')
-            ->toArray();
+        $topMen = [];
+        $topWomen = [];
+
+        if ($latestRanking) {
+            $topMen = MonthlyRanking::where('year', $latestRanking->year)
+                ->where('month', $latestRanking->month)
+                ->whereHas('user', function ($q) {
+                    $q->where('gender', 'male')
+                      ->where('is_active_player', true)
+                      ->where('visible_in_players', true);
+                })
+                ->orderByDesc('points')
+                ->limit(3)
+                ->pluck('user_id')
+                ->toArray();
+
+            $topWomen = MonthlyRanking::where('year', $latestRanking->year)
+                ->where('month', $latestRanking->month)
+                ->whereHas('user', function ($q) {
+                    $q->where('gender', 'female')
+                      ->where('is_active_player', true)
+                      ->where('visible_in_players', true);
+                })
+                ->orderByDesc('points')
+                ->limit(3)
+                ->pluck('user_id')
+                ->toArray();
+        }
 
         // Create position maps
         $rankingPositions = [];

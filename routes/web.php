@@ -44,6 +44,7 @@ use App\Livewire\Admin\Contacts\Respond as AdminContactsRespond;
 use App\Livewire\Admin\Banners\Index as AdminBannersIndex;
 use App\Livewire\Admin\Banners\Form as AdminBannersForm;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 

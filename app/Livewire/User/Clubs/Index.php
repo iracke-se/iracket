@@ -4,10 +4,18 @@ namespace App\Livewire\User\Clubs;
 
 use App\Models\Club;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
+    use WithPagination;
+
     public string $search = '';
+
+    public function updatingSearch()
+    {
+        $this->resetPage();
+    }
 
     public function render()
     {
@@ -20,7 +28,7 @@ class Index extends Component
             });
         }
 
-        $clubs = $query->orderBy('name')->get();
+        $clubs = $query->orderBy('name')->paginate(20);
 
         return view('livewire.user.clubs.index', [
             'clubs' => $clubs,

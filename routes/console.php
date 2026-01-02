@@ -191,3 +191,23 @@ Schedule::command('apple:regenerate-secret')
     ->at('02:30')
     ->withoutOverlapping()
     ->onOneServer();
+
+/*
+|--------------------------------------------------------------------------
+| Heartbeat Monitoring
+|--------------------------------------------------------------------------
+|
+| Update scheduler heartbeat every minute to track scheduler health
+|
+*/
+
+Schedule::command('heartbeat:scheduler')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+// Dispatch queue heartbeat job periodically to monitor queue workers
+if (config('heartbeat.queue.enabled')) {
+    Schedule::job(new \App\Jobs\QueueHeartbeat())
+        ->everyFiveMinutes()
+        ->withoutOverlapping();
+}

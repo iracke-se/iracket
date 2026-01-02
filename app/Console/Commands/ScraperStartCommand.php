@@ -610,7 +610,51 @@ class ScraperStartCommand extends Command
      */
     protected function runScraperWithProgress(string $command, string $label): array
     {
-        // Start the scraper command in the background
+        // Detect execution context: use Artisan::call() for queue, Process::start() for CLI
+        $isQueueContext = $this->option('force');
+
+        if ($isQueueContext) {
+            // Queue execution - run via Artisan::call() to avoid process issues
+            [$artisanCommand, $args] = $this->parseCommand($command);
+
+            // Run synchronously in same process
+            \Illuminate\Support\Facades\Artisan::call($artisanCommand, $args);
+
+            // Get the latest scraper run that was just created
+            sleep(1);
+            $run = ScraperRun::latest('id')->first();
+
+            if (!$run) {
+                throw new \Exception("Failed to find scraper run in database");
+            }
+
+            $this->line("  <fg=cyan>Scraper Run ID: #{$run->id}</>");
+            $this->newLine();
+
+            // For queue context, the command runs synchronously so we can just return the results
+            $run->refresh();
+
+            if ($run->status === ScraperRun::STATUS_COMPLETED) {
+                $this->line("  <fg=green>✓</> {$label} scraping completed!");
+                $this->line("  <fg=yellow>Final count:</> {$run->items_scraped} items scraped" .
+                    ($run->items_failed > 0 ? ", {$run->items_failed} failed" : ""));
+            } else {
+                $this->line("  <fg=red>✗</> {$label} scraping failed!");
+                if ($run->error_message) {
+                    $this->line("  <fg=red>Error:</> {$run->error_message}");
+                }
+            }
+
+            return [
+                'run_id' => $run->id,
+                'status' => $run->status,
+                'items_scraped' => $run->items_scraped,
+                'items_failed' => $run->items_failed,
+                'duration' => $run->duration,
+            ];
+        }
+
+        // CLI execution - use Process::start() for background execution with live progress
         $process = Process::start($command);
 
         // Wait a moment for the scraper run to be created in the database
@@ -703,6 +747,57 @@ class ScraperStartCommand extends Command
         ];
     }
 
+    /**
+     * Parse a shell command string into Artisan command name and arguments
+     *
+     * Example: "php artisan scraper:run players --period=2025-12-01 --direction=gte"
+     * Returns: ['scraper:run', ['type' => 'players', '--period' => '2025-12-01', '--direction' => 'gte']]
+     */
+    protected function parseCommand(string $command): array
+    {
+        // Remove "php artisan " prefix if present
+        $command = preg_replace('/^php\s+artisan\s+/', '', $command);
+
+        // Split into parts
+        $parts = preg_split('/\s+/', trim($command));
+
+        // First part is the command name
+        $commandName = array_shift($parts);
+
+        // Parse remaining parts as arguments
+        $args = [];
+        $positionalIndex = 0;
+
+        foreach ($parts as $part) {
+            if (str_starts_with($part, '--')) {
+                // Long option: --name=value or --flag
+                if (str_contains($part, '=')) {
+                    [$key, $value] = explode('=', $part, 2);
+                    // Remove quotes from value if present
+                    $value = trim($value, '"\'');
+                    $args[$key] = $value;
+                } else {
+                    // Boolean flag
+                    $args[$part] = true;
+                }
+            } elseif (str_starts_with($part, '-') && strlen($part) === 2) {
+                // Short option: -v
+                $args[$part] = true;
+            } else {
+                // Positional argument
+                // For scraper:run, first positional is the 'type'
+                if ($commandName === 'scraper:run' && $positionalIndex === 0) {
+                    $args['type'] = $part;
+                } else {
+                    $args[$positionalIndex] = $part;
+                }
+                $positionalIndex++;
+            }
+        }
+
+        return [$commandName, $args];
+    }
+
     protected function scrapePlayers(string $month, bool $scrapeAll): array
     {
         $command = 'php artisan scraper:run players';
@@ -766,8 +861,23 @@ class ScraperStartCommand extends Command
             ]
         );
 
-        $this->stats['bubbler'] = $stats;
-        return $stats;
+        // Assign player ranks after calculating points
+        $this->newLine();
+        $this->line("  🏅 Assigning player ranks...");
+        $rankStats = $bubblerService->assignPlayerRanks($period->year, $period->month, $this->parentRun);
+
+        $this->newLine();
+        $this->table(
+            ['Gender', 'Players Ranked'],
+            [
+                ['Male', "<fg=cyan>{$rankStats['male_players_ranked']}</>"],
+                ['Female', "<fg=magenta>{$rankStats['female_players_ranked']}</>"],
+                ['Players in Ties', "<fg=yellow>{$rankStats['total_ties']}</>"],
+            ]
+        );
+
+        $this->stats['bubbler'] = array_merge($stats, $rankStats);
+        return $this->stats['bubbler'];
     }
 
     protected function aggregateClubRankings(string $month): array

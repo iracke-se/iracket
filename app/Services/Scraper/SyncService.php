@@ -314,7 +314,8 @@ class SyncService
 
         // Check cache first
         if (isset($this->clubsCache[$slug])) {
-            return new Club($this->clubsCache[$slug]);
+            // Return actual model from database, not from array
+            return Club::find($this->clubsCache[$slug]['id']);
         }
 
         // Create new club if it doesn't exist

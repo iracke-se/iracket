@@ -64,5 +64,17 @@
                 </a>
             @endforeach
         </div>
+
+        <!-- Pagination -->
+        <div class="mt-6">
+            <!-- Mobile Pagination -->
+            <div class="sm:hidden">
+                {{ $clubs->onEachSide(0)->links() }}
+            </div>
+            <!-- Desktop Pagination -->
+            <div class="hidden sm:block">
+                {{ $clubs->onEachSide(2)->links() }}
+            </div>
+        </div>
     @endif
 </div>

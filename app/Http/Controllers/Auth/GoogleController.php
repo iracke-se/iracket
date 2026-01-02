@@ -62,7 +62,7 @@ class GoogleController extends Controller
                 return redirect('/connect-account');
             }
 
-            return redirect()->intended('dashboard');
+            return redirect()->intended('/players');
         } catch (\Exception $e) {
             return redirect()->route('login')->with('error', 'Google authentication failed. Please try again.');
         }

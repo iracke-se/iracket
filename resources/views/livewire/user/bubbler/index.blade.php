@@ -1,6 +1,34 @@
 <div class="max-w-2xl mx-auto">
     <h1 class="text-2xl font-bold text-zinc-900 dark:text-white mb-6">{{ __('user-bubbler.bubbler') }}</h1>
 
+    <!-- Period Selector -->
+    <div class="mb-6 flex gap-3">
+        <div class="flex-1">
+            <label for="year-selector" class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Year</label>
+            <select
+                id="year-selector"
+                wire:model.live="selectedYear"
+                class="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
+            >
+                @foreach($this->availableYears as $year)
+                    <option value="{{ $year }}">{{ $year }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="flex-1">
+            <label for="month-selector" class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Month</label>
+            <select
+                id="month-selector"
+                wire:model.live="selectedMonth"
+                class="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
+            >
+                @foreach($this->availableMonthsForYear as $month)
+                    <option value="{{ $month }}">{{ \Carbon\Carbon::create(null, $month)->format('F') }}</option>
+                @endforeach
+            </select>
+        </div>
+    </div>
+
     <!-- Tabs -->
     <div class="flex gap-2 mb-6">
         <button
@@ -21,11 +49,6 @@
         >
             {{ __('user-bubbler.clubs') }}
         </button>
-    </div>
-
-    <!-- Month Label -->
-    <div class="text-center mb-4">
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ now()->format('F Y') }}</p>
     </div>
 
     <!-- Ladies Tab -->
