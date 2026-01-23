@@ -214,8 +214,9 @@ class RankingsScraper:
             pos_match = re.search(r'\d+$', position_text.strip())
             position = int(pos_match.group(0)) if pos_match else 0
 
-            # Clean points value
-            points = int(points_text.strip().replace(' ', '').replace('.', '').replace(',', ''))
+            # Clean points value (handle empty strings for players with no points)
+            cleaned_points = points_text.strip().replace(' ', '').replace('.', '').replace(',', '')
+            points = int(cleaned_points) if cleaned_points else 0
 
             players.append({
                 "profixio_id": player_id,
@@ -275,14 +276,18 @@ class RankingsScraper:
             points_text = await points_span.text_content()
             rmld_id = await points_span.get_attribute('id')
 
+            # Clean and parse numeric values (handle empty strings)
+            cleaned_points = points_text.strip().replace(' ', '').replace('.', '').replace(',', '')
+            cleaned_position = position_text.strip()
+
             rankings.append({
                 "profixio_player_id": player['profixio_id'],
                 "player_name": player['name'],
                 "born": player.get('born', ''),
                 "club": player.get('club', ''),
                 "ranking_date": date_text.strip(),
-                "points": int(points_text.strip().replace(' ', '').replace('.', '').replace(',', '')),
-                "position": int(position_text.strip()),
+                "points": int(cleaned_points) if cleaned_points else 0,
+                "position": int(cleaned_position) if cleaned_position else 0,
                 "points_diff": points_diff_text.strip(),
                 "rmld_id": rmld_id
             })
@@ -337,13 +342,17 @@ class RankingsScraper:
             match_points = await cells[3].text_content()
             match_date = await cells[4].text_content()
 
+            # Clean and parse numeric values (handle empty strings)
+            cleaned_opp_points = opponent_points.strip().replace('+', '').replace(' ', '').replace('.', '').replace(',', '')
+            cleaned_match_points = match_points.strip().replace('+', '').replace(' ', '').replace('.', '').replace(',', '')
+
             matches.append({
                 "profixio_player_id": player['profixio_id'],
                 "player_name": player['name'],
                 "result": result,
                 "opponent_name": opponent_name.strip(),
-                "opponent_points": int(opponent_points.strip().replace('+', '').replace(' ', '').replace('.', '').replace(',', '')),
-                "match_points": int(match_points.strip().replace('+', '').replace(' ', '').replace('.', '').replace(',', '')),
+                "opponent_points": int(cleaned_opp_points) if cleaned_opp_points else 0,
+                "match_points": int(cleaned_match_points) if cleaned_match_points else 0,
                 "match_date": match_date.strip(),
                 "scraped_month": target_date
             })
