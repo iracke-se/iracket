@@ -260,41 +260,34 @@ class RankingsScraper extends BaseScraperService
         // Click player name to open popup using player ID
         $playerId = $player['profixio_id'];
 
-        // Click and wait for popup in a single evaluation
-        // This ensures the popup state persists within the same browser context
-        $this->withRetry(function () use ($playerId, $player) {
-            return $this->browser->evaluate("
-                (function() {
-                    // Find and click span
-                    const spans = document.querySelectorAll('span.rml_poeng');
-                    let targetSpan = null;
-                    for (const span of spans) {
-                        if (span.id && span.id.includes('rml:{$playerId}:')) {
-                            targetSpan = span;
-                            break;
-                        }
+        // Step 1: Click the span (separate from wait to allow browser event processing)
+        $this->browser->evaluate("
+            (function() {
+                const spans = document.querySelectorAll('span.rml_poeng');
+                for (const span of spans) {
+                    if (span.id && span.id.includes('rml:{$playerId}:')) {
+                        span.click();
+                        return true;
                     }
+                }
+                throw new Error('Player span not found for ID: {$playerId}');
+            })()
+        ");
 
-                    if (!targetSpan) {
-                        throw new Error('Player span not found for ID: {$playerId}');
-                    }
+        // Step 2: Give browser time to process the click event and show popup
+        sleep(2);
 
-                    targetSpan.click();
+        // Step 3: Verify popup appeared
+        $popupVisible = $this->browser->evaluate("
+            (function() {
+                const popup = document.querySelector('#multipurpose');
+                return popup && popup.style.visibility === 'visible';
+            })()
+        ");
 
-                    // Wait for popup to appear (synchronous busy-wait)
-                    const startTime = Date.now();
-                    while (Date.now() - startTime < 5000) {
-                        const popup = document.querySelector('#multipurpose');
-                        if (popup && popup.style.visibility === 'visible') {
-                            return true;
-                        }
-                        // Busy wait - no async needed
-                    }
-
-                    throw new Error('Popup did not appear within 5 seconds');
-                })()
-            ");
-        }, "Click player and wait for popup: {$player['name']}");
+        if (!$popupVisible) {
+            throw new \Exception("Popup did not appear for player {$player['name']}");
+        }
 
         // Get popup HTML
         $popupHtml = $this->withRetry(function () {
