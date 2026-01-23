@@ -159,39 +159,41 @@ class RankingsScraper extends BaseScraperService
 
         $players = [];
 
-        // Find the rankings table (usually has headers: Placering, Namn, Poäng, etc.)
-        $rows = $xpath->query("//table//tr[td]");
+        // Find the rankings table - look for rows with 7 cells (data rows)
+        $rows = $xpath->query("//table//tr[count(td)=7]");
 
         foreach ($rows as $row) {
             $cells = $xpath->query(".//td", $row);
-            if ($cells->length < 3) {
+
+            // Expected structure: Placering | Change | Namn | Born | Club | Points | Points Change
+            $position = trim($cells->item(0)->textContent); // e.g., "WR05 1"
+            $nameCell = $cells->item(2); // Name is in 3rd column
+            $pointsCell = $cells->item(5); // Points in 6th column
+
+            // Extract player name from span with class "rml_poeng"
+            $nameSpan = $xpath->query(".//span[@class='rml_poeng']", $nameCell)->item(0);
+            if (!$nameSpan) {
                 continue;
             }
 
-            // Expected structure: Placering | Namn | Poäng | ...
-            $position = trim($cells->item(0)->textContent);
-            $nameCell = $cells->item(1);
-            $points = trim($cells->item(2)->textContent);
+            $playerName = trim($nameSpan->textContent);
+            $spanId = $nameSpan->getAttribute('id'); // Format: rml:14450:391:0
 
-            // Extract player name link
-            $nameLink = $xpath->query(".//a", $nameCell)->item(0);
-            if (!$nameLink) {
-                continue;
-            }
-
-            $playerName = trim($nameLink->textContent);
-            $onclickAttr = $nameLink->getAttribute('onclick');
-
-            // Extract player ID from onclick (e.g., onclick="visRankingPoeng('14450')")
-            if (preg_match("/visRankingPoeng\('(\d+)'\)/", $onclickAttr, $matches)) {
+            // Extract player ID from span id (e.g., id="rml:14450:391:0" -> 14450)
+            if (preg_match("/rml:(\d+):/", $spanId, $matches)) {
                 $playerId = $matches[1];
+
+                // Extract numeric position (e.g., "WR05 1" -> 1)
+                preg_match("/\d+$/", $position, $posMatches);
+                $numericPosition = $posMatches[0] ?? 0;
 
                 $players[] = [
                     'profixio_id' => $playerId,
                     'name' => $playerName,
-                    'position' => (int)$position,
-                    'points' => (int)str_replace([' ', '.', ','], '', $points),
-                    'selector' => "a[onclick*=\"visRankingPoeng('{$playerId}')\"]",
+                    'position' => (int)$numericPosition,
+                    'points' => (int)str_replace([' ', '.', ','], '', trim($pointsCell->textContent)),
+                    'selector' => "span.rml_poeng[id*='rml:{$playerId}:']",
+                    'span_id' => $spanId,
                 ];
             }
         }
@@ -209,13 +211,23 @@ class RankingsScraper extends BaseScraperService
      */
     protected function scrapePlayerRankingPopup(array $player): array
     {
-        // Click player name to open popup
-        $this->withRetry(function () use ($player) {
+        // Click player name to open popup using player ID
+        $playerId = $player['profixio_id'];
+        $this->withRetry(function () use ($playerId, $player) {
             $this->browser->evaluate("
                 (function() {
-                    const element = document.querySelector('{$player['selector']}');
-                    if (element) {
-                        element.click();
+                    // Find span with id containing the player ID
+                    const spans = document.querySelectorAll('span.rml_poeng');
+                    let targetSpan = null;
+                    for (const span of spans) {
+                        if (span.id && span.id.includes('rml:{$playerId}:')) {
+                            targetSpan = span;
+                            break;
+                        }
+                    }
+
+                    if (targetSpan) {
+                        targetSpan.click();
 
                         // Wait for popup
                         const startTime = Date.now();
@@ -227,7 +239,7 @@ class RankingsScraper extends BaseScraperService
                         }
                         throw new Error('Popup did not appear within timeout');
                     }
-                    throw new Error('Element not found: {$player['selector']}');
+                    throw new Error('Player span not found for ID: {$playerId}');
                 })()
             ");
         }, "Click player name: {$player['name']}");
@@ -374,16 +386,19 @@ class RankingsScraper extends BaseScraperService
             $matchPoints = trim($cells->item(3)->textContent);
             $matchDate = trim($cells->item(4)->textContent);
 
-            $matches[] = [
-                'profixio_player_id' => $player['profixio_id'],
-                'player_name' => $player['name'],
-                'result' => $result, // 'W' or 'L'
-                'opponent_name' => $opponentName,
-                'opponent_points' => (int)str_replace(['+', ' ', '.', ','], '', $opponentPoints),
-                'match_points' => (int)str_replace(['+', '-', ' ', '.', ','], '', $matchPoints),
-                'match_date' => $matchDate,
-                'scraped_month' => $targetDate,
-            ];
+            // Skip header rows
+            if ($result === 'W' || $result === 'L') {
+                $matches[] = [
+                    'profixio_player_id' => $player['profixio_id'],
+                    'player_name' => $player['name'],
+                    'result' => $result, // 'W' or 'L'
+                    'opponent_name' => $opponentName,
+                    'opponent_points' => (int)str_replace(['+', ' ', '.', ','], '', $opponentPoints),
+                    'match_points' => (int)str_replace(['+', ' ', '.', ','], '', $matchPoints), // Keep negative sign
+                    'match_date' => $matchDate,
+                    'scraped_month' => $targetDate,
+                ];
+            }
         }
 
         if (!empty($matches)) {

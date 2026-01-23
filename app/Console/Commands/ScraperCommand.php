@@ -12,7 +12,9 @@ class ScraperCommand extends Command
      */
     protected $signature = 'scraper:run
                             {type : The type of scrape (rankings, players, transitions, series, series_matches, live_center)}
-                            {--gender=male : Gender for rankings (male/female)}
+                            {--year= : Year for popup-based rankings scraper (e.g., 2026)}
+                            {--month= : Month for popup-based rankings scraper (e.g., 01)}
+                            {--gender=male : Gender for rankings (male/female, or m/k for popup scraper)}
                             {--period= : Period filter (e.g., 2024.01.01)}
                             {--direction=gte : Direction for period filter (gte/lte)}
                             {--period-skip= : Skip first N periods (for parallel processing)}
@@ -23,6 +25,7 @@ class ScraperCommand extends Command
                             {--limit-seasons= : Limit number of seasons to scrape (for testing, series/series_matches)}
                             {--limit-series= : Limit number of series per season to scrape (for testing, series/series_matches)}
                             {--limit-matches= : Limit number of matches per series to scrape (for testing, series_matches only)}
+                            {--limit-players= : Limit number of players to scrape (for testing, rankings popup scraper)}
                             {--queue : Queue the job instead of running synchronously}';
 
     /**
@@ -47,7 +50,16 @@ class ScraperCommand extends Command
 
         // Build parameters based on type
         if ($type === 'rankings') {
+            // New popup-based scraper uses year/month/gender parameters
+            if ($this->option('year')) {
+                $parameters['year'] = $this->option('year');
+            }
+            if ($this->option('month')) {
+                $parameters['month'] = $this->option('month');
+            }
             $parameters['gender'] = $this->option('gender');
+
+            // Legacy parameters for backward compatibility
             if ($this->option('period')) {
                 $parameters['period'] = $this->option('period');
                 $parameters['direction'] = $this->option('direction');
@@ -63,6 +75,9 @@ class ScraperCommand extends Command
             }
             if ($this->option('limit-divisions')) {
                 $parameters['limit_divisions'] = (int) $this->option('limit-divisions');
+            }
+            if ($this->option('limit-players')) {
+                $parameters['limit_players'] = (int) $this->option('limit-players');
             }
         }
 
