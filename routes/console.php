@@ -120,6 +120,27 @@ if (Schema::hasTable('scraper_settings')) {
 
 /*
 |--------------------------------------------------------------------------
+| Monthly Rankings Scraper with Popup Interaction
+|--------------------------------------------------------------------------
+|
+| Run new popup-based rankings scraper on first Tuesday of each month
+| Profixio updates data on first Monday, we scrape on first Tuesday at 2 AM
+| This scraper clicks through popups to get both rankings and matches
+|
+*/
+
+// Rankings scraper: First Tuesday of every month at 2 AM
+// Cron: "0 2 1-7 * 2" means 2 AM on days 1-7 of month, only on Tuesday (2)
+Schedule::command('scraper:start', [
+    date('Y-m') // Current year-month
+])
+    ->cron('0 2 1-7 * 2')
+    ->name('rankings-scraper-monthly-popup')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
 | Monthly Full Scraper Export
 |--------------------------------------------------------------------------
 |

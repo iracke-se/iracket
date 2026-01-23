@@ -9,6 +9,18 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Bubbler Service - Swiss Tournament Style Ranking Calculator
+ *
+ * NOTE: This service is now ONLY used for manual matches added by users
+ * between monthly scrapes. The monthly rankings are scraped directly from
+ * profixio.com via RankingsScraper.
+ *
+ * Usage:
+ * - Users manually add matches via /bubbler interface
+ * - Bubbler calculates temporary rankings until next monthly scrape
+ * - First Tuesday of month: Rankings scraper overwrites with official data
+ */
 class BubblerService
 {
     protected array $stats = [

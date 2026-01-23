@@ -21,12 +21,13 @@ class ScraperStartCommand extends Command
                             {--limit-periods= : Limit number of periods to scrape (for testing)}
                             {--limit-divisions= : Limit number of divisions to scrape (for testing)}
                             {--limit-clubs= : Limit number of clubs to scrape (for testing)}
-                            {--limit-seasons= : Limit number of seasons to scrape (for testing)}';
+                            {--limit-seasons= : Limit number of seasons to scrape (for testing)}
+                            {--limit-players= : Limit number of players to scrape (for testing)}';
 
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
     protected array $stats = [];
-    protected int $totalSteps = 12; // Full pipeline with Bubbler and club rankings
+    protected int $totalSteps = 8; // Rankings (with matches), Players, Sync Players, Sync Rankings, Sync Matches, Standings, Verify
     protected int $currentStep = 0;
     protected ?string $backupFile = null;
     protected array $executionLog = [];
@@ -134,60 +135,46 @@ class ScraperStartCommand extends Command
                 $this->newLine();
             }
 
-            // Step 1: Scrape Players
-            $result = $this->runStep('Scraping Players', function () use ($month, $scrapeAll) {
-                return $this->scrapePlayers($month, $scrapeAll);
+            // Step 1: Scrape Rankings with Popup Interaction (includes matches)
+            // This now scrapes both rankings and matches from popup for both genders
+            $result = $this->runStep('Scraping Rankings & Matches (Male)', function () use ($month, $scrapeAll) {
+                return $this->scrapeRankingsWithPopup('m', $month, $scrapeAll);
             });
             $this->latestRunId = $result['run_id'] ?? null;
 
-            // Step 2: Sync Players
+            $result = $this->runStep('Scraping Rankings & Matches (Female)', function () use ($month, $scrapeAll) {
+                return $this->scrapeRankingsWithPopup('k', $month, $scrapeAll);
+            });
+            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+
+            // Step 2: Scrape Players
+            $result = $this->runStep('Scraping Players', function () use ($month, $scrapeAll) {
+                return $this->scrapePlayers($month, $scrapeAll);
+            });
+            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+
+            // Step 3: Sync Players
             $this->runStep('Syncing Players → Users & Clubs', function () use ($syncService) {
                 return $this->syncData($syncService, 'players');
             });
 
-            // Step 3: Scrape Series Matches
-            $result = $this->runStep('Scraping Series Matches', function () use ($month, $scrapeAll) {
-                return $this->scrapeSeriesMatches($month, $scrapeAll);
+            // Step 4: Sync Rankings
+            $this->runStep('Syncing Rankings', function () use ($syncService) {
+                return $this->syncData($syncService, 'rankings');
             });
-            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
-            // Step 4: Sync Matches
+            // Step 5: Sync Matches
             $this->runStep('Syncing Matches', function () {
                 return $this->syncMatches();
             });
 
-            // Step 5: Scrape Rankings (Male) - Parallel Processing
-            $this->runStep('Scraping Rankings (Male) - 3 Parallel Processes', function () use ($month, $scrapeAll) {
-                return $this->scrapeRankingsParallel('male', $month, $scrapeAll);
-            });
-
-            // Step 6: Scrape Rankings (Female) - Parallel Processing
-            $this->runStep('Scraping Rankings (Female) - 3 Parallel Processes', function () use ($month, $scrapeAll) {
-                return $this->scrapeRankingsParallel('female', $month, $scrapeAll);
-            });
-
-            // Step 7: Sync Rankings
-            $this->runStep('Syncing All Rankings', function () use ($syncService) {
-                return $this->syncData($syncService, 'rankings');
-            });
-
-            // Step 8: Scrape Series Standings
+            // Step 6: Scrape Series Standings
             $result = $this->runStep('Scraping Series Standings', function () use ($month, $scrapeAll) {
                 return $this->scrapeSeries($month, $scrapeAll);
             });
             $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
-            // Step 9: Calculate Bubbler Points
-            $this->runStep('Calculating Bubbler Points', function () use ($month) {
-                return $this->calculateBubblerPoints($month);
-            });
-
-            // Step 10: Aggregate Club Rankings
-            $this->runStep('Aggregating Club Rankings', function () use ($month) {
-                return $this->aggregateClubRankings($month);
-            });
-
-            // Step 11: Verify Data
+            // Step 7: Verify Data
             $this->runStep('Verifying Data Integrity', function () {
                 return $this->verifyData();
             });
@@ -477,6 +464,10 @@ class ScraperStartCommand extends Command
 
         if ($this->option('limit-seasons')) {
             $options .= ' --limit-seasons=' . escapeshellarg($this->option('limit-seasons'));
+        }
+
+        if ($this->option('limit-players')) {
+            $options .= ' --limit-players=' . escapeshellarg($this->option('limit-players'));
         }
 
         return $options;
@@ -798,6 +789,23 @@ class ScraperStartCommand extends Command
         return [$commandName, $args];
     }
 
+    /**
+     * Scrape rankings with popup interaction (includes matches)
+     */
+    protected function scrapeRankingsWithPopup(string $gender, string $month, bool $scrapeAll): array
+    {
+        // Parse month into year and month components
+        [$year, $monthNum] = explode('-', $month);
+
+        $command = "php artisan scraper:run rankings --year={$year} --month={$monthNum} --gender={$gender}";
+
+        // Add limit options (including limit-players)
+        $command .= $this->buildLimitOptions();
+
+        $genderLabel = $gender === 'm' ? 'Male' : 'Female';
+        return $this->runScraperWithProgress($command, "Rankings & Matches ({$genderLabel})");
+    }
+
     protected function scrapePlayers(string $month, bool $scrapeAll): array
     {
         $command = 'php artisan scraper:run players';
@@ -812,20 +820,6 @@ class ScraperStartCommand extends Command
         return $this->runScraperWithProgress($command, 'Players');
     }
 
-    protected function scrapeSeriesMatches(string $month, bool $scrapeAll): array
-    {
-        $command = 'php artisan scraper:run series_matches';
-
-        if (!$scrapeAll) {
-            $command .= " --period=" . escapeshellarg($month . '-01');
-            $command .= " --direction=gte";
-        }
-
-        $command .= $this->buildLimitOptions();
-
-        return $this->runScraperWithProgress($command, 'Series Matches');
-    }
-
     protected function scrapeSeries(string $month, bool $scrapeAll): array
     {
         $command = 'php artisan scraper:run series';
@@ -838,214 +832,6 @@ class ScraperStartCommand extends Command
         $command .= $this->buildLimitOptions();
 
         return $this->runScraperWithProgress($command, 'Series Standings');
-    }
-
-    protected function calculateBubblerPoints(string $month): array
-    {
-        $this->line("  🎯 Calculating Bubbler points for matches...");
-        $this->newLine();
-
-        $period = \Carbon\Carbon::parse($month . '-01');
-        $bubblerService = app(\App\Services\BubblerService::class);
-
-        $stats = $bubblerService->calculateMatchPoints($period, $this->parentRun);
-
-        $this->newLine();
-        $this->table(
-            ['Metric', 'Count'],
-            [
-                ['Matches Processed', "<fg=cyan>{$stats['matches_processed']}</>"],
-                ['Points Calculated', "<fg=yellow>{$stats['points_calculated']}</>"],
-                ['Rankings Updated', "<fg=green>{$stats['rankings_updated']}</>"],
-                ['Errors', $stats['errors'] > 0 ? "<fg=red>{$stats['errors']}</>" : "<fg=green>0</>"],
-            ]
-        );
-
-        // Assign player ranks after calculating points
-        $this->newLine();
-        $this->line("  🏅 Assigning player ranks...");
-        $rankStats = $bubblerService->assignPlayerRanks($period->year, $period->month, $this->parentRun);
-
-        $this->newLine();
-        $this->table(
-            ['Gender', 'Players Ranked'],
-            [
-                ['Male', "<fg=cyan>{$rankStats['male_players_ranked']}</>"],
-                ['Female', "<fg=magenta>{$rankStats['female_players_ranked']}</>"],
-                ['Players in Ties', "<fg=yellow>{$rankStats['total_ties']}</>"],
-            ]
-        );
-
-        $this->stats['bubbler'] = array_merge($stats, $rankStats);
-        return $this->stats['bubbler'];
-    }
-
-    protected function aggregateClubRankings(string $month): array
-    {
-        $this->line("  🏆 Aggregating club rankings...");
-        $this->newLine();
-
-        $period = \Carbon\Carbon::parse($month . '-01');
-        $clubRankingService = app(\App\Services\ClubRankingService::class);
-
-        $stats = $clubRankingService->aggregateClubRankings($period, $this->parentRun);
-
-        $this->newLine();
-        $this->table(
-            ['Metric', 'Count'],
-            [
-                ['Clubs Processed', "<fg=cyan>{$stats['clubs_processed']}</>"],
-                ['Rankings Created', "<fg=green>{$stats['rankings_created']}</>"],
-                ['Rankings Updated', "<fg=yellow>{$stats['rankings_updated']}</>"],
-            ]
-        );
-
-        $this->stats['club_rankings'] = $stats;
-        return $stats;
-    }
-
-    protected function scrapeRankings(string $gender, string $month, bool $scrapeAll): array
-    {
-        $command = "php artisan scraper:run rankings --gender={$gender}";
-
-        if (!$scrapeAll) {
-            $command .= " --period=" . escapeshellarg($month . '-01');
-            $command .= " --direction=gte";
-        }
-
-        $command .= $this->buildLimitOptions();
-
-        return $this->runScraperWithProgress($command, "Rankings ({$gender})");
-    }
-
-    protected function scrapeRankingsParallel(string $gender, string $month, bool $scrapeAll): array
-    {
-        $this->line("  🚀 Starting parallel rankings scrape for {$gender}...");
-        $this->line("  Running 3 period chunks in parallel");
-        $this->newLine();
-
-        // Split ~195 periods into 3 chunks of 65 each
-        $chunks = [
-            ['skip' => 0, 'take' => 65, 'label' => 'Chunk 1/3 (periods 1-65)'],
-            ['skip' => 65, 'take' => 65, 'label' => 'Chunk 2/3 (periods 66-130)'],
-            ['skip' => 130, 'take' => 65, 'label' => 'Chunk 3/3 (periods 131-195)'],
-        ];
-
-        $processes = [];
-        $runIds = [];
-
-        // Start all 3 processes
-        foreach ($chunks as $index => $chunk) {
-            $command = "php artisan scraper:run rankings --gender={$gender} --period-skip={$chunk['skip']} --period-take={$chunk['take']}";
-
-            // Pass period filter to each parallel job
-            if (!$scrapeAll) {
-                $command .= " --period=" . escapeshellarg($month . '-01');
-                $command .= " --direction=gte";
-            }
-
-            // Add limit options
-            $command .= $this->buildLimitOptions();
-
-            $process = \Symfony\Component\Process\Process::fromShellCommandline($command);
-            $process->setTimeout(null);
-            $process->start();
-
-            $processes[$index] = $process;
-            $this->line("  <fg=cyan>→</> Started {$chunk['label']}");
-
-            // Give each process time to create its database entry
-            sleep(2);
-        }
-
-        $this->newLine();
-        $this->line("  <fg=yellow>⏳</> Monitoring 3 parallel processes...");
-        $this->newLine();
-
-        // Get the latest 3 scraper runs (one for each process)
-        sleep(1);
-        $runs = ScraperRun::where('type', ScraperRun::TYPE_RANKINGS)
-            ->where('created_at', '>=', now()->subMinutes(1))
-            ->latest('id')
-            ->limit(3)
-            ->get();
-
-        $lastItemCounts = array_fill(0, 3, 0);
-        $totalScraped = 0;
-
-        // Monitor all processes
-        while (true) {
-            $allFinished = true;
-            $currentTotal = 0;
-
-            foreach ($processes as $index => $process) {
-                if ($process->isRunning()) {
-                    $allFinished = false;
-                }
-
-                // Update progress for this chunk
-                if (isset($runs[$index])) {
-                    $run = $runs[$index];
-                    $run->refresh();
-
-                    if ($run->items_scraped > $lastItemCounts[$index]) {
-                        $this->line("  <fg=green>✓</> {$chunks[$index]['label']}: {$run->items_scraped} items");
-                        $lastItemCounts[$index] = $run->items_scraped;
-                    }
-
-                    $currentTotal += $run->items_scraped;
-                }
-            }
-
-            // Show total progress
-            if ($currentTotal > $totalScraped) {
-                $this->line("  <fg=yellow>Total scraped:</> {$currentTotal} items");
-                $totalScraped = $currentTotal;
-            }
-
-            if ($allFinished) {
-                break;
-            }
-
-            sleep(5);
-        }
-
-        // Wait for all processes to complete
-        foreach ($processes as $process) {
-            $process->wait();
-        }
-
-        $this->newLine();
-        $this->line("  <fg=green>✓</> All 3 parallel processes completed!");
-
-        // Calculate final totals
-        $finalTotal = 0;
-        foreach ($runs as $run) {
-            $run->refresh();
-            $finalTotal += $run->items_scraped;
-        }
-
-        $this->line("  <fg=yellow>Final count:</> {$finalTotal} items scraped");
-        $this->newLine();
-
-        return [
-            'total_scraped' => $finalTotal,
-            'chunks' => 3,
-        ];
-    }
-
-    protected function scrapeMatches(string $month, bool $scrapeAll): array
-    {
-        $command = 'php artisan scraper:run live_center';
-
-        if (!$scrapeAll) {
-            $command .= " --period=" . escapeshellarg($month . '-01');
-            $command .= " --direction=gte";
-        }
-
-        $command .= $this->buildLimitOptions();
-
-        return $this->runScraperWithProgress($command, 'Matches');
     }
 
     protected function syncData(SyncService $syncService, string $type): array

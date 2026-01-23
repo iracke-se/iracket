@@ -70,6 +70,106 @@ class BrowserService
     }
 
     /**
+     * Click element and wait for popup to appear
+     *
+     * @param string $selector Selector to click
+     * @param string $popupSelector Selector to check for popup visibility (default: #multipurpose)
+     * @param int $timeout Milliseconds to wait for popup (default: 5000)
+     * @return void
+     * @throws \Exception if popup does not appear within timeout
+     */
+    public function clickAndWaitForPopup(string $selector, string $popupSelector = '#multipurpose', int $timeout = 5000): void
+    {
+        $this->evaluate("
+            (function() {
+                const element = document.querySelector('{$selector}');
+                if (element) {
+                    element.click();
+
+                    // Wait for popup
+                    const startTime = Date.now();
+                    while (Date.now() - startTime < {$timeout}) {
+                        const popup = document.querySelector('{$popupSelector}');
+                        if (popup && popup.style.visibility === 'visible') {
+                            return true;
+                        }
+                    }
+                    throw new Error('Popup did not appear within timeout');
+                }
+                throw new Error('Element not found: {$selector}');
+            })()
+        ");
+    }
+
+    /**
+     * Extract HTML content from popup
+     *
+     * @param string $popupSelector Popup container selector (default: #multipurpose)
+     * @return string HTML content
+     * @throws \Exception if popup is not visible
+     */
+    public function getPopupContent(string $popupSelector = '#multipurpose'): string
+    {
+        return $this->evaluate("
+            (function() {
+                const popup = document.querySelector('{$popupSelector}');
+                if (popup && popup.style.visibility === 'visible') {
+                    return popup.innerHTML;
+                }
+                throw new Error('Popup not visible');
+            })()
+        ");
+    }
+
+    /**
+     * Close popup by clicking close button
+     *
+     * @param string $buttonText Text of close button (default: 'Stäng' - Swedish for 'Close')
+     * @return void
+     * @throws \Exception if close button not found
+     */
+    public function closePopup(string $buttonText = 'Stäng'): void
+    {
+        $this->evaluate("
+            (function() {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const closeButton = buttons.find(btn => btn.textContent.includes('{$buttonText}'));
+                if (closeButton) {
+                    closeButton.click();
+                    return true;
+                }
+                throw new Error('Close button not found');
+            })()
+        ");
+
+        $this->delay('page_load'); // Wait for popup to close
+    }
+
+    /**
+     * Click back button in nested popup
+     *
+     * @param string $buttonText Text of back button (default: 'Tilbake' - Norwegian for 'Back')
+     * @return void
+     * @throws \Exception if back button not found
+     */
+    public function clickBackInPopup(string $buttonText = 'Tilbake'): void
+    {
+        $this->evaluate("
+            (function() {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const backButton = buttons.find(btn => btn.textContent.includes('{$buttonText}'));
+                if (backButton) {
+                    backButton.click();
+                    return true;
+                }
+                throw new Error('Back button not found');
+            })()
+        ");
+
+        $this->delay('page_load'); // Wait for popup to update
+    }
+
+    /**
      * Get all options from a dropdown by ID
      */
     public function getDropdownOptions(string $dropdownId): array
