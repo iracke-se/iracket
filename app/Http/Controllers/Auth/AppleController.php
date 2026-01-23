@@ -45,6 +45,7 @@ class AppleController extends Controller
                 $user = User::create([
                     'first_name' => $firstName,
                     'last_name' => $lastName,
+                    'user_fullname' => $name,
                     'email' => $appleUser->email,
                     'apple_id' => $appleUser->id,
                     'password' => Hash::make(Str::random(24)),

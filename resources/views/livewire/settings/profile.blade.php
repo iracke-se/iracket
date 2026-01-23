@@ -37,36 +37,64 @@
                 @enderror
             </div>
 
-            <!-- Name Fields -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                    <label for="first_name" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-settings.first_name') }}</label>
-                    <input
-                        type="text"
-                        id="first_name"
-                        wire:model="first_name"
-                        required
-                        autofocus
-                        autocomplete="given-name"
-                        class="w-full px-4 py-3 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    >
-                    @error('first_name')
-                        <p class="mt-1 text-sm text-red-500 dark:text-red-400">{{ $message }}</p>
-                    @enderror
-                </div>
-                <div>
-                    <label for="last_name" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-settings.last_name') }}</label>
-                    <input
-                        type="text"
-                        id="last_name"
-                        wire:model="last_name"
-                        required
-                        autocomplete="family-name"
-                        class="w-full px-4 py-3 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    >
-                    @error('last_name')
-                        <p class="mt-1 text-sm text-red-500 dark:text-red-400">{{ $message }}</p>
-                    @enderror
+            <!-- Registered Full Name (Editable) -->
+            <div>
+                <label for="user_fullname" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">
+                    {{ __('Registered Name') }}
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400 font-normal">
+                        ({{ __('This is your display name') }})
+                    </span>
+                </label>
+                <input
+                    type="text"
+                    id="user_fullname"
+                    wire:model="user_fullname"
+                    autocomplete="name"
+                    class="w-full px-4 py-3 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                >
+                @error('user_fullname')
+                    <p class="mt-1 text-sm text-red-500 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <!-- SBTF Player Name (Read-only) -->
+            <div class="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <p class="text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-3">
+                    {{ __('SBTF Player Name') }}
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400 font-normal">
+                        ({{ __('Synced from SBTF, cannot be edited') }})
+                    </span>
+                </p>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="first_name" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-settings.first_name') }}</label>
+                        <input
+                            type="text"
+                            id="first_name"
+                            wire:model="first_name"
+                            disabled
+                            readonly
+                            class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-600 dark:text-zinc-400 cursor-not-allowed"
+                        >
+                        @error('first_name')
+                            <p class="mt-1 text-sm text-red-500 dark:text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="last_name" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-settings.last_name') }}</label>
+                        <input
+                            type="text"
+                            id="last_name"
+                            wire:model="last_name"
+                            disabled
+                            readonly
+                            class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-600 dark:text-zinc-400 cursor-not-allowed"
+                        >
+                        @error('last_name')
+                            <p class="mt-1 text-sm text-red-500 dark:text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
             </div>
 

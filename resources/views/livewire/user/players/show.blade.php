@@ -57,6 +57,13 @@
                 @endif
             </div>
 
+            <!-- Registered Name -->
+            @if($player->user_fullname && $player->user_fullname !== $player->name)
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                    {{ __('Registered as: ') }}{{ $player->user_fullname }}
+                </p>
+            @endif
+
             <!-- Club -->
             @if($player->club)
                 <a href="{{ route('clubs.show', $player->club) }}" wire:navigate class="text-sm text-accent hover:underline mt-1">

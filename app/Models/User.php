@@ -50,6 +50,7 @@ class User extends Authenticatable
     protected $fillable = [
         'first_name',
         'last_name',
+        'user_fullname',
         'email',
         'phone_number',
         'gender',
@@ -117,6 +118,16 @@ class User extends Authenticatable
     {
         return Attribute::make(
             get: fn () => trim($this->first_name . ' ' . $this->last_name),
+        );
+    }
+
+    /**
+     * Get the user's registered full name (with fallback to regular name)
+     */
+    protected function registeredName(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->user_fullname ?? $this->name,
         );
     }
 

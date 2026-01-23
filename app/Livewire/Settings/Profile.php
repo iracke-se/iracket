@@ -18,6 +18,8 @@ class Profile extends Component
 
     public string $last_name = '';
 
+    public ?string $user_fullname = '';
+
     public string $email = '';
 
     public ?string $phone_number = '';
@@ -38,6 +40,7 @@ class Profile extends Component
         $user = Auth::user();
         $this->first_name = $user->first_name;
         $this->last_name = $user->last_name;
+        $this->user_fullname = $user->user_fullname ?? '';
         $this->email = $user->email;
         $this->phone_number = $user->phone_number ?? '';
         $this->gender = $user->gender ?? '';
@@ -55,6 +58,7 @@ class Profile extends Component
         $validated = $this->validate([
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
+            'user_fullname' => ['nullable', 'string', 'max:255'],
             'email' => [
                 'required',
                 'string',
