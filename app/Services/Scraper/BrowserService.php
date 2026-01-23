@@ -70,35 +70,90 @@ class BrowserService
     }
 
     /**
-     * Click element and wait for popup to appear
+     * Click element and wait for popup to appear using MutationObserver
      *
      * @param string $selector Selector to click
      * @param string $popupSelector Selector to check for popup visibility (default: #multipurpose)
-     * @param int $timeout Milliseconds to wait for popup (default: 5000)
-     * @return void
+     * @param int $timeout Milliseconds to wait for popup (default: 10000)
+     * @return bool True if popup appeared
      * @throws \Exception if popup does not appear within timeout
      */
-    public function clickAndWaitForPopup(string $selector, string $popupSelector = '#multipurpose', int $timeout = 5000): void
+    public function clickAndWaitForPopup(string $selector, string $popupSelector = '#multipurpose', int $timeout = 10000): bool
     {
-        $this->evaluate("
-            (function() {
-                const element = document.querySelector('{$selector}');
-                if (element) {
-                    element.click();
-
-                    // Wait for popup
-                    const startTime = Date.now();
-                    while (Date.now() - startTime < {$timeout}) {
-                        const popup = document.querySelector('{$popupSelector}');
-                        if (popup && popup.style.visibility === 'visible') {
-                            return true;
-                        }
+        $result = $this->evaluate("
+            (async function() {
+                return new Promise((resolve, reject) => {
+                    const element = document.querySelector('{$selector}');
+                    if (!element) {
+                        reject(new Error('Element not found: {$selector}'));
+                        return;
                     }
-                    throw new Error('Popup did not appear within timeout');
-                }
-                throw new Error('Element not found: {$selector}');
+
+                    const popup = document.querySelector('{$popupSelector}');
+                    if (!popup) {
+                        reject(new Error('Popup element not found: {$popupSelector}'));
+                        return;
+                    }
+
+                    // Check if popup is already visible
+                    if (popup.style.visibility === 'visible' ||
+                        window.getComputedStyle(popup).visibility === 'visible') {
+                        resolve(true);
+                        return;
+                    }
+
+                    // Set up timeout
+                    const timeoutId = setTimeout(() => {
+                        observer.disconnect();
+                        reject(new Error('Popup did not appear within {$timeout}ms'));
+                    }, {$timeout});
+
+                    // Set up MutationObserver to watch for popup visibility changes
+                    const observer = new MutationObserver((mutations) => {
+                        const computedStyle = window.getComputedStyle(popup);
+                        if (popup.style.visibility === 'visible' ||
+                            computedStyle.visibility === 'visible' ||
+                            computedStyle.display !== 'none') {
+                            clearTimeout(timeoutId);
+                            observer.disconnect();
+                            resolve(true);
+                        }
+                    });
+
+                    // Start observing
+                    observer.observe(popup, {
+                        attributes: true,
+                        attributeFilter: ['style', 'class'],
+                        childList: true,
+                        subtree: false
+                    });
+
+                    // Also observe the document body for any changes
+                    const bodyObserver = new MutationObserver(() => {
+                        const computedStyle = window.getComputedStyle(popup);
+                        if (popup.style.visibility === 'visible' ||
+                            computedStyle.visibility === 'visible' ||
+                            computedStyle.display !== 'none') {
+                            clearTimeout(timeoutId);
+                            observer.disconnect();
+                            bodyObserver.disconnect();
+                            resolve(true);
+                        }
+                    });
+
+                    bodyObserver.observe(document.body, {
+                        attributes: true,
+                        childList: true,
+                        subtree: true
+                    });
+
+                    // Trigger the click
+                    element.click();
+                });
             })()
         ");
+
+        return $result === true;
     }
 
     /**

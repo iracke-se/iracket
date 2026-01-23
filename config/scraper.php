@@ -97,4 +97,10 @@ return [
             'time' => '05:00',
         ],
     ],
+
+    // Python scraper settings (for Playwright-based scrapers)
+    'python' => [
+        'binary' => env('SCRAPER_PYTHON_BINARY', 'python3'),
+        'timeout' => env('SCRAPER_PYTHON_TIMEOUT', 3600), // 1 hour default
+    ],
 ];

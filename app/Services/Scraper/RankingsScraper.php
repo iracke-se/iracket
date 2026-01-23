@@ -3,12 +3,12 @@
 namespace App\Services\Scraper;
 
 use App\Models\Scraper\ScraperRun;
-use Spatie\Browsershot\Browsershot;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Process\Process;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 
 class RankingsScraper extends BaseScraperService
 {
-    protected Browsershot $browser;
     protected array $options = [];
 
     public function getType(): string
@@ -30,461 +30,115 @@ class RankingsScraper extends BaseScraperService
             'limit_players' => $this->getParameter('limit_players'),
         ];
 
-        $this->info("Starting rankings scraper with popup interaction for {$year}-{$month}, gender: {$gender}");
+        $this->info("Starting Python Playwright rankings scraper for {$year}-{$month}, gender: {$gender}");
 
-        // Step 1: Get the rid (ranking ID) for the target month
-        $rid = $this->getRidForMonth($year, $month, $gender);
-        $this->info("Found rid={$rid} for {$year}-{$month}");
+        // Call Python scraper script
+        $result = $this->executePythonScraper($year, $month, $gender, $this->options['limit_players']);
 
-        // Step 2: Navigate directly to rankings page with rid parameter
-        $url = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender={$gender}&rid={$rid}";
-        $this->browser = Browsershot::url($url)
-            ->setNodeBinary(config('scraper.browser.node_binary'))
-            ->setNpmBinary(config('scraper.browser.npm_binary'))
-            ->timeout(config('scraper.browser.timeout'))
-            ->waitUntilNetworkIdle()
-            ->noSandbox();
-
-        if (config('scraper.browser.chrome_path')) {
-            $this->browser->setChromePath(config('scraper.browser.chrome_path'));
+        if (!$result['success']) {
+            throw new \Exception("Python scraper failed: " . json_encode($result['errors']));
         }
 
-        $this->delay('page_load');
+        // Parse and save results
+        $data = $result['data'];
+        $this->info("Python scraper completed: {$data['players_processed']} players, {$data['rankings_count']} rankings, {$data['matches_count']} matches");
 
-        // Step 3: Get all players from rankings table
-        $players = $this->getPlayersFromRankingsTable();
-        $this->info("Found " . count($players) . " players in rankings table");
-
-        if (empty($players)) {
-            $this->warning("No players found in rankings table");
-            return;
+        // Save rankings to database
+        if (!empty($data['rankings'])) {
+            $this->saveRankingsToDatabase($data['rankings']);
         }
 
-        // Step 4: For each player, click name and scrape ranking history + matches
-        $totalRankings = 0;
-        $totalMatches = 0;
-        $processedCount = 0;
+        // Save matches to database
+        if (!empty($data['matches'])) {
+            $this->saveMatchesToDatabase($data['matches']);
+        }
 
-        foreach ($players as $index => $player) {
-            if (!$this->shouldContinue()) {
-                break;
-            }
-
-            $this->info("Processing player " . ($index + 1) . "/" . count($players) . ": {$player['name']}");
-
-            try {
-                // Click player name to open popup
-                $rankingData = $this->scrapePlayerRankingPopup($player);
-                $totalRankings += count($rankingData['rankings']);
-
-                // For the current month's ranking, click points to get matches
-                $matches = $this->scrapePlayerMatchesFromPopup($player, $year, $month);
-                $totalMatches += count($matches);
-
-                // Close popup
-                $this->closePopup();
-                $this->delay('page_load');
-
-                $processedCount++;
-
-            } catch (\Exception $e) {
-                $this->warning("Error processing player {$player['name']}: " . $e->getMessage());
+        // Log any partial failures
+        if (!empty($result['errors'])) {
+            foreach ($result['errors'] as $error) {
+                $this->warning("Error processing player {$error['player']}: {$error['error']}");
                 $this->run->incrementFailed();
-
-                // Try to close popup in case it's stuck open
-                try {
-                    $this->closePopup();
-                } catch (\Exception $closeError) {
-                    // Ignore close errors
-                }
-
-                continue;
             }
         }
 
-        $this->info("Rankings scraper completed: {$processedCount} players processed, {$totalRankings} rankings scraped, {$totalMatches} matches scraped");
+        $this->info("Rankings scraper completed: {$data['players_processed']} players processed, {$data['rankings_count']} rankings saved, {$data['matches_count']} matches saved");
     }
 
     /**
-     * Get rid (ranking ID) for a specific month
+     * Execute Python scraper script
      */
-    protected function getRidForMonth(string $year, string $month, string $gender): string
+    protected function executePythonScraper(string $year, string $month, string $gender, ?int $limitPlayers): array
     {
-        $targetDate = "{$year}." . str_pad($month, 2, '0', STR_PAD_LEFT) . ".01";
+        // Get Python binary path from config
+        $pythonBinary = config('scraper.python.binary', 'python3');
 
-        // Navigate to page without rid to get dropdown options
-        $tempUrl = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender={$gender}";
-        $tempBrowser = Browsershot::url($tempUrl)
-            ->setNodeBinary(config('scraper.browser.node_binary'))
-            ->setNpmBinary(config('scraper.browser.npm_binary'))
-            ->timeout(config('scraper.browser.timeout'))
-            ->waitUntilNetworkIdle()
-            ->noSandbox();
+        // Build script path
+        $scriptPath = base_path('scripts/scraper/rankings_popup_scraper.py');
 
-        if (config('scraper.browser.chrome_path')) {
-            $tempBrowser->setChromePath(config('scraper.browser.chrome_path'));
+        if (!file_exists($scriptPath)) {
+            throw new \Exception("Python scraper script not found at: {$scriptPath}");
         }
 
-        $rid = $tempBrowser->evaluate("
-            (function() {
-                const select = document.querySelector('select[name=\"rid\"]');
-                if (!select) throw new Error('Month dropdown not found');
-
-                const options = Array.from(select.options);
-                const targetOption = options.find(opt => opt.text.startsWith('{$targetDate}'));
-
-                if (!targetOption) {
-                    throw new Error('Month {$targetDate} not found in dropdown');
-                }
-
-                return targetOption.value;
-            })()
-        ");
-
-        return $rid;
-    }
-
-    /**
-     * Select month from dropdown (DEPRECATED - use getRidForMonth and direct navigation instead)
-     */
-    protected function selectMonthFromDropdown(string $year, string $month): void
-    {
-        $targetDate = "{$year}." . str_pad($month, 2, '0', STR_PAD_LEFT) . ".01";
-
-        $this->info("Selecting month: {$targetDate}");
-
-        // Use JavaScript to select the option
-        $selected = $this->withRetry(function () use ($targetDate) {
-            return $this->browser->evaluate("
-                (function() {
-                    const select = document.querySelector('select[name=\"rid\"]');
-                    if (!select) throw new Error('Month dropdown not found');
-
-                    const options = Array.from(select.options);
-                    const targetOption = options.find(opt => opt.text.startsWith('{$targetDate}'));
-
-                    if (!targetOption) {
-                        throw new Error('Month {$targetDate} not found in dropdown');
-                    }
-
-                    select.value = targetOption.value;
-                    select.dispatchEvent(new Event('change', { bubbles: true }));
-
-                    return targetOption.text;
-                })()
-            ");
-        }, "Select month: {$targetDate}");
-
-        $this->info("Selected month: {$selected}");
-
-        // Wait longer for page to fully reload after dropdown change
-        sleep(3); // Give page time to reload
-
-        // Verify page loaded by checking for rankings table
-        $this->withRetry(function () {
-            $html = $this->browser->bodyHtml();
-            if (strpos($html, 'Rankingpoäng') === false) {
-                throw new \Exception('Rankings table not loaded yet');
-            }
-            return true;
-        }, 'Wait for page reload');
-    }
-
-    /**
-     * Get players from rankings table
-     */
-    protected function getPlayersFromRankingsTable(): array
-    {
-        $html = $this->withRetry(function () {
-            return $this->browser->bodyHtml();
-        }, 'Get page HTML');
-
-        $dom = new \DOMDocument();
-        @$dom->loadHTML($html);
-        $xpath = new \DOMXPath($dom);
-
-        $players = [];
-
-        // Find the rankings table - look for rows with 7 cells (data rows)
-        $rows = $xpath->query("//table//tr[count(td)=7]");
-
-        foreach ($rows as $row) {
-            $cells = $xpath->query(".//td", $row);
-
-            // Expected structure: Placering | Change | Namn | Born | Club | Points | Points Change
-            $position = trim($cells->item(0)->textContent); // e.g., "WR05 1"
-            $nameCell = $cells->item(2); // Name is in 3rd column
-            $pointsCell = $cells->item(5); // Points in 6th column
-
-            // Extract player name from span with class "rml_poeng"
-            $nameSpan = $xpath->query(".//span[@class='rml_poeng']", $nameCell)->item(0);
-            if (!$nameSpan) {
-                continue;
-            }
-
-            $playerName = trim($nameSpan->textContent);
-            $spanId = $nameSpan->getAttribute('id'); // Format: rml:14450:391:0
-
-            // Extract player ID from span id (e.g., id="rml:14450:391:0" -> 14450)
-            if (preg_match("/rml:(\d+):/", $spanId, $matches)) {
-                $playerId = $matches[1];
-
-                // Extract numeric position (e.g., "WR05 1" -> 1)
-                preg_match("/\d+$/", $position, $posMatches);
-                $numericPosition = $posMatches[0] ?? 0;
-
-                $players[] = [
-                    'profixio_id' => $playerId,
-                    'name' => $playerName,
-                    'position' => (int)$numericPosition,
-                    'points' => (int)str_replace([' ', '.', ','], '', trim($pointsCell->textContent)),
-                    'selector' => "span.rml_poeng[id*='rml:{$playerId}:']",
-                    'span_id' => $spanId,
-                ];
-            }
-        }
-
-        // Apply limit if set in options
-        if (isset($this->options['limit_players']) && $this->options['limit_players'] > 0) {
-            $players = array_slice($players, 0, $this->options['limit_players']);
-        }
-
-        return $players;
-    }
-
-    /**
-     * Scrape player ranking popup
-     */
-    protected function scrapePlayerRankingPopup(array $player): array
-    {
-        // Click player name to open popup using player ID
-        $playerId = $player['profixio_id'];
-
-        // Step 1: Click the span (separate from wait to allow browser event processing)
-        $this->browser->evaluate("
-            (function() {
-                const spans = document.querySelectorAll('span.rml_poeng');
-                for (const span of spans) {
-                    if (span.id && span.id.includes('rml:{$playerId}:')) {
-                        span.click();
-                        return true;
-                    }
-                }
-                throw new Error('Player span not found for ID: {$playerId}');
-            })()
-        ");
-
-        // Step 2: Give browser time to process the click event and show popup
-        sleep(2);
-
-        // Step 3: Verify popup appeared
-        $popupVisible = $this->browser->evaluate("
-            (function() {
-                const popup = document.querySelector('#multipurpose');
-                return popup && popup.style.visibility === 'visible';
-            })()
-        ");
-
-        if (!$popupVisible) {
-            throw new \Exception("Popup did not appear for player {$player['name']}");
-        }
-
-        // Get popup HTML
-        $popupHtml = $this->withRetry(function () {
-            return $this->browser->evaluate("
-                (function() {
-                    const popup = document.querySelector('#multipurpose');
-                    if (popup && popup.style.visibility === 'visible') {
-                        return popup.innerHTML;
-                    }
-                    throw new Error('Popup not visible');
-                })()
-            ");
-        }, "Get popup content");
-
-        // Parse popup content
-        $dom = new \DOMDocument();
-        @$dom->loadHTML($popupHtml);
-        $xpath = new \DOMXPath($dom);
-
-        $rankings = [];
-
-        // Find ranking history table
-        // Structure: <tr><td>Datum</td><td>Poäng</td><td>Placering</td><td>Poängskillnad</td></tr>
-        $rows = $xpath->query("//table//tr[td]");
-
-        foreach ($rows as $row) {
-            $cells = $xpath->query(".//td", $row);
-            if ($cells->length < 4) {
-                continue;
-            }
-
-            $date = trim($cells->item(0)->textContent);
-            $pointsCell = $cells->item(1);
-            $position = trim($cells->item(2)->textContent);
-            $pointsDiff = trim($cells->item(3)->textContent);
-
-            // Extract points value and rmld ID
-            $pointsSpan = $xpath->query(".//span[@class='rmld_poeng']", $pointsCell)->item(0);
-            if (!$pointsSpan) {
-                continue;
-            }
-
-            $points = trim($pointsSpan->textContent);
-            $rmldId = $pointsSpan->getAttribute('id'); // e.g., "rmld:14450:391:0"
-
-            $rankings[] = [
-                'profixio_player_id' => $player['profixio_id'],
-                'date' => $date,
-                'points' => (int)str_replace([' ', '.', ','], '', $points),
-                'position' => (int)$position,
-                'points_diff' => $pointsDiff,
-                'rmld_id' => $rmldId,
-            ];
-        }
-
-        if (!empty($rankings)) {
-            $this->saveRankingsToDatabase($rankings);
-            $this->info("Found " . count($rankings) . " rankings for {$player['name']}");
-        }
-
-        return [
-            'player' => $player,
-            'rankings' => $rankings,
+        // Build command arguments
+        $arguments = [
+            $pythonBinary,
+            $scriptPath,
+            '--year', $year,
+            '--month', str_pad($month, 2, '0', STR_PAD_LEFT),
+            '--gender', $gender,
         ];
-    }
 
-    /**
-     * Scrape matches from nested popup
-     */
-    protected function scrapePlayerMatchesFromPopup(array $player, string $year, string $month): array
-    {
-        // Player popup should already be open from previous step
-        // Find the current month's ranking row and click on the points value
+        if ($limitPlayers) {
+            $arguments[] = '--limit';
+            $arguments[] = (string) $limitPlayers;
+        }
 
-        $targetDate = "{$year}-" . str_pad($month, 2, '0', STR_PAD_LEFT);
+        // Create process with timeout
+        $timeout = config('scraper.python.timeout', 3600); // Default 1 hour
+        $process = new Process($arguments);
+        $process->setTimeout($timeout);
 
-        // Use JavaScript to find and click the points span for the target month
-        $clicked = $this->browser->evaluate("
-            (function() {
-                const rows = Array.from(document.querySelectorAll('#multipurpose table tr'));
+        $this->info("Executing Python script: " . $process->getCommandLine());
 
-                for (const row of rows) {
-                    const dateCell = row.querySelector('td:first-child');
-                    if (!dateCell) continue;
-
-                    const dateText = dateCell.textContent.trim();
-                    if (dateText.startsWith('{$targetDate}')) {
-                        const pointsSpan = row.querySelector('span.rmld_poeng');
-                        if (pointsSpan) {
-                            pointsSpan.click();
-                            return true;
+        try {
+            $process->mustRun(function ($type, $buffer) {
+                // Log stderr output (Python script logs go here)
+                if ($type === Process::ERR) {
+                    $lines = explode("\n", trim($buffer));
+                    foreach ($lines as $line) {
+                        if (!empty($line)) {
+                            $this->info("Python: {$line}");
                         }
                     }
                 }
+            });
 
-                return false;
-            })()
-        ");
+            // Parse JSON output from stdout
+            $output = $process->getOutput();
 
-        if (!$clicked) {
-            $this->info("No points to click for {$targetDate}, player may have no matches");
-            return [];
-        }
-
-        $this->delay('page_load'); // Wait for nested popup to load
-
-        // Get nested popup HTML (should now show matches)
-        $popupHtml = $this->withRetry(function () {
-            return $this->browser->evaluate("
-                (function() {
-                    const popup = document.querySelector('#multipurpose');
-                    if (popup && popup.style.visibility === 'visible') {
-                        return popup.innerHTML;
-                    }
-                    throw new Error('Popup not visible');
-                })()
-            ");
-        }, "Get matches popup content");
-
-        // Parse matches
-        $dom = new \DOMDocument();
-        @$dom->loadHTML($popupHtml);
-        $xpath = new \DOMXPath($dom);
-
-        $matches = [];
-
-        // Structure: <tr><td>W/L</td><td>Opponent Name</td><td>Opponent Points</td><td>Match Points</td><td>Date</td></tr>
-        $rows = $xpath->query("//table//tr[td]");
-
-        foreach ($rows as $row) {
-            $cells = $xpath->query(".//td", $row);
-            if ($cells->length < 5) {
-                continue;
+            if (empty($output)) {
+                throw new \Exception("Python script produced no output");
             }
 
-            $result = trim($cells->item(0)->textContent); // W or L
-            $opponentName = trim($cells->item(1)->textContent);
-            $opponentPoints = trim($cells->item(2)->textContent);
-            $matchPoints = trim($cells->item(3)->textContent);
-            $matchDate = trim($cells->item(4)->textContent);
+            $result = json_decode($output, true);
 
-            // Skip header rows
-            if ($result === 'W' || $result === 'L') {
-                $matches[] = [
-                    'profixio_player_id' => $player['profixio_id'],
-                    'player_name' => $player['name'],
-                    'result' => $result, // 'W' or 'L'
-                    'opponent_name' => $opponentName,
-                    'opponent_points' => (int)str_replace(['+', ' ', '.', ','], '', $opponentPoints),
-                    'match_points' => (int)str_replace(['+', ' ', '.', ','], '', $matchPoints), // Keep negative sign
-                    'match_date' => $matchDate,
-                    'scraped_month' => $targetDate,
-                ];
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception("Failed to parse Python script output as JSON: " . json_last_error_msg() . "\nOutput: " . $output);
             }
+
+            return $result;
+
+        } catch (ProcessFailedException $e) {
+            $errorOutput = $e->getProcess()->getErrorOutput();
+            $standardOutput = $e->getProcess()->getOutput();
+
+            throw new \Exception(
+                "Python scraper process failed:\n" .
+                "Exit Code: {$e->getProcess()->getExitCode()}\n" .
+                "Error Output: {$errorOutput}\n" .
+                "Standard Output: {$standardOutput}"
+            );
         }
-
-        if (!empty($matches)) {
-            $this->saveMatchesToDatabase($matches);
-            $this->info("Found " . count($matches) . " matches for {$player['name']}");
-        }
-
-        // Click back button to return to ranking history popup
-        $this->browser->evaluate("
-            (function() {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const backButton = buttons.find(btn => btn.textContent.includes('Tilbake'));
-                if (backButton) {
-                    backButton.click();
-                    return true;
-                }
-                return false;
-            })()
-        ");
-
-        $this->delay('page_load');
-
-        return $matches;
-    }
-
-    /**
-     * Close popup
-     */
-    protected function closePopup(): void
-    {
-        $this->browser->evaluate("
-            (function() {
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const closeButton = buttons.find(btn => btn.textContent.includes('Stäng'));
-                if (closeButton) {
-                    closeButton.click();
-                    return true;
-                }
-                return false;
-            })()
-        ");
-
-        $this->delay('page_load');
     }
 
     /**
@@ -496,7 +150,7 @@ class RankingsScraper extends BaseScraperService
             DB::table('scraped_rankings')->insert([
                 'scraper_run_id' => $this->run->id,
                 'profixio_player_id' => $ranking['profixio_player_id'],
-                'ranking_date' => $ranking['date'],
+                'ranking_date' => $ranking['ranking_date'],
                 'points' => $ranking['points'],
                 'position' => $ranking['position'],
                 'points_diff' => $ranking['points_diff'],
@@ -537,7 +191,7 @@ class RankingsScraper extends BaseScraperService
                 'scraped_month' => $match['scraped_month'],
                 'is_synced' => false,
                 // Legacy fields for backward compatibility
-                'source' => 'rankings_popup',
+                'source' => 'rankings_popup_python',
                 'period' => $this->options['year'] . '-' . str_pad($this->options['month'], 2, '0', STR_PAD_LEFT),
                 'division' => '',
                 'series_name' => '',
