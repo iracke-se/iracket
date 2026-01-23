@@ -204,8 +204,10 @@ class RankingsScraper:
 
             player_id = match.group(1)
 
-            # Get position and points
+            # Get position, birth year, club, and points
             position_text = await cells[0].text_content()
+            born_text = await cells[3].text_content()
+            club_text = await cells[4].text_content()
             points_text = await cells[5].text_content()
 
             # Extract numeric position
@@ -218,6 +220,8 @@ class RankingsScraper:
             players.append({
                 "profixio_id": player_id,
                 "name": player_name.strip(),
+                "born": born_text.strip(),
+                "club": club_text.strip(),
                 "position": position,
                 "points": points,
                 "span_id": span_id
@@ -273,6 +277,9 @@ class RankingsScraper:
 
             rankings.append({
                 "profixio_player_id": player['profixio_id'],
+                "player_name": player['name'],
+                "born": player.get('born', ''),
+                "club": player.get('club', ''),
                 "ranking_date": date_text.strip(),
                 "points": int(points_text.strip().replace(' ', '').replace('.', '').replace(',', '')),
                 "position": int(position_text.strip()),
