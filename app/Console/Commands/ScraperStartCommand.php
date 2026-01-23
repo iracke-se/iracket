@@ -27,7 +27,7 @@ class ScraperStartCommand extends Command
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
     protected array $stats = [];
-    protected int $totalSteps = 8; // Rankings (with matches), Players, Sync Players, Sync Rankings, Sync Matches, Standings, Verify
+    protected int $totalSteps = 9; // Rankings (with matches), Players, Sync Players, Sync Rankings, Create Monthly Rankings, Sync Matches, Standings, Verify
     protected int $currentStep = 0;
     protected ?string $backupFile = null;
     protected array $executionLog = [];
@@ -163,18 +163,23 @@ class ScraperStartCommand extends Command
                 return $this->syncData($syncService, 'rankings');
             });
 
-            // Step 5: Sync Matches
+            // Step 5: Create Monthly Rankings
+            $this->runStep('Creating Monthly Rankings', function () use ($syncService) {
+                return $this->createMonthlyRankings($syncService);
+            });
+
+            // Step 6: Sync Matches
             $this->runStep('Syncing Matches', function () {
                 return $this->syncMatches();
             });
 
-            // Step 6: Scrape Series Standings
+            // Step 7: Scrape Series Standings
             $result = $this->runStep('Scraping Series Standings', function () use ($month, $scrapeAll) {
                 return $this->scrapeSeries($month, $scrapeAll);
             });
             $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
-            // Step 7: Verify Data
+            // Step 8: Verify Data
             $this->runStep('Verifying Data Integrity', function () {
                 return $this->verifyData();
             });
@@ -864,6 +869,38 @@ class ScraperStartCommand extends Command
 
         $this->displaySyncStats($stats);
         $this->stats[$type] = $stats;
+
+        return $stats;
+    }
+
+    protected function createMonthlyRankings(SyncService $syncService): array
+    {
+        $this->line("  📊 Creating monthly rankings from scraped data...");
+        $this->newLine();
+
+        // Use parent run for logging
+        $run = $this->parentRun;
+
+        $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
+
+        // Create monthly rankings with progress
+        $this->syncWithProgress(function() use ($syncService, $run) {
+            return $syncService->createMonthlyRankings(null, $run);
+        }, $run, $lastLogId);
+
+        $stats = $syncService->getStats();
+
+        // Display results
+        $this->newLine();
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Created/Updated', number_format($stats['created'])],
+                ['Errors', number_format($stats['errors'])],
+            ]
+        );
+
+        $this->stats['monthly_rankings'] = $stats;
 
         return $stats;
     }

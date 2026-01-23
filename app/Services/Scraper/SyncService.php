@@ -152,6 +152,101 @@ class SyncService
     }
 
     /**
+     * Create monthly rankings from scraped rankings
+     * Takes the latest ranking for each user in a given month
+     */
+    public function createMonthlyRankings(?int $runId = null, ?ScraperRun $run = null): array
+    {
+        $this->resetStats();
+
+        $query = ScrapedRanking::where('is_synced', true)
+            ->whereNotNull('synced_user_id');
+
+        if ($runId) {
+            $query->where('scraper_run_id', $runId);
+        }
+
+        if ($run) {
+            $run->log('info', 'Starting monthly rankings creation from scraped data');
+        }
+
+        // Group by user and period, get the latest ranking for each
+        $rankings = $query->select('synced_user_id', 'period', DB::raw('MAX(ranking_date) as latest_date'))
+            ->groupBy('synced_user_id', 'period')
+            ->get();
+
+        $totalCount = $rankings->count();
+        if ($run) {
+            $run->log('info', "Found {$totalCount} unique user/period combinations to process");
+        }
+
+        $processed = 0;
+        foreach ($rankings as $grouping) {
+            try {
+                // Get the full ranking record for this user's latest ranking in this period
+                $ranking = ScrapedRanking::where('synced_user_id', $grouping->synced_user_id)
+                    ->where('period', $grouping->period)
+                    ->where('ranking_date', $grouping->latest_date)
+                    ->first();
+
+                if ($ranking) {
+                    // Parse period (format: "2025-12")
+                    [$year, $month] = explode('-', $ranking->period);
+
+                    // Create or update monthly ranking
+                    \App\Models\MonthlyRanking::updateOrCreate(
+                        [
+                            'user_id' => $ranking->synced_user_id,
+                            'year' => (int) $year,
+                            'month' => (int) $month,
+                        ],
+                        [
+                            'rank' => $ranking->position,
+                            'points' => $ranking->points,
+                            'points_change' => $this->parsePointsChange($ranking->points_diff),
+                        ]
+                    );
+
+                    $this->stats['created']++;
+                }
+
+                $processed++;
+
+                // Log progress every 100 items
+                if ($processed % 100 === 0 && $run) {
+                    $run->log('info', "Created monthly rankings: {$processed}/{$totalCount}");
+                }
+            } catch (\Exception $e) {
+                $this->stats['errors']++;
+                Log::error("Failed to create monthly ranking", [
+                    'user_id' => $grouping->synced_user_id,
+                    'period' => $grouping->period,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($run) {
+            $run->log('info', "Monthly rankings creation completed: {$this->stats['created']} created, {$this->stats['errors']} errors");
+        }
+
+        return $this->stats;
+    }
+
+    /**
+     * Parse points change string like "+9", "-5", "" to integer
+     */
+    protected function parsePointsChange(?string $pointsDiff): int
+    {
+        if (empty($pointsDiff)) {
+            return 0;
+        }
+
+        $cleaned = str_replace(' ', '', $pointsDiff);
+        return (int) $cleaned;
+    }
+
+    /**
      * Sync a single player
      */
     protected function syncPlayer(ScrapedPlayer $player): void
