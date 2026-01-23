@@ -3,12 +3,13 @@
 namespace App\Livewire\User\MyMonitored;
 
 use App\Models\User;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
 
@@ -36,10 +37,7 @@ class Index extends Component
                   ->where('month', now()->month);
             }])
             ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('first_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('last_name', 'like', '%' . $this->search . '%');
-                });
+                $this->applySearch($query, $this->search, ['first_name', 'last_name']);
             })
             ->paginate(20);
 

@@ -4,12 +4,13 @@ namespace App\Livewire\Admin\Users;
 
 use App\Models\Club;
 use App\Models\User;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
     public string $gender = '';
@@ -65,11 +66,7 @@ class Index extends Component
     {
         return User::query()
             ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('first_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('last_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('email', 'like', '%' . $this->search . '%');
-                });
+                $this->applySearch($query, $this->search, ['first_name', 'last_name', 'email']);
             })
             ->when($this->gender, function ($query) {
                 $query->where('gender', $this->gender);
@@ -132,11 +129,7 @@ class Index extends Component
         $users = User::query()
             ->with('club')
             ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('first_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('last_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('email', 'like', '%' . $this->search . '%');
-                });
+                $this->applySearch($query, $this->search, ['first_name', 'last_name', 'email']);
             })
             ->when($this->gender, function ($query) {
                 $query->where('gender', $this->gender);

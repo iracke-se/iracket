@@ -3,12 +3,13 @@
 namespace App\Livewire\Admin\Contacts;
 
 use App\Models\Contact;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
     public string $status = '';
@@ -41,9 +42,7 @@ class Index extends Component
             ->with('repliedBy')
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                      ->orWhere('email', 'like', '%' . $this->search . '%')
-                      ->orWhere('message', 'like', '%' . $this->search . '%');
+                    $this->applySearch($q, $this->search, ['name', 'email', 'message']);
                 });
             })
             ->when($this->status, function ($query) {

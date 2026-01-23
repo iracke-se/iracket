@@ -4,10 +4,12 @@ namespace App\Livewire\User\Matches;
 
 use App\Models\GameMatch;
 use App\Models\User;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use HasSearchableQueries;
     public int $selectedYear;
     public ?int $selectedOpponent = null;
     public string $opponentSearch = '';
@@ -91,10 +93,7 @@ class Index extends Component
         $opponentsQuery = User::whereIn('id', $opponentIds)->with('club');
 
         if ($this->opponentSearch) {
-            $opponentsQuery->where(function ($q) {
-                $q->where('first_name', 'like', '%' . $this->opponentSearch . '%')
-                  ->orWhere('last_name', 'like', '%' . $this->opponentSearch . '%');
-            });
+            $this->applySearch($opponentsQuery, $this->opponentSearch, ['first_name', 'last_name']);
         }
 
         $opponents = $opponentsQuery->orderBy('first_name')->get();

@@ -3,12 +3,13 @@
 namespace App\Livewire\Admin\Matches;
 
 use App\Models\GameMatch;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
     public string $status = '';
@@ -39,13 +40,10 @@ class Index extends Component
         $matches = GameMatch::query()
             ->with(['player1', 'player2', 'winner'])
             ->when($this->search, function ($query) {
-                $query->whereHas('player1', function ($q) {
-                    $q->where('first_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('last_name', 'like', '%' . $this->search . '%');
-                })->orWhereHas('player2', function ($q) {
-                    $q->where('first_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('last_name', 'like', '%' . $this->search . '%');
-                });
+                $this->applySearchToMultipleRelations($query, $this->search, [
+                    'player1' => ['first_name', 'last_name'],
+                    'player2' => ['first_name', 'last_name'],
+                ]);
             })
             ->when($this->status, function ($query) {
                 $query->where('status', $this->status);

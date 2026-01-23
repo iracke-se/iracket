@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Models\Club as ClubModel;
+use App\Traits\HasSearchableQueries;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -10,7 +11,7 @@ use Livewire\WithFileUploads;
 
 class Club extends Component
 {
-    use WithFileUploads;
+    use WithFileUploads, HasSearchableQueries;
 
     public string $search = '';
     public bool $showCreateForm = false;
@@ -180,8 +181,7 @@ class Club extends Component
             $query = ClubModel::withCount('members')->orderBy('name');
 
             if ($this->search) {
-                $query->where('name', 'like', '%' . $this->search . '%')
-                      ->orWhere('location', 'like', '%' . $this->search . '%');
+                $this->applySearch($query, $this->search, ['name', 'location']);
             }
 
             $clubs = $query->get();

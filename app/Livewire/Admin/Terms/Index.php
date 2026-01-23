@@ -3,12 +3,13 @@
 namespace App\Livewire\Admin\Terms;
 
 use App\Models\Term;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
 
@@ -29,8 +30,7 @@ class Index extends Component
     {
         $terms = Term::query()
             ->when($this->search, function ($query) {
-                $query->where('title', 'like', '%' . $this->search . '%')
-                      ->orWhere('slug', 'like', '%' . $this->search . '%');
+                $this->applySearch($query, $this->search, ['title', 'slug']);
             })
             ->orderBy('created_at', 'desc')
             ->paginate(10);

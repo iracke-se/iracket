@@ -3,12 +3,13 @@
 namespace App\Livewire\Admin\Staff;
 
 use App\Models\User;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
 
@@ -45,9 +46,7 @@ class Index extends Component
             ->role(['Admin', 'Manager'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('first_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('last_name', 'like', '%' . $this->search . '%')
-                      ->orWhere('email', 'like', '%' . $this->search . '%');
+                    $this->applySearch($q, $this->search, ['first_name', 'last_name', 'email']);
                 });
             })
             ->orderBy('created_at', 'desc')

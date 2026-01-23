@@ -4,6 +4,7 @@ namespace App\Livewire\Auth;
 
 use App\Models\Club;
 use App\Models\User;
+use App\Traits\HasSearchableQueries;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -11,6 +12,7 @@ use Livewire\Component;
 #[Layout('components.layouts.auth')]
 class ConnectAccount extends Component
 {
+    use HasSearchableQueries;
     public bool $isActivePlayer = true;
     public ?int $clubId = null;
     public ?int $playerId = null;
@@ -161,10 +163,7 @@ class ConnectAccount extends Component
             ->orderBy('last_name');
 
         if ($this->playerSearch) {
-            $playersQuery->where(function ($query) {
-                $query->where('first_name', 'like', '%' . $this->playerSearch . '%')
-                    ->orWhere('last_name', 'like', '%' . $this->playerSearch . '%');
-            });
+            $this->applySearch($playersQuery, $this->playerSearch, ['first_name', 'last_name']);
         }
 
         $playersGrouped = $playersQuery->get()->groupBy(function ($player) {

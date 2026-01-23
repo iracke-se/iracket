@@ -3,12 +3,13 @@
 namespace App\Livewire\Admin\Banners;
 
 use App\Models\Banner;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
     public string $status = '';
@@ -61,7 +62,7 @@ class Index extends Component
     {
         $banners = Banner::query()
             ->when($this->search, function ($query) {
-                $query->where('name', 'like', '%' . $this->search . '%');
+                $this->applySearch($query, $this->search, ['name']);
             })
             ->when($this->status, function ($query) {
                 $query->where('status', $this->status);

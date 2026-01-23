@@ -3,12 +3,13 @@
 namespace App\Livewire\User\Clubs;
 
 use App\Models\Club;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
 
@@ -22,10 +23,7 @@ class Index extends Component
         $query = Club::query()->withCount('members');
 
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('location', 'like', '%' . $this->search . '%');
-            });
+            $this->applySearch($query, $this->search, ['name', 'location']);
         }
 
         $clubs = $query->orderBy('name')->paginate(20);

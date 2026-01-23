@@ -4,12 +4,13 @@ namespace App\Livewire\Admin\Clubs;
 
 use App\Models\Club;
 use App\Models\User;
+use App\Traits\HasSearchableQueries;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, HasSearchableQueries;
 
     public string $search = '';
     public string $hasMembers = '';
@@ -44,8 +45,7 @@ class Index extends Component
     {
         return Club::query()
             ->when($this->search, function ($query) {
-                $query->where('name', 'like', '%' . $this->search . '%')
-                      ->orWhere('location', 'like', '%' . $this->search . '%');
+                $this->applySearch($query, $this->search, ['name', 'location']);
             })
             ->when($this->hasMembers !== '', function ($query) {
                 if ($this->hasMembers === '1') {
@@ -94,8 +94,7 @@ class Index extends Component
     {
         $clubs = Club::query()
             ->when($this->search, function ($query) {
-                $query->where('name', 'like', '%' . $this->search . '%')
-                      ->orWhere('location', 'like', '%' . $this->search . '%');
+                $this->applySearch($query, $this->search, ['name', 'location']);
             })
             ->when($this->hasMembers !== '', function ($query) {
                 if ($this->hasMembers === '1') {
