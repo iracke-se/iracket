@@ -32,8 +32,12 @@ class RankingsScraper extends BaseScraperService
 
         $this->info("Starting rankings scraper with popup interaction for {$year}-{$month}, gender: {$gender}");
 
-        // Step 1: Navigate to rankings page
-        $url = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender={$gender}";
+        // Step 1: Get the rid (ranking ID) for the target month
+        $rid = $this->getRidForMonth($year, $month, $gender);
+        $this->info("Found rid={$rid} for {$year}-{$month}");
+
+        // Step 2: Navigate directly to rankings page with rid parameter
+        $url = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender={$gender}&rid={$rid}";
         $this->browser = Browsershot::url($url)
             ->setNodeBinary(config('scraper.browser.node_binary'))
             ->setNpmBinary(config('scraper.browser.npm_binary'))
@@ -46,14 +50,6 @@ class RankingsScraper extends BaseScraperService
         }
 
         $this->delay('page_load');
-
-        // Step 2: Select the month from dropdown
-        try {
-            $this->selectMonthFromDropdown($year, $month);
-        } catch (\Exception $e) {
-            $this->error("Failed to select month: " . $e->getMessage());
-            return;
-        }
 
         // Step 3: Get all players from rankings table
         $players = $this->getPlayersFromRankingsTable();
@@ -110,7 +106,46 @@ class RankingsScraper extends BaseScraperService
     }
 
     /**
-     * Select month from dropdown
+     * Get rid (ranking ID) for a specific month
+     */
+    protected function getRidForMonth(string $year, string $month, string $gender): string
+    {
+        $targetDate = "{$year}." . str_pad($month, 2, '0', STR_PAD_LEFT) . ".01";
+
+        // Navigate to page without rid to get dropdown options
+        $tempUrl = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender={$gender}";
+        $tempBrowser = Browsershot::url($tempUrl)
+            ->setNodeBinary(config('scraper.browser.node_binary'))
+            ->setNpmBinary(config('scraper.browser.npm_binary'))
+            ->timeout(config('scraper.browser.timeout'))
+            ->waitUntilNetworkIdle()
+            ->noSandbox();
+
+        if (config('scraper.browser.chrome_path')) {
+            $tempBrowser->setChromePath(config('scraper.browser.chrome_path'));
+        }
+
+        $rid = $tempBrowser->evaluate("
+            (function() {
+                const select = document.querySelector('select[name=\"rid\"]');
+                if (!select) throw new Error('Month dropdown not found');
+
+                const options = Array.from(select.options);
+                const targetOption = options.find(opt => opt.text.startsWith('{$targetDate}'));
+
+                if (!targetOption) {
+                    throw new Error('Month {$targetDate} not found in dropdown');
+                }
+
+                return targetOption.value;
+            })()
+        ");
+
+        return $rid;
+    }
+
+    /**
+     * Select month from dropdown (DEPRECATED - use getRidForMonth and direct navigation instead)
      */
     protected function selectMonthFromDropdown(string $year, string $month): void
     {
@@ -140,8 +175,19 @@ class RankingsScraper extends BaseScraperService
             ");
         }, "Select month: {$targetDate}");
 
-        $this->delay('page_load'); // Wait for page to reload with new data
         $this->info("Selected month: {$selected}");
+
+        // Wait longer for page to fully reload after dropdown change
+        sleep(3); // Give page time to reload
+
+        // Verify page loaded by checking for rankings table
+        $this->withRetry(function () {
+            $html = $this->browser->bodyHtml();
+            if (strpos($html, 'Rankingpoäng') === false) {
+                throw new \Exception('Rankings table not loaded yet');
+            }
+            return true;
+        }, 'Wait for page reload');
     }
 
     /**
@@ -213,10 +259,13 @@ class RankingsScraper extends BaseScraperService
     {
         // Click player name to open popup using player ID
         $playerId = $player['profixio_id'];
+
+        // Click and wait for popup in a single evaluation
+        // This ensures the popup state persists within the same browser context
         $this->withRetry(function () use ($playerId, $player) {
-            $this->browser->evaluate("
+            return $this->browser->evaluate("
                 (function() {
-                    // Find span with id containing the player ID
+                    // Find and click span
                     const spans = document.querySelectorAll('span.rml_poeng');
                     let targetSpan = null;
                     for (const span of spans) {
@@ -226,25 +275,26 @@ class RankingsScraper extends BaseScraperService
                         }
                     }
 
-                    if (targetSpan) {
-                        targetSpan.click();
-
-                        // Wait for popup
-                        const startTime = Date.now();
-                        while (Date.now() - startTime < 5000) {
-                            const popup = document.querySelector('#multipurpose');
-                            if (popup && popup.style.visibility === 'visible') {
-                                return true;
-                            }
-                        }
-                        throw new Error('Popup did not appear within timeout');
+                    if (!targetSpan) {
+                        throw new Error('Player span not found for ID: {$playerId}');
                     }
-                    throw new Error('Player span not found for ID: {$playerId}');
+
+                    targetSpan.click();
+
+                    // Wait for popup to appear (synchronous busy-wait)
+                    const startTime = Date.now();
+                    while (Date.now() - startTime < 5000) {
+                        const popup = document.querySelector('#multipurpose');
+                        if (popup && popup.style.visibility === 'visible') {
+                            return true;
+                        }
+                        // Busy wait - no async needed
+                    }
+
+                    throw new Error('Popup did not appear within 5 seconds');
                 })()
             ");
-        }, "Click player name: {$player['name']}");
-
-        $this->delay('page_load');
+        }, "Click player and wait for popup: {$player['name']}");
 
         // Get popup HTML
         $popupHtml = $this->withRetry(function () {
