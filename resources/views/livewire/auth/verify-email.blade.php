@@ -17,7 +17,11 @@
     @endif
 
     @if ($success)
-        <div class="p-3 text-sm text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 rounded-lg text-center">
+        <div class="p-3 text-sm text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 rounded-lg text-center"
+             id="successMessage"
+             x-data="{ show: true }"
+             x-show="show"
+             x-init="setTimeout(() => show = false, 3000)">
             {{ $success }}
         </div>
     @endif
@@ -53,12 +57,173 @@
             <button
                 type="button"
                 wire:click="resend"
-                class="text-accent hover:underline font-medium"
+                onclick="handleResendClick(event)"
+                id="resendButton"
+                class="text-accent hover:underline font-medium disabled:text-zinc-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:no-underline dark:disabled:text-zinc-600"
             >
-                {{ __('auth.resend_code') }}
+                <span id="resendText">{{ __('auth.resend_code') }}</span>
             </button>
         </p>
     </div>
+
+    <script>
+        (function() {
+            // Prevent multiple initializations
+            if (window.resendCodeInitialized) {
+                return;
+            }
+            window.resendCodeInitialized = true;
+
+            const COOLDOWN_SECONDS = 15;
+            const STORAGE_KEY = 'verify_email_resend_cooldown';
+            let countdownInterval = null;
+
+        function handleResendClick(event) {
+            const button = document.getElementById('resendButton');
+            const textSpan = document.getElementById('resendText');
+
+            // Prevent action if button is already disabled
+            if (button.disabled) {
+                if (event) event.preventDefault();
+                return false;
+            }
+
+            // Set localStorage immediately when button is clicked
+            localStorage.setItem(STORAGE_KEY, Date.now().toString());
+
+            // Immediately disable button and show countdown
+            const originalText = textSpan.getAttribute('data-original-text') || textSpan.textContent;
+            if (!textSpan.getAttribute('data-original-text')) {
+                textSpan.setAttribute('data-original-text', originalText);
+            }
+            disableButton(COOLDOWN_SECONDS);
+        }
+
+        function updateButtonState() {
+            const button = document.getElementById('resendButton');
+            const textSpan = document.getElementById('resendText');
+
+            if (!button || !textSpan) return;
+
+            const originalText = textSpan.getAttribute('data-original-text') || textSpan.textContent;
+            if (!textSpan.getAttribute('data-original-text')) {
+                textSpan.setAttribute('data-original-text', originalText);
+            }
+
+            const lastResend = localStorage.getItem(STORAGE_KEY);
+
+            if (!lastResend) {
+                enableButton();
+                return;
+            }
+
+            const elapsed = Math.floor((Date.now() - parseInt(lastResend)) / 1000);
+            const remaining = COOLDOWN_SECONDS - elapsed;
+
+            if (remaining > 0) {
+                disableButton(remaining);
+            } else {
+                enableButton();
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        }
+
+        function disableButton(seconds) {
+            const button = document.getElementById('resendButton');
+            const textSpan = document.getElementById('resendText');
+            const originalText = textSpan.getAttribute('data-original-text');
+
+            button.disabled = true;
+            textSpan.textContent = `${originalText} (${seconds}s)`;
+
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+
+            countdownInterval = setInterval(() => {
+                const lastResend = localStorage.getItem(STORAGE_KEY);
+                if (!lastResend) {
+                    enableButton();
+                    return;
+                }
+
+                const elapsed = Math.floor((Date.now() - parseInt(lastResend)) / 1000);
+                const remaining = COOLDOWN_SECONDS - elapsed;
+
+                if (remaining > 0) {
+                    textSpan.textContent = `${originalText} (${remaining}s)`;
+                } else {
+                    enableButton();
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            }, 1000);
+        }
+
+        function enableButton() {
+            const button = document.getElementById('resendButton');
+            const textSpan = document.getElementById('resendText');
+            const originalText = textSpan.getAttribute('data-original-text');
+
+            button.disabled = false;
+            textSpan.textContent = originalText;
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
+            // Clear localStorage when countdown completes
+            localStorage.removeItem(STORAGE_KEY);
+        }
+
+        // Clean up old localStorage entries on initialization
+        function cleanupOldStorage() {
+            const lastResend = localStorage.getItem(STORAGE_KEY);
+            if (lastResend) {
+                const elapsed = Math.floor((Date.now() - parseInt(lastResend)) / 1000);
+                if (elapsed >= COOLDOWN_SECONDS) {
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            }
+        }
+
+        // Check button state on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            cleanupOldStorage();
+            updateButtonState();
+        });
+
+        // Also check on Livewire load
+        document.addEventListener('livewire:init', () => {
+            cleanupOldStorage();
+            updateButtonState();
+
+            // Re-apply button state after Livewire updates
+            Livewire.hook('morph.updated', () => {
+                setTimeout(() => {
+                    updateButtonState();
+                }, 50);
+            });
+
+            // Re-apply after any Livewire request finishes
+            Livewire.hook('request.finished', () => {
+                setTimeout(() => {
+                    updateButtonState();
+                }, 50);
+            });
+        });
+
+        // Clean up interval when page is unloaded
+        window.addEventListener('beforeunload', () => {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+        });
+
+        // Make functions globally accessible
+        window.handleResendClick = handleResendClick;
+        window.updateButtonState = updateButtonState;
+        })();
+    </script>
 
     <div class="text-center">
         <form method="POST" action="{{ route('logout') }}">

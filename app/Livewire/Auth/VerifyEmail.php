@@ -15,6 +15,13 @@ class VerifyEmail extends Component
     public string $error = '';
     public string $success = '';
 
+    public function mount()
+    {
+        // Clear any old error/success messages on page load
+        $this->error = '';
+        $this->success = '';
+    }
+
     public function verify()
     {
         $this->error = '';
@@ -54,6 +61,8 @@ class VerifyEmail extends Component
 
         $this->success = 'A new verification code has been sent to your email.';
         $this->code = '';
+
+        $this->dispatch('code-resent');
     }
 
     public function render()

@@ -58,7 +58,7 @@
             <div>
                 <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.sort_by') }}</label>
                 <select
-                    wire:model="sortBy"
+                    wire:model.live="sortBy"
                     class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 >
                     <option value="points_desc">{{ __('user-players.points_descending') }}</option>
@@ -72,7 +72,7 @@
             <div>
                 <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.place') }}</label>
                 <select
-                    wire:model="location"
+                    wire:model.live="location"
                     class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 >
                     <option value="">{{ __('user-players.all_of_sweden') }}</option>
@@ -95,7 +95,7 @@
                         <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.from') }}</label>
                         <input
                             type="number"
-                            wire:model="rankingFrom"
+                            wire:model.blur="rankingFrom"
                             placeholder="1500"
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
@@ -104,7 +104,7 @@
                         <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.to') }}</label>
                         <input
                             type="number"
-                            wire:model="rankingTo"
+                            wire:model.blur="rankingTo"
                             placeholder="1749"
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
@@ -120,7 +120,7 @@
                         <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.from') }}</label>
                         <input
                             type="number"
-                            wire:model="ageFrom"
+                            wire:model.blur="ageFrom"
                             placeholder="18"
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
@@ -129,7 +129,7 @@
                         <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.to') }}</label>
                         <input
                             type="number"
-                            wire:model="ageTo"
+                            wire:model.blur="ageTo"
                             placeholder="50"
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
@@ -137,12 +137,12 @@
                 </div>
             </div>
 
-            <!-- Date -->
+            <!-- Month -->
             <div>
-                <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.date') }}</label>
+                <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.month') }}</label>
                 <input
-                    type="date"
-                    wire:model="selectedDate"
+                    type="month"
+                    wire:model.live="selectedMonth"
                     class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 >
             </div>
