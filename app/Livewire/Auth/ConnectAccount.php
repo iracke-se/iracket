@@ -124,10 +124,45 @@ class ConnectAccount extends Component
             $existingPlayer = User::find($this->playerId);
 
             if ($existingPlayer && $existingPlayer->sbtf_synced) {
-                // Transfer relevant data from the existing SBTF player to current user
+                // Validate that SBTF player has required data
+                if (empty($existingPlayer->first_name) || empty($existingPlayer->last_name)) {
+                    Log::error('SBTF player has invalid name data', [
+                        'player_id' => $existingPlayer->id,
+                        'sbtf_player_id' => $existingPlayer->sbtf_player_id,
+                    ]);
+
+                    $this->addError('playerId', __('connect.invalid_sbtf_player_data'));
+                    return;
+                }
+
+                // Preserve the user's registered name before transferring SBTF data
+                if (!$user->user_fullname) {
+                    $currentName = trim($user->first_name . ' ' . $user->last_name);
+                    if (!empty($currentName)) {
+                        $user->user_fullname = $currentName;
+                    }
+                }
+
+                // Transfer SBTF identifiers
                 $user->sbtf_player_id = $existingPlayer->sbtf_player_id;
                 $user->sbtf_synced = true;
                 $user->sbtf_synced_at = $existingPlayer->sbtf_synced_at;
+
+                // Transfer official SBTF player profile data (SBTF data is authoritative)
+                $user->first_name = $existingPlayer->first_name;
+                $user->last_name = $existingPlayer->last_name;
+
+                // Transfer optional fields if available from SBTF player
+                if (!empty($existingPlayer->gender)) {
+                    $user->gender = $existingPlayer->gender;
+                }
+
+                if (!empty($existingPlayer->birth_year)) {
+                    $user->birth_year = $existingPlayer->birth_year;
+                }
+
+                // Save all changes before transferring relationships
+                $user->save();
 
                 // Transfer rankings if any
                 $existingPlayer->monthlyRankings()->update(['user_id' => $user->id]);
