@@ -6,6 +6,7 @@ use App\Models\Club;
 use App\Models\User;
 use App\Traits\HasSearchableQueries;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -163,7 +164,27 @@ class ConnectAccount extends Component
             ->orderBy('last_name');
 
         if ($this->playerSearch) {
-            $this->applySearch($playersQuery, $this->playerSearch, ['first_name', 'last_name']);
+            $search = trim($this->playerSearch);
+
+            // If search contains space, split and search first/last name parts
+            if (str_contains($search, ' ')) {
+                $parts = explode(' ', $search, 2);
+                $firstName = trim($parts[0]);
+                $lastName = trim($parts[1] ?? '');
+
+                if ($firstName && $lastName) {
+                    // Apply search for first name
+                    $this->applySearch($playersQuery, $firstName, ['first_name']);
+                    // Apply search for last name (both must match)
+                    $this->applySearch($playersQuery, $lastName, ['last_name']);
+                } else {
+                    // If only first part exists, search normally
+                    $this->applySearch($playersQuery, $firstName ?: $lastName, ['first_name', 'last_name']);
+                }
+            } else {
+                // Single word search - search in both first_name and last_name separately
+                $this->applySearch($playersQuery, $search, ['first_name', 'last_name']);
+            }
         }
 
         $playersGrouped = $playersQuery->get()->groupBy(function ($player) {
