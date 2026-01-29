@@ -51,7 +51,8 @@ class SyncService
         $batchSize = 100;
 
         // Process in batches for better performance and progress tracking
-        $query->chunk($batchSize, function ($players) use (&$processed, $totalCount, $run) {
+        // Use chunkById to safely iterate while modifying is_synced flag
+        $query->chunkById($batchSize, function ($players) use (&$processed, $totalCount, $run) {
             foreach ($players as $player) {
                 try {
                     $this->syncPlayer($player);
@@ -125,7 +126,8 @@ class SyncService
         $batchSize = 100;
 
         // Process in batches for better performance and progress tracking
-        $query->chunk($batchSize, function ($rankings) use (&$processed, $totalCount, $run) {
+        // Use chunkById to safely iterate while modifying is_synced flag
+        $query->chunkById($batchSize, function ($rankings) use (&$processed, $totalCount, $run) {
             foreach ($rankings as $ranking) {
                 try {
                     $this->syncRanking($ranking);

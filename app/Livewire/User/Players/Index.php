@@ -30,6 +30,12 @@ class Index extends Component
         'gender' => ['except' => ''],
     ];
 
+    public function mount()
+    {
+        // Don't set a default month - show all players with their latest rankings
+        $this->selectedMonth = null;
+    }
+
     public function updatingSearch()
     {
         $this->resetPage();

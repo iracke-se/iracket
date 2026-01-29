@@ -107,6 +107,11 @@ class ScraperStartCommand extends Command
             }
         }
 
+        // Adjust totalSteps if --limit-players is set (skips Steps 4 & 5)
+        if ($this->option('limit-players')) {
+            $this->totalSteps = 7; // Skip "Scraping Players" and "Syncing Players"
+        }
+
         $this->displayHeader($month, $scrapeAll);
 
         // Create parent scraper run to track the entire process
@@ -148,15 +153,27 @@ class ScraperStartCommand extends Command
             $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
             // Step 2: Scrape Players
-            $result = $this->runStep('Scraping Players', function () use ($month, $scrapeAll) {
-                return $this->scrapePlayers($month, $scrapeAll);
-            });
-            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+            // Skip this step if --limit-players is set, since players will be created from rankings
+            if (!$this->option('limit-players')) {
+                $result = $this->runStep('Scraping Players', function () use ($month, $scrapeAll) {
+                    return $this->scrapePlayers($month, $scrapeAll);
+                });
+                $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+            } else {
+                $this->line("  ⏭️  Skipping player list scrape (using --limit-players)");
+                $this->newLine();
+            }
 
             // Step 3: Sync Players
-            $this->runStep('Syncing Players → Users & Clubs', function () use ($syncService) {
-                return $this->syncData($syncService, 'players');
-            });
+            // Skip this step if --limit-players is set, since players will be synced from rankings
+            if (!$this->option('limit-players')) {
+                $this->runStep('Syncing Players → Users & Clubs', function () use ($syncService) {
+                    return $this->syncData($syncService, 'players');
+                });
+            } else {
+                $this->line("  ⏭️  Skipping player sync (players will be synced from rankings)");
+                $this->newLine();
+            }
 
             // Step 4: Sync Rankings
             $this->runStep('Syncing Rankings', function () use ($syncService) {

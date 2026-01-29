@@ -157,7 +157,7 @@ class RankingsScraper extends BaseScraperService
                 'rmld_id' => $ranking['rmld_id'],
                 'is_synced' => false,
                 // Legacy fields for backward compatibility
-                'period' => $this->options['year'] . '-' . str_pad($this->options['month'], 2, '0', STR_PAD_LEFT),
+                'period' => date('Y-m', strtotime($ranking['ranking_date'])),
                 'division' => '',
                 'gender' => $this->options['gender'] === 'm' ? 'male' : 'female',
                 'position_change' => '',
@@ -192,7 +192,7 @@ class RankingsScraper extends BaseScraperService
                 'is_synced' => false,
                 // Legacy fields for backward compatibility
                 'source' => 'rankings_popup_python',
-                'period' => $this->options['year'] . '-' . str_pad($this->options['month'], 2, '0', STR_PAD_LEFT),
+                'period' => date('Y-m', strtotime($match['match_date'])),
                 'division' => '',
                 'series_name' => '',
                 'team1_name' => '',

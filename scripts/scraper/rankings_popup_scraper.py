@@ -60,10 +60,21 @@ class RankingsScraper:
     async def run(self) -> Dict:
         """Execute scraping workflow"""
         async with async_playwright() as p:
-            # Launch browser (headless in production)
-            self.browser = await p.chromium.launch(headless=True)
+            # Launch browser with additional stability arguments
+            self.browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox'
+                ]
+            )
             self.context = await self.browser.new_context()
             self.page = await self.context.new_page()
+
+            # Set longer default timeout
+            self.page.set_default_timeout(30000)
 
             try:
                 # Step 1: Get RID for target month
@@ -151,7 +162,8 @@ class RankingsScraper:
 
         # Navigate to page without rid
         url = f"{self.config.base_url}?gender={self.config.gender}"
-        await self.page.goto(url, wait_until="networkidle")
+        await self.page.goto(url, wait_until="domcontentloaded")
+        await self.page.wait_for_timeout(2000)  # Wait for dynamic content to load
 
         # Find select element and get options
         select = await self.page.query_selector('select[name="rid"]')
@@ -172,7 +184,7 @@ class RankingsScraper:
     async def navigate_to_rankings(self, rid: str):
         """Navigate to rankings page with specific RID"""
         url = self.config.get_rankings_url(rid)
-        await self.page.goto(url, wait_until="networkidle")
+        await self.page.goto(url, wait_until="domcontentloaded")
         await self.page.wait_for_timeout(2000)  # Extra wait for stability
 
     async def extract_players_from_table(self) -> List[Dict]:
@@ -232,15 +244,23 @@ class RankingsScraper:
 
     async def click_player_name(self, player_id: str):
         """Click player name span to open popup"""
-        # Find span with player ID
-        selector = f"span.rml_poeng[id*='rml:{player_id}:']"
-        await self.page.click(selector)
+        # Use JavaScript click for more stability
+        await self.page.evaluate(f"""
+            () => {{
+                const span = document.querySelector("span.rml_poeng[id*='rml:{player_id}:']");
+                if (span) {{
+                    span.click();
+                }} else {{
+                    throw new Error("Player span not found");
+                }}
+            }}
+        """)
 
         # Wait for popup to become visible
         await self.page.wait_for_selector(
             "#multipurpose",
             state="visible",
-            timeout=10000
+            timeout=15000
         )
 
         # Extra wait for content to load
@@ -311,10 +331,17 @@ class RankingsScraper:
 
             date_cell_text = await cells[0].text_content()
             if date_cell_text.strip().startswith(target_date):
-                # Found target month row - click points span
+                # Found target month row - get points span ID and click with JavaScript
                 points_span = await cells[1].query_selector("span.rmld_poeng")
                 if points_span:
-                    await points_span.click()
+                    span_id = await points_span.get_attribute("id")
+                    # Use JavaScript click for stability
+                    await self.page.evaluate(f"""
+                        () => {{
+                            const span = document.getElementById('{span_id}');
+                            if (span) span.click();
+                        }}
+                    """)
                     await self.page.wait_for_timeout(2000)
                     break
 
