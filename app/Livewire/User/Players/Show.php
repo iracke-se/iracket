@@ -9,6 +9,7 @@ use Livewire\Component;
 class Show extends Component
 {
     public User $player;
+    public ?int $expandedRankingId = null;
 
     public function mount(User $user)
     {
@@ -18,6 +19,43 @@ class Show extends Component
     public function toggleMonitor()
     {
         auth()->user()->toggleMonitoring($this->player);
+    }
+
+    public function toggleRanking($rankingId)
+    {
+        $this->expandedRankingId = $this->expandedRankingId === $rankingId ? null : $rankingId;
+    }
+
+    public function getMatchesForRanking($year, $month)
+    {
+        // First try to get synced matches from GameMatch
+        $matches = GameMatch::where(function ($query) {
+            $query->where('player1_id', $this->player->id)
+                  ->orWhere('player2_id', $this->player->id);
+        })
+        ->whereYear('played_at', $year)
+        ->whereMonth('played_at', $month)
+        ->with(['player1', 'player2', 'winner'])
+        ->orderBy('played_at', 'desc')
+        ->get();
+
+        // If no matches found, check scraped matches that might not be synced yet
+        if ($matches->isEmpty()) {
+            $playerFullName = $this->player->last_name . ', ' . $this->player->first_name;
+            $scrapedMonth = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT);
+
+            $scrapedMatches = \App\Models\Scraper\ScrapedMatch::where(function ($query) use ($playerFullName) {
+                $query->where('player_name', $playerFullName)
+                      ->orWhere('opponent_name', $playerFullName);
+            })
+            ->where('scraped_month', $scrapedMonth)
+            ->orderByRaw('COALESCE(match_date, played_at) DESC')
+            ->get();
+
+            return $scrapedMatches;
+        }
+
+        return $matches;
     }
 
     public function render()
@@ -77,6 +115,18 @@ class Show extends Component
             ->orderByDesc('completion_date')
             ->get();
 
+        // Get matches for expanded ranking
+        $expandedRankingMatches = collect();
+        if ($this->expandedRankingId) {
+            $expandedRanking = $rankingsHistory->firstWhere('id', $this->expandedRankingId);
+            if ($expandedRanking) {
+                $expandedRankingMatches = $this->getMatchesForRanking(
+                    $expandedRanking->year,
+                    $expandedRanking->month
+                );
+            }
+        }
+
         return view('livewire.user.players.show', [
             'currentRanking' => $currentRanking,
             'rankingsHistory' => $rankingsHistory,
@@ -87,6 +137,7 @@ class Show extends Component
             'rankingPosition' => $rankingPosition,
             'rankingCategory' => $rankingCategory,
             'clubTransitions' => $clubTransitions,
+            'expandedRankingMatches' => $expandedRankingMatches,
         ])->layout('components.layouts.app');
     }
 }

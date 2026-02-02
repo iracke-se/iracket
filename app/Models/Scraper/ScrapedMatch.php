@@ -12,6 +12,14 @@ class ScrapedMatch extends Model
 
     protected $fillable = [
         'scraper_run_id',
+        'profixio_player_id',
+        'player_name',
+        'opponent_name',
+        'result',
+        'opponent_points',
+        'match_points',
+        'match_date',
+        'scraped_month',
         'source',
         'period',
         'division',

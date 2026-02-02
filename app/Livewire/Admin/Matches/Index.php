@@ -38,7 +38,7 @@ class Index extends Component
     public function render()
     {
         $matches = GameMatch::query()
-            ->with(['player1', 'player2', 'winner'])
+            ->with(['player1', 'player2', 'winner', 'scrapedMatches'])
             ->when($this->search, function ($query) {
                 $this->applySearchToMultipleRelations($query, $this->search, [
                     'player1' => ['first_name', 'last_name'],

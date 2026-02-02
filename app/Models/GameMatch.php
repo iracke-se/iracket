@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Scraper\ScrapedMatch;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class GameMatch extends Model
@@ -42,6 +44,10 @@ class GameMatch extends Model
         'played_at',
         'player1_sets',
         'player2_sets',
+        'player1_match_points',
+        'player2_match_points',
+        'player1_opponent_rating',
+        'player2_opponent_rating',
         'player1_points_before',
         'player2_points_before',
         'player1_points_change',
@@ -81,6 +87,11 @@ class GameMatch extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function scrapedMatches(): HasMany
+    {
+        return $this->hasMany(ScrapedMatch::class, 'synced_match_id');
     }
 
     public function getResultAttribute(): string

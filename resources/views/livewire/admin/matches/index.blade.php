@@ -104,6 +104,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-matches.players') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-matches.result') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-matches.winner') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">Source</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-matches.date') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-matches.status') }}</th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-matches.actions') }}</th>
@@ -113,13 +114,73 @@
                 @forelse($matches as $match)
                     <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-700/30">
                         <td class="px-6 py-4 whitespace-nowrap text-zinc-900 dark:text-white">
-                            {{ $match->player1?->name ?? 'Unknown' }} vs {{ $match->player2?->name ?? 'Unknown' }}
+                            <div class="flex items-center gap-2">
+                                <span class="{{ $match->winner_id === $match->player1_id ? 'font-bold' : '' }}">
+                                    {{ $match->player1?->name ?? 'Unknown' }}
+                                </span>
+                                <span class="text-zinc-400">vs</span>
+                                <span class="{{ $match->winner_id === $match->player2_id ? 'font-bold' : '' }}">
+                                    {{ $match->player2?->name ?? 'Unknown' }}
+                                </span>
+                            </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-zinc-500 dark:text-zinc-400">
-                            {{ $match->player1_sets }} - {{ $match->player2_sets }}
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            @if($match->player1_sets > 0 || $match->player2_sets > 0)
+                                <span class="text-zinc-900 dark:text-white font-medium">{{ $match->player1_sets }} - {{ $match->player2_sets }}</span>
+                            @elseif($match->scrapedMatches->isNotEmpty())
+                                @php
+                                    $player1Name = $match->player1->last_name . ', ' . $match->player1->first_name;
+                                    $player2Name = $match->player2->last_name . ', ' . $match->player2->first_name;
+
+                                    $player1Points = null;
+                                    $player2Points = null;
+
+                                    // Find data for both players from ALL scraped matches
+                                    foreach ($match->scrapedMatches as $sm) {
+                                        if ($sm->player_name === $player1Name) {
+                                            $player1Points = ($sm->match_points > 0 ? '+' : '') . $sm->match_points;
+                                        }
+                                        if ($sm->player_name === $player2Name) {
+                                            $player2Points = ($sm->match_points > 0 ? '+' : '') . $sm->match_points;
+                                        }
+                                    }
+                                @endphp
+                                <div class="flex items-center gap-2 text-sm">
+                                    @if($player1Points && $player2Points)
+                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player1Points }}</span>
+                                        <span class="text-zinc-400">|</span>
+                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player2Points }}</span>
+                                        <span class="text-zinc-400 text-xs">pts</span>
+                                    @elseif($player1Points)
+                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player1Points }} pts</span>
+                                        <span class="text-zinc-400 text-xs">({{ $player1Name }})</span>
+                                    @elseif($player2Points)
+                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player2Points }} pts</span>
+                                        <span class="text-zinc-400 text-xs">({{ $player2Name }})</span>
+                                    @endif
+                                </div>
+                            @elseif($match->winner_id)
+                                @php
+                                    $player1Score = $match->winner_id === $match->player1_id ? 2 : 0;
+                                    $player2Score = $match->winner_id === $match->player2_id ? 2 : 0;
+                                @endphp
+                                <span class="text-zinc-900 dark:text-white font-medium">{{ $player1Score }} - {{ $player2Score }}</span>
+                            @else
+                                <span class="text-zinc-400 text-sm">-</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-accent">
+                        <td class="px-6 py-4 whitespace-nowrap text-accent font-medium">
                             {{ $match->winner?->name ?? '-' }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            @if($match->source === 'scraped')
+                                <span class="px-2 py-1 text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full">Official</span>
+                            @else
+                                <span class="px-2 py-1 text-xs font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 rounded-full">Manual</span>
+                            @endif
+                            @if($match->is_unofficial)
+                                <span class="px-2 py-1 text-xs font-medium bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-full ml-1">Unofficial</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-zinc-500 dark:text-zinc-400">
                             {{ $match->played_at?->format('M d, Y') ?? '-' }}
@@ -141,7 +202,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-zinc-500 dark:text-zinc-400">{{ __('admin-matches.no_matches_found') }}</td>
+                        <td colspan="7" class="px-6 py-8 text-center text-zinc-500 dark:text-zinc-400">{{ __('admin-matches.no_matches_found') }}</td>
                     </tr>
                 @endforelse
             </tbody>

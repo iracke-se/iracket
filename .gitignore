@@ -28,3 +28,6 @@ yarn-error.log
 
 # Chrome/Puppeteer data
 /chrome-data
+
+# Python virtual environment
+/scripts/scraper/venv

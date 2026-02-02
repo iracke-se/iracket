@@ -189,3 +189,4 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
     Route::get('banners/create', AdminBannersForm::class)->name('banners.create');
     Route::get('banners/{id}/edit', AdminBannersForm::class)->name('banners.edit');
 });
+require __DIR__.'/debug.php';

@@ -222,33 +222,114 @@
                 <p class="text-zinc-500 dark:text-zinc-400">{{ __('user-player-show.no_ranking_history') }}</p>
             </div>
         @else
-            <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                            <th class="px-4 py-3 text-left text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-player-show.month') }}</th>
-                            <th class="px-4 py-3 text-center text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-player-show.ranking') }}</th>
-                            <th class="px-4 py-3 text-right text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('user-player-show.points_change') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($rankingsHistory as $ranking)
-                            <tr class="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
-                                <td class="px-4 py-3 text-sm text-zinc-900 dark:text-white">{{ $ranking->formatted_date }}</td>
-                                <td class="px-4 py-3 text-sm text-center text-zinc-900 dark:text-white">#{{ $ranking->rank }}</td>
-                                <td class="px-4 py-3 text-sm text-right">
-                                    @if($ranking->points_change > 0)
-                                        <span class="text-green-500 dark:text-green-400">+{{ $ranking->points_change }}</span>
-                                    @elseif($ranking->points_change < 0)
-                                        <span class="text-red-500 dark:text-red-400">{{ $ranking->points_change }}</span>
-                                    @else
-                                        <span class="text-zinc-500 dark:text-zinc-400">0</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+            <div class="space-y-2">
+                @foreach($rankingsHistory as $ranking)
+                    <div wire:key="ranking-{{ $ranking->id }}" class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
+                        <!-- Clickable Header -->
+                        <button
+                            wire:click="toggleRanking({{ $ranking->id }})"
+                            class="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                            <div class="flex items-center gap-4 flex-1">
+                                <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ $ranking->formatted_date }}</span>
+                                <span class="text-sm text-zinc-900 dark:text-white">#{{ $ranking->rank }}</span>
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ number_format($ranking->points) }} pts</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                @if($ranking->points_change > 0)
+                                    <span class="text-sm text-green-500 dark:text-green-400">+{{ $ranking->points_change }}</span>
+                                @elseif($ranking->points_change < 0)
+                                    <span class="text-sm text-red-500 dark:text-red-400">{{ $ranking->points_change }}</span>
+                                @else
+                                    <span class="text-sm text-zinc-500 dark:text-zinc-400">0</span>
+                                @endif
+                                <svg
+                                    class="w-5 h-5 text-zinc-400 transition-transform {{ $this->expandedRankingId === $ranking->id ? 'rotate-180' : '' }}"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </div>
+                        </button>
+
+                        <!-- Expandable Content -->
+                        @if($this->expandedRankingId === $ranking->id)
+                            <div class="border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-4">
+                                <!-- Debug: Show which month we're displaying -->
+                                <p class="text-xs text-zinc-400 mb-2">Showing matches for: {{ $ranking->formatted_date }}</p>
+                                @if($expandedRankingMatches->isEmpty())
+                                    <p class="text-sm text-center text-zinc-500 dark:text-zinc-400 py-4">{{ __('No matches found for this month') }}</p>
+                                @else
+                                    <div class="space-y-2">
+                                        @foreach($expandedRankingMatches as $match)
+                                            @php
+                                                // Check if this is a ScrapedMatch or GameMatch
+                                                $isScrapedMatch = $match instanceof \App\Models\Scraper\ScrapedMatch;
+
+                                                if ($isScrapedMatch) {
+                                                    // ScrapedMatch data
+                                                    $playerFullName = $player->last_name . ', ' . $player->first_name;
+                                                    $isPlayerMatch = $match->player_name === $playerFullName;
+                                                    $opponentName = $isPlayerMatch ? $match->opponent_name : $match->player_name;
+                                                    $myMatchPoints = $isPlayerMatch ? $match->match_points : null;
+                                                    $matchDate = $match->match_date ? \Carbon\Carbon::parse($match->match_date) : null;
+                                                    $score = $match->score ?? $match->result;
+                                                    $won = $match->result === 'W' || ($match->winner && $match->winner === $playerFullName);
+                                                } else {
+                                                    // GameMatch data
+                                                    $isPlayer1 = $match->player1_id === $player->id;
+                                                    $opponent = $isPlayer1 ? $match->player2 : $match->player1;
+                                                    $opponentName = $opponent->name;
+                                                    $mySets = $isPlayer1 ? $match->player1_sets : $match->player2_sets;
+                                                    $opponentSets = $isPlayer1 ? $match->player2_sets : $match->player1_sets;
+                                                    $myPointsChange = $isPlayer1 ? $match->player1_points_change : $match->player2_points_change;
+                                                    $myMatchPoints = $isPlayer1 ? $match->player1_match_points : $match->player2_match_points;
+                                                    $matchDate = $match->played_at;
+                                                    $score = "$mySets - $opponentSets";
+                                                    $won = $match->winner_id === $player->id;
+                                                }
+                                            @endphp
+                                            <div class="block p-3 bg-white dark:bg-zinc-800 rounded-lg">
+                                                <div class="flex items-center justify-between mb-2">
+                                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">
+                                                        {{ $matchDate ? $matchDate->format('d M Y') : 'N/A' }}
+                                                    </span>
+                                                    <div class="flex items-center gap-2">
+                                                        @if($myMatchPoints)
+                                                            <span class="text-xs font-medium px-2 py-0.5 rounded {{ $myMatchPoints > 0 ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-red-500/10 text-red-600 dark:text-red-400' }}">
+                                                                {{ $myMatchPoints > 0 ? '+' : '' }}{{ $myMatchPoints }} pts
+                                                            </span>
+                                                        @elseif(!$isScrapedMatch && isset($myPointsChange) && $myPointsChange)
+                                                            <span class="text-xs font-medium px-2 py-0.5 rounded {{ $myPointsChange > 0 ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-red-500/10 text-red-600 dark:text-red-400' }}">
+                                                                {{ $myPointsChange > 0 ? '+' : '' }}{{ $myPointsChange }} pts
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center justify-between">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                                            <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                                                                {{ substr($opponentName, 0, 2) }}
+                                                            </span>
+                                                        </div>
+                                                        <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ $opponentName }}</span>
+                                                    </div>
+                                                    <span class="text-sm font-bold {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">
+                                                        {{ $score }}
+                                                        <span class="text-xs ml-1">{{ $won ? 'W' : 'L' }}</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
             </div>
         @endif
     </div>
@@ -272,4 +353,23 @@
             </svg>
         </a>
     </div>
+
+    <!-- View All Matches Button (Own Profile Only) -->
+    @if($isOwnProfile)
+        <div class="mt-6">
+            <a href="{{ route('matches.index') }}" class="flex items-center justify-between p-4 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors" wire:navigate>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                    </div>
+                    <span class="font-medium">{{ __('View All My Matches') }}</span>
+                </div>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    @endif
 </div>
