@@ -117,7 +117,34 @@ class SearchService
         return $query->where(function ($q) use ($term, $relations) {
             foreach ($relations as $relation => $columns) {
                 $q->orWhereHas($relation, function ($subQ) use ($term, $columns) {
-                    $this->buildSearchQuery($subQ, $term, $columns);
+                    // If searching both first_name and last_name, add custom logic for full name search
+                    if (in_array('first_name', $columns) && in_array('last_name', $columns)) {
+                        $subQ->where(function ($innerQ) use ($term, $columns) {
+                            // Search individual columns
+                            $isFirst = true;
+                            foreach ($columns as $column) {
+                                if ($isFirst) {
+                                    $innerQ->where($column, 'like', '%' . $term . '%');
+                                    $isFirst = false;
+                                } else {
+                                    $innerQ->orWhere($column, 'like', '%' . $term . '%');
+                                }
+                            }
+
+                            // Search concatenated full name
+                            $isSqlite = $this->isSqlite();
+                            if ($isSqlite) {
+                                $innerQ->orWhereRaw("LOWER(first_name || ' ' || last_name) LIKE ?", ['%' . strtolower(trim($term)) . '%']);
+                                $innerQ->orWhereRaw("LOWER(last_name || ', ' || first_name) LIKE ?", ['%' . strtolower(trim($term)) . '%']);
+                            } else {
+                                $innerQ->orWhereRaw("LOWER(CONCAT(first_name, ' ', last_name)) LIKE ?", ['%' . strtolower(trim($term)) . '%']);
+                                $innerQ->orWhereRaw("LOWER(CONCAT(last_name, ', ', first_name)) LIKE ?", ['%' . strtolower(trim($term)) . '%']);
+                            }
+                        });
+                    } else {
+                        // For other columns, use the standard search
+                        $this->buildSearchQuery($subQ, $term, $columns);
+                    }
                 });
             }
         });

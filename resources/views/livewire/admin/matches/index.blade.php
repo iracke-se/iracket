@@ -126,7 +126,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             @if($match->player1_sets > 0 || $match->player2_sets > 0)
-                                <span class="text-zinc-900 dark:text-white font-medium">{{ $match->player1_sets }} - {{ $match->player2_sets }}</span>
+                                <span class="text-zinc-900 dark:text-white font-medium">{{ $match->player1_sets }} | {{ $match->player2_sets }}</span>
                             @elseif($match->scrapedMatches->isNotEmpty())
                                 @php
                                     $player1Name = $match->player1->last_name . ', ' . $match->player1->first_name;
@@ -138,25 +138,28 @@
                                     // Find data for both players from ALL scraped matches
                                     foreach ($match->scrapedMatches as $sm) {
                                         if ($sm->player_name === $player1Name) {
-                                            $player1Points = ($sm->match_points > 0 ? '+' : '') . $sm->match_points;
+                                            $player1Points = $sm->match_points;
                                         }
                                         if ($sm->player_name === $player2Name) {
-                                            $player2Points = ($sm->match_points > 0 ? '+' : '') . $sm->match_points;
+                                            $player2Points = $sm->match_points;
                                         }
                                     }
+
+                                    // If we only have one player's points, calculate the other (inverse)
+                                    if ($player1Points !== null && $player2Points === null) {
+                                        $player2Points = -$player1Points;
+                                    } elseif ($player2Points !== null && $player1Points === null) {
+                                        $player1Points = -$player2Points;
+                                    }
                                 @endphp
-                                <div class="flex items-center gap-2 text-sm">
-                                    @if($player1Points && $player2Points)
-                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player1Points }}</span>
-                                        <span class="text-zinc-400">|</span>
-                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player2Points }}</span>
-                                        <span class="text-zinc-400 text-xs">pts</span>
-                                    @elseif($player1Points)
-                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player1Points }} pts</span>
-                                        <span class="text-zinc-400 text-xs">({{ $player1Name }})</span>
-                                    @elseif($player2Points)
-                                        <span class="text-zinc-900 dark:text-white font-medium">{{ $player2Points }} pts</span>
-                                        <span class="text-zinc-400 text-xs">({{ $player2Name }})</span>
+                                <div class="flex items-center gap-2">
+                                    @if($player1Points !== null && $player2Points !== null)
+                                        <span class="px-3 py-1 rounded-md text-sm font-bold {{ $player1Points > 0 ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">
+                                            {{ $player1Points > 0 ? 'W' : 'L' }}
+                                        </span>
+                                        <span class="px-3 py-1 rounded-md text-sm font-bold {{ $player2Points > 0 ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">
+                                            {{ $player2Points > 0 ? 'W' : 'L' }}
+                                        </span>
                                     @endif
                                 </div>
                             @elseif($match->winner_id)
@@ -164,7 +167,7 @@
                                     $player1Score = $match->winner_id === $match->player1_id ? 2 : 0;
                                     $player2Score = $match->winner_id === $match->player2_id ? 2 : 0;
                                 @endphp
-                                <span class="text-zinc-900 dark:text-white font-medium">{{ $player1Score }} - {{ $player2Score }}</span>
+                                <span class="text-zinc-900 dark:text-white font-medium">{{ $player1Score }} | {{ $player2Score }}</span>
                             @else
                                 <span class="text-zinc-400 text-sm">-</span>
                             @endif
