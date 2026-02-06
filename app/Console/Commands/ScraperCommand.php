@@ -11,7 +11,7 @@ class ScraperCommand extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'scraper:run
-                            {type : The type of scrape (rankings, players, transitions, series, series_matches, live_center)}
+                            {type : The type of scrape (rankings, players, transitions, series, series_matches)}
                             {--year= : Year for popup-based rankings scraper (e.g., 2026)}
                             {--month= : Month for popup-based rankings scraper (e.g., 01)}
                             {--gender=male : Gender for rankings (male/female, or m/k for popup scraper)}
@@ -21,7 +21,7 @@ class ScraperCommand extends Command
                             {--period-take= : Take only N periods after skip (for parallel processing)}
                             {--limit-periods= : Limit number of periods to scrape (for testing)}
                             {--limit-clubs= : Limit number of clubs to scrape (for testing, players only)}
-                            {--limit-divisions= : Limit number of divisions to scrape (for testing, rankings/live_center)}
+                            {--limit-divisions= : Limit number of divisions to scrape (for testing, rankings only)}
                             {--limit-seasons= : Limit number of seasons to scrape (for testing, series/series_matches)}
                             {--limit-series= : Limit number of series per season to scrape (for testing, series/series_matches)}
                             {--limit-matches= : Limit number of matches per series to scrape (for testing, series_matches only)}
@@ -39,7 +39,7 @@ class ScraperCommand extends Command
     public function handle(): int
     {
         $type = $this->argument('type');
-        $validTypes = ['rankings', 'players', 'transitions', 'series', 'series_matches', 'live_center'];
+        $validTypes = ['rankings', 'players', 'transitions', 'series', 'series_matches'];
 
         if (!in_array($type, $validTypes)) {
             $this->error("Invalid type. Must be one of: " . implode(', ', $validTypes));
@@ -100,19 +100,6 @@ class ScraperCommand extends Command
             }
         }
 
-        if ($type === 'live_center') {
-            if ($this->option('period')) {
-                $parameters['period'] = $this->option('period');
-                $parameters['direction'] = $this->option('direction');
-            }
-            if ($this->option('limit-periods')) {
-                $parameters['limit_periods'] = (int) $this->option('limit-periods');
-            }
-            if ($this->option('limit-divisions')) {
-                $parameters['limit_divisions'] = (int) $this->option('limit-divisions');
-            }
-        }
-
         if ($type === 'series') {
             if ($this->option('period')) {
                 $parameters['period'] = $this->option('period');
@@ -159,7 +146,6 @@ class ScraperCommand extends Command
             'players' => \App\Jobs\Scraper\ScrapePlayersJob::class,
             'transitions' => \App\Jobs\Scraper\ScrapeTransitionsJob::class,
             'series' => \App\Jobs\Scraper\ScrapeSeriesJob::class,
-            'live_center' => \App\Jobs\Scraper\ScrapeLiveCenterJob::class,
             default => null,
         };
 
@@ -196,7 +182,6 @@ class ScraperCommand extends Command
             'players' => \App\Services\Scraper\PlayerListScraper::class,
             'transitions' => \App\Services\Scraper\TransitionsScraper::class,
             'series' => \App\Services\Scraper\SeriesScraper::class,
-            'live_center' => \App\Services\Scraper\LiveCenterScraper::class,
             default => null,
         };
 

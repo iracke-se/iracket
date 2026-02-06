@@ -44,7 +44,6 @@ return [
         'player_list' => '#hoved-meny > li:nth-child(2) > a',
         'series' => '#hoved-meny > li:nth-child(3) > a',
         'rankings' => '#hoved-meny > li:nth-child(4) > a',
-        'live_center' => '#hoved-meny > li:nth-child(5) > a',
     ],
 
     // Queue settings
@@ -90,11 +89,6 @@ return [
             'frequency' => 'weekly',
             'day' => 'monday',
             'time' => '04:00',
-        ],
-        'live_center' => [
-            'enabled' => env('SCRAPER_SCHEDULE_LIVECENTER', false),
-            'frequency' => 'daily',
-            'time' => '05:00',
         ],
     ],
 

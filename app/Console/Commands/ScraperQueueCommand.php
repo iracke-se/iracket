@@ -17,7 +17,12 @@ class ScraperQueueCommand extends Command
                             {--limit-divisions= : Limit divisions for testing}
                             {--skip-sync : Skip automatic sync}
                             {--skip-bubbler : Skip Bubbler recalculation}
-                            {--no-backup : Skip automatic backup}';
+                            {--no-backup : Skip automatic backup}
+                            {--only-existing-dates : Scrape only dates that already have matches in database (live-center only)}
+                            {--date= : Date for live_center scraper (YYYY-MM-DD)}
+                            {--date-from= : Start date for live_center date range (YYYY-MM-DD)}
+                            {--date-to= : End date for live_center date range (YYYY-MM-DD)}
+                            {--limit= : Limit number of matches per date for live_center scraper}';
 
     protected $description = 'Dispatch a scraper job to the queue (production-ready)';
 
@@ -88,6 +93,25 @@ class ScraperQueueCommand extends Command
             if ($this->option('gender')) {
                 $options['--gender'] = $this->option('gender');
             }
+
+            // Live-center specific options
+            if ($type === 'live-center') {
+                if ($this->option('only-existing-dates')) {
+                    $options['--use-existing-dates'] = true;
+                }
+                if ($this->option('date')) {
+                    $options['--date'] = $this->option('date');
+                }
+                if ($this->option('date-from')) {
+                    $options['--date-from'] = $this->option('date-from');
+                }
+                if ($this->option('date-to')) {
+                    $options['--date-to'] = $this->option('date-to');
+                }
+                if ($this->option('limit')) {
+                    $options['--limit'] = $this->option('limit');
+                }
+            }
         }
 
         // Add common options
@@ -109,9 +133,6 @@ class ScraperQueueCommand extends Command
         if ($this->option('no-backup')) {
             $options['--no-backup'] = true;
         }
-
-        // Always add --force flag for queue jobs to avoid interactive prompts
-        $options['--force'] = true;
 
         // Dispatch job to queue
         $this->newLine();
