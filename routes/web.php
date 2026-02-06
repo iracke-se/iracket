@@ -22,7 +22,6 @@ use App\Livewire\User\Matches\Show as MatchShow;
 use App\Livewire\User\Notifications\Index as Notifications;
 use App\Livewire\User\MyMonitored\Index as MyMonitored;
 use App\Livewire\User\Players\Index as Players;
-use App\Livewire\User\Players\PlayerMatches;
 use App\Livewire\User\Players\Show as PlayerShow;
 use App\Livewire\User\Players\Transitions as PlayerTransitions;
 use App\Livewire\Admin\Terms\Index as AdminTermsIndex;
@@ -96,7 +95,6 @@ Route::middleware(['auth'])->group(function () {
     // Players page
     Route::get('players', Players::class)->middleware(['verified', 'connected'])->name('players.index');
     Route::get('players/{user}', PlayerShow::class)->middleware(['verified', 'connected'])->name('players.show');
-    Route::get('players/{user}/matches', PlayerMatches::class)->middleware(['verified', 'connected'])->name('players.matches');
     Route::get('players/{user}/transitions', PlayerTransitions::class)->middleware(['verified', 'connected'])->name('players.transitions');
 
     // My Monitored Players
