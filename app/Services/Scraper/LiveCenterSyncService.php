@@ -76,14 +76,21 @@ class LiveCenterSyncService
      */
     protected function syncGame(LiveMatchGame $game): void
     {
-        // Find or create players
-        $player1 = $this->findOrCreateUser($game->player1_name);
-        $player2 = $this->findOrCreateUser($game->player2_name);
+        // Find existing players (do NOT create new ones)
+        $player1 = $this->findUserByName($game->player1_name);
+        $player2 = $this->findUserByName($game->player2_name);
 
         if (!$player1 || !$player2) {
-            // Mark as synced even if we can't create players (invalid names)
+            // Skip if both players are not already in the database
             $game->update(['is_synced' => true]);
             $this->stats['skipped']++;
+            Log::info("Skipped Live Center game - player(s) not found", [
+                'game_id' => $game->id,
+                'player1_name' => $game->player1_name,
+                'player2_name' => $game->player2_name,
+                'player1_found' => $player1 ? 'yes' : 'no',
+                'player2_found' => $player2 ? 'yes' : 'no',
+            ]);
             return;
         }
 
