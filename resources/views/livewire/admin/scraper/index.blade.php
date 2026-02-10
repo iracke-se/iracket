@@ -225,6 +225,39 @@
                 </div>
                 @endif
 
+                <!-- Live Center Options -->
+                @if($scraperType === 'live-center')
+                <div>
+                    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Date <span class="text-red-500">*</span>
+                    </label>
+                    <input type="date"
+                           wire:model="liveCenterDate"
+                           class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
+                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Select the date to scrape match details from Live Center</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="checkbox"
+                           wire:model="skipPoints"
+                           id="skipPoints"
+                           class="w-4 h-4 text-accent bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-600 rounded focus:ring-accent">
+                    <label for="skipPoints" class="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                        Skip point-by-point data (faster scrape)
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Limit Matches
+                    </label>
+                    <input type="number"
+                           wire:model="limitMatches"
+                           placeholder="e.g., 5"
+                           min="1"
+                           class="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-accent focus:border-transparent">
+                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Limit team matches to scrape (for testing)</p>
+                </div>
+                @endif
+
                 <!-- Testing Limits -->
                 <div class="border-t border-zinc-200 dark:border-zinc-700 pt-4">
                     <h3 class="text-sm font-semibold text-zinc-900 dark:text-white mb-3">Testing Limits (Optional)</h3>

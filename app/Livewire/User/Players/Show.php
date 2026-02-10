@@ -35,7 +35,15 @@ class Show extends Component
         })
         ->whereYear('played_at', $year)
         ->whereMonth('played_at', $month)
-        ->with(['player1', 'player2', 'winner'])
+        ->with([
+            'player1',
+            'player2',
+            'winner',
+            'liveMatchGame.sets' => function ($query) {
+                $query->orderBy('set_number');
+            },
+            'liveMatchGame.detail'
+        ])
         ->orderBy('played_at', 'desc')
         ->get();
 
@@ -98,7 +106,15 @@ class Show extends Component
                         $query->whereIn('player1_id', $monitoredPlayerIds)
                               ->orWhereIn('player2_id', $monitoredPlayerIds);
                     })
-                    ->with(['player1', 'player2', 'winner'])
+                    ->with([
+                        'player1',
+                        'player2',
+                        'winner',
+                        'liveMatchGame.sets' => function ($query) {
+                            $query->orderBy('set_number');
+                        },
+                        'liveMatchGame.detail'
+                    ])
                     ->orderBy('played_at', 'desc')
                     ->take(10)
                     ->get();

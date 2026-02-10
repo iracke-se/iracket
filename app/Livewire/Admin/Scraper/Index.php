@@ -31,6 +31,9 @@ class Index extends Component
     public bool $skipSync = false;
     public bool $skipBubbler = false;
     public bool $noBackup = false;
+    public string $liveCenterDate = '';
+    public bool $skipPoints = false;
+    public ?int $limitMatches = null;
 
     protected $queryString = [
         'typeFilter' => ['except' => ''],
@@ -41,6 +44,7 @@ class Index extends Component
     {
         // Set default month to current month
         $this->month = now()->format('Y-m');
+        $this->liveCenterDate = now()->format('Y-m-d');
 
         // Check if there's a running scraper
         $this->checkRunningStatus();
@@ -66,8 +70,17 @@ class Index extends Component
      */
     public function startScraper(): void
     {
+        // Validate live center date
+        if ($this->scraperType === 'live-center' && !$this->liveCenterDate) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Please select a date for Live Center scraper',
+            ]);
+            return;
+        }
+
         // Validate required fields
-        if (!$this->scrapeAll && !$this->month) {
+        if ($this->scraperType !== 'live-center' && !$this->scrapeAll && !$this->month) {
             $this->dispatch('notify', [
                 'type' => 'error',
                 'message' => 'Please select a month or enable "Scrape All"',
@@ -148,6 +161,19 @@ class Index extends Component
             }
             if ($this->noBackup) {
                 $options['--no-backup'] = true;
+            }
+
+            // Live center specific options
+            if ($this->scraperType === 'live-center') {
+                if ($this->liveCenterDate) {
+                    $options['--date'] = $this->liveCenterDate;
+                }
+                if ($this->skipPoints) {
+                    $options['--skip-points'] = true;
+                }
+                if ($this->limitMatches) {
+                    $options['--limit-matches'] = $this->limitMatches;
+                }
             }
 
             // Dispatch job to queue

@@ -11,11 +11,21 @@ abstract class BaseScraperService
     protected BrowserService $browserService;
     protected ScraperRun $run;
     protected array $retryConfig;
+    protected $consoleOutput = null;
 
     public function __construct(BrowserService $browserService)
     {
         $this->browserService = $browserService;
         $this->retryConfig = config('scraper.retry');
+    }
+
+    /**
+     * Set console output for real-time logging
+     */
+    public function setConsoleOutput($output): self
+    {
+        $this->consoleOutput = $output;
+        return $this;
     }
 
     /**
@@ -118,6 +128,11 @@ abstract class BaseScraperService
     {
         $this->run->info($message, $context);
 
+        // Output to console if available
+        if ($this->consoleOutput) {
+            $this->consoleOutput->info($message);
+        }
+
         if (config('scraper.logging.detailed')) {
             Log::channel(config('scraper.logging.channel', 'stack'))
                 ->info($message, $context);
@@ -131,6 +146,11 @@ abstract class BaseScraperService
     {
         $this->run->warning($message, $context);
 
+        // Output to console if available
+        if ($this->consoleOutput) {
+            $this->consoleOutput->warn($message);
+        }
+
         Log::channel(config('scraper.logging.channel', 'stack'))
             ->warning($message, $context);
     }
@@ -141,6 +161,11 @@ abstract class BaseScraperService
     protected function error(string $message, array $context = []): void
     {
         $this->run->error($message, $context);
+
+        // Output to console if available
+        if ($this->consoleOutput) {
+            $this->consoleOutput->error($message);
+        }
 
         Log::channel(config('scraper.logging.channel', 'stack'))
             ->error($message, $context);

@@ -12,8 +12,8 @@ class ScraperCommand extends Command
      */
     protected $signature = 'scraper:run
                             {type : The type of scrape (rankings, players, transitions, series, series_matches, live_center)}
-                            {--year= : Year for popup-based rankings scraper (e.g., 2026)}
-                            {--month= : Month for popup-based rankings scraper (e.g., 01)}
+                            {--year= : Year (YYYY) for rankings scraper or live_center (e.g., 2026)}
+                            {--month= : Month (MM or YYYY-MM) for rankings scraper or live_center (e.g., 01 or 2025-12)}
                             {--gender=male : Gender for rankings (male/female, or m/k for popup scraper)}
                             {--period= : Period filter (e.g., 2024.01.01)}
                             {--direction=gte : Direction for period filter (gte/lte)}
@@ -24,8 +24,11 @@ class ScraperCommand extends Command
                             {--limit-divisions= : Limit number of divisions to scrape (for testing, rankings/live_center)}
                             {--limit-seasons= : Limit number of seasons to scrape (for testing, series/series_matches)}
                             {--limit-series= : Limit number of series per season to scrape (for testing, series/series_matches)}
-                            {--limit-matches= : Limit number of matches per series to scrape (for testing, series_matches only)}
+                            {--limit-matches= : Limit number of matches to scrape (for testing, series_matches/live_center)}
                             {--limit-players= : Limit number of players to scrape (for testing, rankings popup scraper)}
+                            {--date= : Date to scrape (YYYY-MM-DD format, for live_center)}
+                            {--from-matches : Scrape dates from existing matches table (for live_center)}
+                            {--skip-points : Skip point-by-point data (for live_center)}
                             {--queue : Queue the job instead of running synchronously}';
 
     /**
@@ -101,15 +104,29 @@ class ScraperCommand extends Command
         }
 
         if ($type === 'live_center') {
-            if ($this->option('period')) {
-                $parameters['period'] = $this->option('period');
-                $parameters['direction'] = $this->option('direction');
+            if ($this->option('from-matches')) {
+                $parameters['from_matches'] = true;
+                // Optional: filter by month or year when using from-matches
+                if ($this->option('month')) {
+                    $parameters['month'] = $this->option('month');
+                } elseif ($this->option('year')) {
+                    $parameters['year'] = $this->option('year');
+                }
+            } elseif ($this->option('date')) {
+                $parameters['date'] = $this->option('date');
+            } elseif ($this->option('month')) {
+                $parameters['month'] = $this->option('month');
+            } elseif ($this->option('year')) {
+                $parameters['year'] = $this->option('year');
+            } else {
+                // Default to today's date
+                $parameters['date'] = now()->format('Y-m-d');
             }
-            if ($this->option('limit-periods')) {
-                $parameters['limit_periods'] = (int) $this->option('limit-periods');
+            if ($this->option('limit-matches')) {
+                $parameters['limit_matches'] = (int) $this->option('limit-matches');
             }
-            if ($this->option('limit-divisions')) {
-                $parameters['limit_divisions'] = (int) $this->option('limit-divisions');
+            if ($this->option('skip-points')) {
+                $parameters['skip_points'] = true;
             }
         }
 
@@ -196,7 +213,7 @@ class ScraperCommand extends Command
             'players' => \App\Services\Scraper\PlayerListScraper::class,
             'transitions' => \App\Services\Scraper\TransitionsScraper::class,
             'series' => \App\Services\Scraper\SeriesScraper::class,
-            'live_center' => \App\Services\Scraper\LiveCenterScraper::class,
+            'live_center' => \App\Services\Scraper\LiveCenterDetailsScraper::class,
             default => null,
         };
 
@@ -216,6 +233,7 @@ class ScraperCommand extends Command
 
         try {
             $scraper = app($scraperClass);
+            $scraper->setConsoleOutput($this);
             $run = $scraper->scrape($parameters);
 
             $this->newLine();

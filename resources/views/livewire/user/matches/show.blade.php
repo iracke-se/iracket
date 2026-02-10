@@ -15,9 +15,29 @@
 
         <!-- Result -->
         <div class="text-center mb-6">
-            @if($match->player1_sets > 0 || $match->player2_sets > 0)
+            @php
+                // Calculate sets from live center data if available
+                $player1Sets = $match->player1_sets;
+                $player2Sets = $match->player2_sets;
+
+                if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
+                    $player1SetsWon = 0;
+                    $player2SetsWon = 0;
+                    foreach ($match->liveMatchGame->sets as $set) {
+                        if ($set->player1_points > $set->player2_points) {
+                            $player1SetsWon++;
+                        } else {
+                            $player2SetsWon++;
+                        }
+                    }
+                    $player1Sets = $player1SetsWon;
+                    $player2Sets = $player2SetsWon;
+                }
+            @endphp
+
+            @if($player1Sets > 0 || $player2Sets > 0)
                 <div class="text-4xl font-bold text-zinc-900 dark:text-white">
-                    {{ $match->player1_sets }} - {{ $match->player2_sets }}
+                    {{ $player1Sets }} - {{ $player2Sets }}
                 </div>
             @elseif($match->scrapedMatches->isNotEmpty())
                 @php
@@ -113,6 +133,41 @@
             </div>
         </div>
     </div>
+
+    <!-- Live Center Set Scores -->
+    @if($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty())
+        @php
+            $liveGame = $match->liveMatchGame;
+            $sets = $liveGame->sets->sortBy('set_number');
+        @endphp
+        <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">Set Scores</h3>
+            <div class="flex items-center justify-center gap-2 flex-wrap">
+                @foreach($sets as $set)
+                    @php
+                        $p1Won = $set->player1_points > $set->player2_points;
+                        $p2Won = $set->player2_points > $set->player1_points;
+                    @endphp
+                    <div class="text-center">
+                        <div class="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Set {{ $set->set_number }}</div>
+                        <div class="px-3 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-700">
+                            <span class="{{ $p1Won ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $set->player1_points }}</span>
+                            <span class="text-zinc-400 mx-1">-</span>
+                            <span class="{{ $p2Won ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $set->player2_points }}</span>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            @if($liveGame->detail)
+                <div class="mt-3 text-center text-xs text-zinc-400 dark:text-zinc-500">
+                    {{ $liveGame->detail->team1_name }} vs {{ $liveGame->detail->team2_name }}
+                    ({{ $liveGame->detail->team1_score }}-{{ $liveGame->detail->team2_score }})
+                </div>
+            @endif
+        </div>
+
+    @endif
 
     <!-- Description -->
     @if($match->description)

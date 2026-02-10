@@ -11,7 +11,7 @@ class Show extends Component
 
     public function mount(GameMatch $match)
     {
-        $this->match = $match;
+        $this->match = $match->loadMissing(['liveMatchGame.sets', 'liveMatchGame.detail']);
     }
 
     public function render()

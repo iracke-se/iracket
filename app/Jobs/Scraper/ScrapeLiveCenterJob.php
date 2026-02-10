@@ -2,7 +2,7 @@
 
 namespace App\Jobs\Scraper;
 
-use App\Services\Scraper\LiveCenterScraper;
+use App\Services\Scraper\LiveCenterDetailsScraper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,7 +25,7 @@ class ScrapeLiveCenterJob implements ShouldQueue
         $this->onQueue(config('scraper.queue.queue_name', 'scraper'));
     }
 
-    public function handle(LiveCenterScraper $scraper): void
+    public function handle(LiveCenterDetailsScraper $scraper): void
     {
         $scraper->scrape($this->parameters);
     }

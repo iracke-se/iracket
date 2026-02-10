@@ -72,6 +72,11 @@ class ScraperRun extends Model
         return $this->hasMany(ScrapedStanding::class);
     }
 
+    public function liveMatchDetails(): HasMany
+    {
+        return $this->hasMany(LiveMatchDetail::class);
+    }
+
     public function markAsRunning(): void
     {
         $this->update([

@@ -103,4 +103,16 @@ return [
         'binary' => env('SCRAPER_PYTHON_BINARY', 'python3'),
         'timeout' => env('SCRAPER_PYTHON_TIMEOUT', 3600), // 1 hour default
     ],
+
+    // Live Center scraper settings
+    'live_center' => [
+        'login_url' => 'https://www.profixio.com/fx/login.php?login_public=SBTF.SE.BT',
+        'livecenter_url' => 'https://www.profixio.com/fx/livecenter/',
+        'callback_url' => 'https://www.profixio.com/fx/livecenter/callback.php',
+        'delays' => [
+            'after_page_load' => 2000,
+            'after_click' => 2000,
+            'after_filter_change' => 3000,
+        ],
+    ],
 ];

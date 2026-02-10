@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scraper\LiveMatchGame;
 use App\Models\Scraper\ScrapedMatch;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -59,6 +60,7 @@ class GameMatch extends Model
         'status',
         'is_manual',
         'created_by',
+        'live_match_game_id',
     ];
 
     protected $casts = [
@@ -92,6 +94,11 @@ class GameMatch extends Model
     public function scrapedMatches(): HasMany
     {
         return $this->hasMany(ScrapedMatch::class, 'synced_match_id');
+    }
+
+    public function liveMatchGame(): BelongsTo
+    {
+        return $this->belongsTo(LiveMatchGame::class);
     }
 
     public function getResultAttribute(): string

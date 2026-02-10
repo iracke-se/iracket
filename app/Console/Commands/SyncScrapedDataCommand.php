@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Scraper\LiveCenterSyncService;
 use App\Services\Scraper\MatchSyncService;
 use App\Services\Scraper\SyncService;
 use Illuminate\Console\Command;
@@ -12,7 +13,7 @@ class SyncScrapedDataCommand extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'scraper:sync
-                            {type : The type of data to sync (players, rankings, matches, all)}
+                            {type : The type of data to sync (players, rankings, matches, live_center, all)}
                             {--run= : Only sync data from a specific scraper run ID}
                             {--dry-run : Show what would be synced without actually syncing}';
 
@@ -24,13 +25,13 @@ class SyncScrapedDataCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(SyncService $syncService, MatchSyncService $matchSyncService): int
+    public function handle(SyncService $syncService, MatchSyncService $matchSyncService, LiveCenterSyncService $liveCenterSyncService): int
     {
         $type = $this->argument('type');
         $runId = $this->option('run') ? (int) $this->option('run') : null;
         $dryRun = $this->option('dry-run');
 
-        $validTypes = ['players', 'rankings', 'matches', 'all'];
+        $validTypes = ['players', 'rankings', 'matches', 'live_center', 'all'];
 
         if (!in_array($type, $validTypes)) {
             $this->error("Invalid type. Must be one of: " . implode(', ', $validTypes));
@@ -71,6 +72,13 @@ class SyncScrapedDataCommand extends Command
                 $matchStats = $matchSyncService->syncMatches($runId);
                 $this->displayMatchStats($matchStats);
                 $stats['matches'] = $matchStats;
+            }
+
+            if ($type === 'live_center' || $type === 'all') {
+                $this->info('Syncing live center games...');
+                $liveCenterStats = $liveCenterSyncService->syncMatches($runId);
+                $this->displayLiveCenterStats($liveCenterStats);
+                $stats['live_center'] = $liveCenterStats;
             }
 
             $this->newLine();
@@ -136,6 +144,24 @@ class SyncScrapedDataCommand extends Command
                 ['Comments migrated', $stats['comments_migrated']],
                 ['Manual matches replaced', $stats['manual_matches_replaced']],
                 ['Manual matches marked unofficial', $stats['manual_matches_marked_unofficial']],
+                ['Errors', $stats['errors']],
+            ]
+        );
+        $this->newLine();
+    }
+
+    /**
+     * Display live center sync statistics
+     */
+    protected function displayLiveCenterStats(array $stats): void
+    {
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Games synced', $stats['games_synced']],
+                ['Matches created', $stats['matches_created']],
+                ['Matches linked', $stats['matches_linked']],
+                ['Skipped', $stats['skipped']],
                 ['Errors', $stats['errors']],
             ]
         );
@@ -214,6 +240,30 @@ class SyncScrapedDataCommand extends Command
                         $m->player2_name,
                         $m->score,
                         $m->played_at,
+                    ])->toArray()
+                );
+            }
+            $this->newLine();
+        }
+
+        if ($type === 'live_center' || $type === 'all') {
+            $query = \App\Models\Scraper\LiveMatchGame::where('is_synced', false)
+                ->where('game_type', 'singles');
+            if ($runId) {
+                $query->whereHas('detail', fn($q) => $q->where('scraper_run_id', $runId));
+            }
+            $count = $query->count();
+
+            $this->info("Would sync {$count} live center games");
+
+            if ($count > 0) {
+                $sample = $query->limit(5)->get(['player1_name', 'player2_name', 'player1_sets', 'player2_sets']);
+                $this->table(
+                    ['Player 1', 'Player 2', 'Sets'],
+                    $sample->map(fn($g) => [
+                        $g->player1_name,
+                        $g->player2_name,
+                        ($g->player1_sets ?? 0) . '-' . ($g->player2_sets ?? 0),
                     ])->toArray()
                 );
             }

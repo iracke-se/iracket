@@ -293,26 +293,9 @@ class SyncService
 
             $this->stats['updated']++;
         } else {
-            // Create new user
-            $user = User::create([
-                'first_name' => $player->first_name,
-                'last_name' => $player->surname,
-                'email' => $this->generateEmail($player->first_name, $player->surname),
-                'password' => Hash::make(Str::random(16)),
-                'club_id' => $club?->id,
-                'gender' => $this->mapGender($player->sex),
-                'birth_year' => $birthYear,
-                'visible_in_players' => true,
-                'sbtf_synced' => true,
-                'sbtf_synced_at' => now(),
-            ]);
-
-            $player->update([
-                'is_synced' => true,
-                'synced_user_id' => $user->id,
-            ]);
-
-            $this->stats['created']++;
+            // Don't create new users - skip if not found
+            Log::info("Skipping player sync - user not found: {$player->first_name} {$player->surname}");
+            $this->stats['skipped']++;
         }
     }
 
@@ -365,26 +348,9 @@ class SyncService
 
             $this->stats['updated']++;
         } else {
-            // Create new user with birth_year
-            $user = User::create([
-                'first_name' => $nameParts['first_name'],
-                'last_name' => $nameParts['last_name'],
-                'email' => $this->generateEmail($nameParts['first_name'], $nameParts['last_name']),
-                'password' => Hash::make(Str::random(16)),
-                'club_id' => $club?->id,
-                'gender' => $ranking->gender,
-                'birth_year' => $birthYear,
-                'visible_in_players' => true,
-                'sbtf_synced' => true,
-                'sbtf_synced_at' => now(),
-            ]);
-
-            $ranking->update([
-                'is_synced' => true,
-                'synced_user_id' => $user->id,
-            ]);
-
-            $this->stats['created']++;
+            // Don't create new users - skip if not found
+            Log::info("Skipping ranking sync - user not found: {$ranking->name}");
+            $this->stats['skipped']++;
         }
     }
 
