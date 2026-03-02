@@ -1,4 +1,4 @@
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl mx-auto px-4">
     @include('partials.settings-heading')
 
     <x-settings.layout :heading="__('user-settings.profile_heading')" :subheading="__('user-settings.profile_subheading')">
@@ -18,12 +18,12 @@
                             </span>
                         </div>
                     @endif
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-2 min-w-0">
                         <input
                             type="file"
                             wire:model="profile_picture"
                             accept="image/*"
-                            class="text-sm text-zinc-600 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-zinc-200 dark:file:bg-zinc-700 file:text-zinc-700 dark:file:text-zinc-300 hover:file:bg-zinc-300 dark:hover:file:bg-zinc-600 file:cursor-pointer"
+                            class="w-full max-w-full text-sm text-zinc-600 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-zinc-200 dark:file:bg-zinc-700 file:text-zinc-700 dark:file:text-zinc-300 hover:file:bg-zinc-300 dark:hover:file:bg-zinc-600 file:cursor-pointer"
                         >
                         @if ($current_profile_picture)
                             <button type="button" wire:click="deleteProfilePicture" class="text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 text-left">

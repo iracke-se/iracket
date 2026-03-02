@@ -41,7 +41,7 @@
     </div>
 
     <!-- Content -->
-    <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-6">
+    <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 sm:p-6 overflow-hidden">
         <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">{{ $heading ?? '' }}</h2>
         <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{{ $subheading ?? '' }}</p>
 

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('live_match_games', function (Blueprint $table) {
             $table->id();
             $table->foreignId('live_match_detail_id')->constrained('live_match_details')->onDelete('cascade');
-            $table->integer('game_number')->nullable();
+            $table->string('game_number')->nullable();
             $table->string('game_type')->nullable();
             $table->string('player1_name')->nullable();
             $table->string('player2_name')->nullable();
