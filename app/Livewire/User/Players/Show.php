@@ -88,8 +88,8 @@ class Show extends Component
             $topMonitoredPlayers = auth()->user()
                 ->monitoring()
                 ->with(['monthlyRankings' => function ($q) {
-                    $q->where('year', now()->year)
-                      ->where('month', now()->month);
+                    $q->orderBy('year', 'desc')
+                      ->orderBy('month', 'desc');
                 }])
                 ->get()
                 ->sortByDesc(function ($player) {

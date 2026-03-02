@@ -83,7 +83,7 @@
                 @else
                     <div class="flex items-center px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
                         <span class="flex-1 text-xs font-bold text-zinc-900 dark:text-white">{{ __('Month') }}</span>
-                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Ranking') }}</span>
+                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Position') }}</span>
                         <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Points') }}</span>
                         <span class="w-10 text-xs font-bold text-zinc-900 dark:text-white text-right">+/-</span>
                     </div>
@@ -101,6 +101,122 @@
             </div>
         </div>
 
+        <!-- Top Monitored Players Section -->
+        <div class="mb-6">
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('Top Monitored Players') }}</p>
+            @if($topMonitoredPlayers->isEmpty())
+                <div class="px-4">
+                    <a href="{{ route('players.index') }}" wire:navigate
+                       class="flex items-center justify-center gap-2 w-full py-5 bg-zinc-100 dark:bg-zinc-800 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-600 text-accent font-medium text-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        {{ __('Add Player') }}
+                    </a>
+                </div>
+            @else
+                <div class="flex gap-3 overflow-x-auto px-4 pb-2" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+                    @foreach($topMonitoredPlayers as $monitoredPlayer)
+                        @php $latestRanking = $monitoredPlayer->monthlyRankings->first(); @endphp
+                        <a href="{{ route('players.show', $monitoredPlayer) }}" wire:navigate
+                           class="flex-shrink-0 flex flex-col items-center gap-2 pt-4 pb-3 px-3 w-28 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                            @if($monitoredPlayer->profile_picture)
+                                <img src="{{ Storage::url($monitoredPlayer->profile_picture) }}" alt="{{ $monitoredPlayer->name }}"
+                                     class="w-16 h-16 rounded-full object-cover">
+                            @else
+                                <div class="w-16 h-16 rounded-full bg-zinc-300 dark:bg-zinc-600 flex items-center justify-center">
+                                    <span class="text-xl font-semibold text-zinc-600 dark:text-zinc-200">{{ $monitoredPlayer->initials() }}</span>
+                                </div>
+                            @endif
+                            <span class="text-xs font-medium text-zinc-900 dark:text-white text-center leading-tight line-clamp-2 w-full">{{ $monitoredPlayer->name }}</span>
+                            @if($latestRanking)
+                                <span class="bg-accent text-white text-xs font-bold px-2.5 py-0.5 rounded-full">{{ number_format($latestRanking->points) }} p</span>
+                            @else
+                                <span class="text-xs text-zinc-400 dark:text-zinc-500">—</span>
+                            @endif
+                        </a>
+                    @endforeach
+                </div>
+            @endif
+            <div class="border-t border-zinc-200 dark:border-zinc-800 mt-3">
+                <a href="{{ route('my-monitored.index') }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('My Monitored Players') }}</span>
+                    <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Latest Matches from Monitored Players -->
+        @if($monitoredPlayersMatches->isNotEmpty())
+        <div class="mb-6">
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('Latest Matches') }}</p>
+            <div class="flex gap-3 overflow-x-auto px-4 pb-2" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+                @foreach($monitoredPlayersMatches as $match)
+                    @php
+                        $p1 = $match->player1;
+                        $p2 = $match->player2;
+                        $p1Sets = $match->player1_sets ?? 0;
+                        $p2Sets = $match->player2_sets ?? 0;
+                        $p1Change = $match->player1_points_change;
+                        $p2Change = $match->player2_points_change;
+                        if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
+                            $s1 = 0; $s2 = 0;
+                            foreach ($match->liveMatchGame->sets as $set) {
+                                if ($set->player1_points > $set->player2_points) { $s1++; } else { $s2++; }
+                            }
+                            $p1Sets = $s1; $p2Sets = $s2;
+                        }
+                    @endphp
+                    <a href="{{ route('matches.show', $match) }}" wire:navigate
+                       class="flex-shrink-0 w-40 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-3 flex flex-col items-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                        <!-- Players row -->
+                        <div class="flex items-center justify-center gap-2 w-full">
+                            <!-- Player 1 -->
+                            <div class="relative flex flex-col items-center gap-1">
+                                @if($p1 && $p1->profile_picture)
+                                    <img src="{{ Storage::url($p1->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
+                                @else
+                                    <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $p1?->initials() ?? '?' }}</span>
+                                    </div>
+                                @endif
+                                @if($p1Change !== null)
+                                    <span class="text-xs font-bold px-1.5 py-0.5 rounded-full {{ $p1Change >= 0 ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-red-500/20 text-red-600 dark:text-red-400' }}">
+                                        {{ $p1Change >= 0 ? '+' : '' }}{{ $p1Change }}
+                                    </span>
+                                @endif
+                            </div>
+                            <!-- Score -->
+                            <span class="text-base font-bold text-zinc-900 dark:text-white">{{ $p1Sets }}-{{ $p2Sets }}</span>
+                            <!-- Player 2 -->
+                            <div class="relative flex flex-col items-center gap-1">
+                                @if($p2 && $p2->profile_picture)
+                                    <img src="{{ Storage::url($p2->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
+                                @else
+                                    <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $p2?->initials() ?? '?' }}</span>
+                                    </div>
+                                @endif
+                                @if($p2Change !== null)
+                                    <span class="text-xs font-bold px-1.5 py-0.5 rounded-full {{ $p2Change >= 0 ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-red-500/20 text-red-600 dark:text-red-400' }}">
+                                        {{ $p2Change >= 0 ? '+' : '' }}{{ $p2Change }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                        <!-- Names -->
+                        <div class="text-center w-full">
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ $p1?->name ?? '—' }}</p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ $p2?->name ?? '—' }}</p>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
         <!-- Other Links -->
         <div class="mb-6">
             <div class="border-t border-zinc-200 dark:border-zinc-800">
@@ -114,8 +230,8 @@
                     </div>
                 </a>
 
-                <a href="{{ route('my-monitored.index') }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('My Monitored Players') }}</span>
+                <a href="{{ route('matches.index') }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('My Matches') }}</span>
                     <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
@@ -200,39 +316,38 @@
             </div>
         </div>
 
-        <!-- Rankings History -->
+        <!-- Latest Ranking -->
         <div class="mb-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">{{ __('user-player-show.rankings_history') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Latest Ranking') }}</h2>
 
             @if($rankingsHistory->isEmpty())
                 <div class="text-center py-8 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
                     <p class="text-zinc-500 dark:text-zinc-400">{{ __('user-player-show.no_ranking_history') }}</p>
                 </div>
             @else
-                <div class="space-y-2">
+                <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
+                    <div class="flex items-center px-4 py-2 border-b border-zinc-200 dark:border-zinc-700">
+                        <span class="flex-1 text-xs font-bold text-zinc-900 dark:text-white">{{ __('Month') }}</span>
+                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Position') }}</span>
+                        <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Points') }}</span>
+                        <span class="w-14 text-xs font-bold text-zinc-900 dark:text-white text-right">+/-</span>
+                    </div>
+                <div class="space-y-0">
                     @foreach($rankingsHistory as $ranking)
-                        <div wire:key="ranking-{{ $ranking->id }}" class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
+                        <div wire:key="ranking-{{ $ranking->id }}" class="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
                             <button
                                 wire:click="toggleRanking({{ $ranking->id }})"
-                                class="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                                class="w-full px-4 py-3 flex items-center hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                             >
-                                <div class="flex items-center gap-4 flex-1">
-                                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ $ranking->formatted_date }}</span>
-                                    <span class="text-sm text-zinc-900 dark:text-white">#{{ $ranking->rank }}</span>
-                                    <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ number_format($ranking->points) }} pts</span>
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    @if($ranking->points_change > 0)
-                                        <span class="text-sm text-green-500 dark:text-green-400">+{{ $ranking->points_change }}</span>
-                                    @elseif($ranking->points_change < 0)
-                                        <span class="text-sm text-red-500 dark:text-red-400">{{ $ranking->points_change }}</span>
-                                    @else
-                                        <span class="text-sm text-zinc-500 dark:text-zinc-400">0</span>
-                                    @endif
-                                    <svg class="w-5 h-5 text-zinc-400 transition-transform {{ $this->expandedRankingId === $ranking->id ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                    </svg>
-                                </div>
+                                <span class="flex-1 text-sm text-zinc-600 dark:text-zinc-400 text-left">{{ $ranking->formatted_date }}</span>
+                                <span class="w-20 text-sm text-zinc-600 dark:text-zinc-400 text-center">#{{ $ranking->rank }}</span>
+                                <span class="w-16 text-sm font-semibold text-accent text-center">{{ number_format($ranking->points) }}</span>
+                                <span class="w-10 text-sm font-semibold text-right {{ $ranking->points_change > 0 ? 'text-green-500 dark:text-green-400' : ($ranking->points_change < 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500') }}">
+                                    {{ $ranking->points_change !== null ? ($ranking->points_change > 0 ? '+' : '') . $ranking->points_change : '—' }}
+                                </span>
+                                <svg class="w-4 h-4 ml-1 text-zinc-400 transition-transform flex-shrink-0 {{ $this->expandedRankingId === $ranking->id ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
                             </button>
 
                             @if($this->expandedRankingId === $ranking->id)
@@ -343,6 +458,7 @@
                             @endif
                         </div>
                     @endforeach
+                </div>
                 </div>
             @endif
         </div>
