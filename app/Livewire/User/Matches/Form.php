@@ -93,13 +93,13 @@ class Form extends Component
 
         // Validate not playing against self
         if ($this->opponent_id === auth()->id()) {
-            $this->addError('opponent_id', __('You cannot play against yourself.'));
+            $this->addError('opponent_id', __('user-matches.cannot_play_yourself'));
             return;
         }
 
         // Validate there's a winner (no ties)
         if ($this->my_sets === $this->opponent_sets) {
-            $this->addError('my_sets', __('Match cannot end in a tie.'));
+            $this->addError('my_sets', __('user-matches.cannot_tie'));
             return;
         }
 
@@ -159,7 +159,7 @@ class Form extends Component
             $this->reverseMatchPoints($this->match);
             $this->match->update($data);
             $this->applyMatchPoints($this->match);
-            session()->flash('message', __('Match updated successfully.'));
+            session()->flash('message', __('user-matches.updated_successfully'));
         } else {
             $match = GameMatch::create($data);
 
@@ -170,7 +170,7 @@ class Form extends Component
             $notificationService = app(AutoNotificationService::class);
             $notificationService->matchCreated($match, $user);
 
-            session()->flash('message', __('Match created successfully.'));
+            session()->flash('message', __('user-matches.created_successfully'));
         }
 
         return redirect()->route('matches.index');

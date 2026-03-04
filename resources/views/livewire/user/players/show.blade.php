@@ -53,8 +53,13 @@
 
                 <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
                     <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Age') }}</span>
-                    @if($player->age)
-                        <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $player->age }} {{ __('user-player-show.years') }}</span>
+                    @php
+                        $displayAge = $player->birth_year
+                            ? now()->year - $player->birth_year
+                            : $player->age;
+                    @endphp
+                    @if($displayAge)
+                        <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $displayAge }} {{ __('user-player-show.years') }}</span>
                     @else
                         <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('Not set') }}</span>
                     @endif

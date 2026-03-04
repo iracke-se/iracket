@@ -1,12 +1,12 @@
 <div class="max-w-2xl mx-auto">
     <h1 class="text-2xl font-bold text-zinc-900 dark:text-white mb-6">
-        {{ $match ? __('Edit Match') : __('New Match') }}
+        {{ $match ? __('user-matches.edit_match') : __('user-matches.new_match') }}
     </h1>
 
     <form wire:submit="save" class="space-y-6">
         <!-- Date -->
         <div>
-            <label for="played_at" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('Date') }}</label>
+            <label for="played_at" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-matches.date') }}</label>
             <input
                 type="date"
                 id="played_at"
@@ -21,11 +21,11 @@
 
         <!-- Opponent -->
         <div>
-            <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('Opponent') }}</label>
+            <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-matches.opponent') }}</label>
             <input
                 type="text"
                 wire:model.live.debounce.300ms="opponentSearch"
-                placeholder="{{ __('Search for opponent...') }}"
+                placeholder="{{ __('user-matches.search_for_opponent') }}"
                 class="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-2"
             >
 
@@ -51,7 +51,7 @@
                         </div>
                     </button>
                 @empty
-                    <p class="p-3 text-sm text-zinc-500 dark:text-zinc-400 text-center">{{ __('No players found') }}</p>
+                    <p class="p-3 text-sm text-zinc-500 dark:text-zinc-400 text-center">{{ __('user-matches.no_players_found') }}</p>
                 @endforelse
             </div>
             @error('opponent_id')
@@ -62,7 +62,7 @@
         <!-- Sets -->
         <div class="grid grid-cols-2 gap-4">
             <div>
-                <label for="my_sets" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('My Sets Won') }}</label>
+                <label for="my_sets" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-matches.my_sets_won') }}</label>
                 <select
                     id="my_sets"
                     wire:model="my_sets"
@@ -78,7 +78,7 @@
             </div>
 
             <div>
-                <label for="opponent_sets" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __("Opponent's Sets Won") }}</label>
+                <label for="opponent_sets" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-matches.opponent_sets_won') }}</label>
                 <select
                     id="opponent_sets"
                     wire:model="opponent_sets"
@@ -96,7 +96,7 @@
 
         <!-- Comments on Opponent -->
         <div>
-            <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('Comments on Opponent') }}</label>
+            <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-matches.comments_on_opponent') }}</label>
             <div class="flex flex-wrap gap-2 mb-3">
                 @foreach($availableComments as $comment)
                     <button
@@ -114,7 +114,7 @@
                 <input
                     type="text"
                     wire:model="custom_comment"
-                    placeholder="{{ __('Add custom comment...') }}"
+                    placeholder="{{ __('user-matches.add_custom_comment') }}"
                     class="flex-1 px-4 py-2 bg-white dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 >
                 <button
@@ -122,14 +122,14 @@
                     wire:click="addCustomComment"
                     class="px-4 py-2 bg-zinc-200 dark:bg-zinc-600 text-zinc-700 dark:text-white rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-500 transition-colors"
                 >
-                    {{ __('Add') }}
+                    {{ __('user-matches.add') }}
                 </button>
             </div>
 
             <!-- Selected Comments -->
             @if(!empty($opponent_comments))
                 <div class="mt-3 p-3 bg-zinc-100 dark:bg-zinc-700/50 rounded-lg">
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ __('Selected comments:') }}</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ __('user-matches.selected_comments') }}</p>
                     <div class="flex flex-wrap gap-1">
                         @foreach($opponent_comments as $comment)
                             <span class="inline-flex items-center gap-1 px-2 py-1 bg-zinc-200 dark:bg-zinc-600 rounded text-xs text-zinc-700 dark:text-zinc-200">
@@ -148,12 +148,12 @@
 
         <!-- Description -->
         <div>
-            <label for="description" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('Description') }}</label>
+            <label for="description" class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-matches.description') }}</label>
             <textarea
                 id="description"
                 wire:model="description"
                 rows="3"
-                placeholder="{{ __('Add notes about the match...') }}"
+                placeholder="{{ __('user-matches.add_notes') }}"
                 class="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             ></textarea>
             @error('description')
@@ -164,10 +164,10 @@
         <!-- Submit -->
         <div class="flex gap-3">
             <a href="{{ route('matches.index') }}" wire:navigate class="flex-1 px-4 py-3 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-center rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">
-                {{ __('Cancel') }}
+                {{ __('user-matches.cancel') }}
             </a>
             <button type="submit" class="flex-1 px-4 py-3 bg-accent text-white font-medium rounded-lg hover:bg-accent/90 transition-colors">
-                {{ $match ? __('Update Match') : __('Create Match') }}
+                {{ $match ? __('user-matches.update_match') : __('user-matches.create_match') }}
             </button>
         </div>
     </form>

@@ -57,11 +57,11 @@ class Form extends Component
 
         if ($this->match) {
             $this->match->update($validated);
-            session()->flash('message', 'Match updated successfully.');
+            session()->flash('message', __('admin-matches.updated_successfully'));
         } else {
             $validated['created_by'] = auth()->id();
             GameMatch::create($validated);
-            session()->flash('message', 'Match created successfully.');
+            session()->flash('message', __('admin-matches.created_successfully'));
         }
 
         return redirect()->route('admin.matches.index');
