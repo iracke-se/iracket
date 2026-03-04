@@ -1,26 +1,26 @@
-<x-emails.email subject="Reset Your Password">
-    <h2 class="email-title">Reset Your Password</h2>
+<x-emails.email subject="{{ __('emails.reset_password.subject', ['app' => config('app.name')]) }}">
+    <h2 class="email-title">{{ __('emails.reset_password.title') }}</h2>
 
     <p class="email-text">
         Hi {{ $user->first_name }},
     </p>
 
     <p class="email-text">
-        We received a request to reset your password for your {{ config('app.name') }} account. Click the button below to create a new password:
+        {{ __('emails.reset_password.body', ['app' => config('app.name')]) }}
     </p>
 
     <div class="text-center">
-        <a href="{{ $url }}" class="email-button">Reset Password</a>
+        <a href="{{ $url }}" class="email-button">{{ __('emails.reset_password.button') }}</a>
     </div>
 
     <p class="email-text">
-        This password reset link will expire in <strong>60 minutes</strong>. If you didn't request a password reset, you can safely ignore this email.
+        {!! __('emails.reset_password.expiry') !!}
     </p>
 
     <div class="divider"></div>
 
     <p class="text-muted text-center">
-        If you're having trouble clicking the button, copy and paste the URL below into your browser:
+        {{ __('emails.reset_password.url_help') }}
     </p>
     <p class="text-muted text-center" style="word-break: break-all; font-size: 12px;">
         <a href="{{ $url }}" class="email-footer-link">{{ $url }}</a>

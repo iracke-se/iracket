@@ -23,7 +23,7 @@ class LoginResponse implements LoginResponseContract
         if (!$user->hasVerifiedEmail()) {
             // Generate new verification code and send email
             $code = $user->generateVerificationCode();
-            Mail::to($user->email)->send(new VerificationCodeResent($user, $code));
+            Mail::to($user)->send(new VerificationCodeResent($user, $code));
 
             return $request->wantsJson()
                 ? new JsonResponse(['two_factor' => false, 'redirect' => route('verification.notice')], 200)

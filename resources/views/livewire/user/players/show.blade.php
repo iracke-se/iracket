@@ -5,7 +5,7 @@
         <!-- Edit link -->
         <div class="flex justify-end px-4 pt-2 mb-2">
             <a href="{{ route('profile.edit') }}" class="text-accent text-sm font-medium py-1" wire:navigate>
-                {{ __('Edit') }}
+                {{ __('user-player-show.edit') }}
             </a>
         </div>
 
@@ -40,19 +40,19 @@
 
         <!-- About Me Section -->
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('About Me') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.about_me') }}</p>
             <div class="border-t border-zinc-200 dark:border-zinc-800">
                 <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Club') }}</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.club') }}</span>
                     @if($player->club)
                         <a href="{{ route('clubs.show', $player->club) }}" wire:navigate class="text-sm text-zinc-500 dark:text-zinc-400">{{ $player->club->name }}</a>
                     @else
-                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('Not set') }}</span>
+                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
                     @endif
                 </div>
 
                 <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Age') }}</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.age') }}</span>
                     @php
                         $displayAge = $player->birth_year
                             ? now()->year - $player->birth_year
@@ -61,16 +61,16 @@
                     @if($displayAge)
                         <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $displayAge }} {{ __('user-player-show.years') }}</span>
                     @else
-                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('Not set') }}</span>
+                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
                     @endif
                 </div>
 
                 <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('My Ranking') }}</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.my_ranking') }}</span>
                     @if($currentRanking)
-                        <span class="px-3 py-1 bg-accent text-white text-xs font-bold rounded-full">{{ number_format($currentRanking->points) }} p</span>
+                        <span class="px-3 py-1 bg-accent text-white text-xs font-bold rounded-full">{{ number_format($currentRanking->points) }} {{ __('user-player-show.pts') }}</span>
                     @else
-                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('Not set') }}</span>
+                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
                     @endif
                 </div>
             </div>
@@ -78,18 +78,18 @@
 
         <!-- Latest Rankings Section -->
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('Latest Ranking') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.latest_ranking') }}</p>
             <div class="border-t border-zinc-200 dark:border-zinc-800">
                 @if($rankingsHistory->isEmpty())
                     <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                        <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Ranking history') }}</span>
-                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('Not set') }}</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.ranking_history') }}</span>
+                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
                     </div>
                 @else
                     <div class="flex items-center px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
-                        <span class="flex-1 text-xs font-bold text-zinc-900 dark:text-white">{{ __('Month') }}</span>
-                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Position') }}</span>
-                        <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Points') }}</span>
+                        <span class="flex-1 text-xs font-bold text-zinc-900 dark:text-white">{{ __('user-player-show.month') }}</span>
+                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('user-player-show.position') }}</span>
+                        <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('user-player-show.points') }}</span>
                         <span class="w-10 text-xs font-bold text-zinc-900 dark:text-white text-right">+/-</span>
                     </div>
                     @foreach($rankingsHistory as $ranking)
@@ -108,7 +108,7 @@
 
         <!-- Top Monitored Players Section -->
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('Top Monitored Players') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.top_monitored_players') }}</p>
             @if($topMonitoredPlayers->isEmpty())
                 <div class="px-4">
                     <a href="{{ route('players.index') }}" wire:navigate
@@ -116,7 +116,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        {{ __('Add Player') }}
+                        {{ __('user-player-show.add_player') }}
                     </a>
                 </div>
             @else
@@ -135,7 +135,7 @@
                             @endif
                             <span class="text-xs font-medium text-zinc-900 dark:text-white text-center leading-tight line-clamp-2 w-full">{{ $monitoredPlayer->name }}</span>
                             @if($latestRanking)
-                                <span class="bg-accent text-white text-xs font-bold px-2.5 py-0.5 rounded-full">{{ number_format($latestRanking->points) }} p</span>
+                                <span class="bg-accent text-white text-xs font-bold px-2.5 py-0.5 rounded-full">{{ number_format($latestRanking->points) }} {{ __('user-player-show.pts') }}</span>
                             @else
                                 <span class="text-xs text-zinc-400 dark:text-zinc-500">—</span>
                             @endif
@@ -145,7 +145,7 @@
             @endif
             <div class="border-t border-zinc-200 dark:border-zinc-800 mt-3">
                 <a href="{{ route('my-monitored.index') }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('My Monitored Players') }}</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.my_monitored_players') }}</span>
                     <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
@@ -156,7 +156,7 @@
         <!-- Latest Matches from Monitored Players -->
         @if($monitoredPlayersMatches->isNotEmpty())
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('Latest Matches') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.latest_matches') }}</p>
             <div class="flex gap-3 overflow-x-auto px-4 pb-2" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
                 @foreach($monitoredPlayersMatches as $match)
                     @php
@@ -226,7 +226,7 @@
         <div class="mb-6">
             <div class="border-t border-zinc-200 dark:border-zinc-800">
                 <a href="{{ route('players.transitions', $player) }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Club Transitions') }}</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.club_transitions') }}</span>
                     <div class="flex items-center gap-2">
                         <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $clubTransitions->count() }}</span>
                         <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,7 +236,7 @@
                 </a>
 
                 <a href="{{ route('matches.index') }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('My Matches') }}</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.my_matches') }}</span>
                     <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
@@ -257,13 +257,13 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
                     </svg>
-                    {{ __('Stop Monitoring') }}
+                    {{ __('user-player-show.stop_monitoring') }}
                 @else
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                     </svg>
-                    {{ __('Monitor Player') }}
+                    {{ __('user-player-show.monitor_player') }}
                 @endif
             </button>
         </div>
@@ -288,7 +288,7 @@
 
                 @if($player->user_fullname && $player->user_fullname !== $player->name)
                     <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                        {{ __('Registered as: ') }}{{ $player->user_fullname }}
+                        {{ __('user-player-show.registered_as') }} {{ $player->user_fullname }}
                     </p>
                 @endif
 
@@ -323,7 +323,7 @@
 
         <!-- Latest Ranking -->
         <div class="mb-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Latest Ranking') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('user-player-show.latest_ranking') }}</h2>
 
             @if($rankingsHistory->isEmpty())
                 <div class="text-center py-8 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
@@ -332,9 +332,9 @@
             @else
                 <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
                     <div class="flex items-center px-4 py-2 border-b border-zinc-200 dark:border-zinc-700">
-                        <span class="flex-1 text-xs font-bold text-zinc-900 dark:text-white">{{ __('Month') }}</span>
-                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Position') }}</span>
-                        <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('Points') }}</span>
+                        <span class="flex-1 text-xs font-bold text-zinc-900 dark:text-white">{{ __('user-player-show.month') }}</span>
+                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('user-player-show.position') }}</span>
+                        <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('user-player-show.points') }}</span>
                         <span class="w-14 text-xs font-bold text-zinc-900 dark:text-white text-right">+/-</span>
                     </div>
                 <div class="space-y-0">
@@ -358,7 +358,7 @@
                             @if($this->expandedRankingId === $ranking->id)
                                 <div class="border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-4">
                                     @if($expandedRankingMatches->isEmpty())
-                                        <p class="text-sm text-center text-zinc-500 dark:text-zinc-400 py-4">{{ __('No matches found for this month') }}</p>
+                                        <p class="text-sm text-center text-zinc-500 dark:text-zinc-400 py-4">{{ __('user-player-show.no_matches_for_month') }}</p>
                                     @else
                                         <div class="space-y-2">
                                             @foreach($expandedRankingMatches as $match)
@@ -404,7 +404,7 @@
                                                         @php $pointsToShow = $myMatchPoints ?? $myPointsChange ?? null; @endphp
                                                         @if($pointsToShow !== null)
                                                             <span class="text-xs font-bold px-2.5 py-1 rounded {{ $pointsToShow > 0 ? 'bg-green-500/20 text-green-600 dark:text-green-400' : ($pointsToShow < 0 ? 'bg-red-500/20 text-red-600 dark:text-red-400' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400') }}">
-                                                                {{ $pointsToShow > 0 ? '+' : '' }}{{ $pointsToShow }} pts
+                                                                {{ $pointsToShow > 0 ? '+' : '' }}{{ $pointsToShow }} {{ __('user-player-show.pts') }}
                                                             </span>
                                                         @endif
                                                     </div>
@@ -448,7 +448,7 @@
                                                     @if(!$isScrapedMatch)
                                                         <div class="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700">
                                                             <a href="{{ route('matches.show', $match) }}" wire:navigate class="text-xs text-accent hover:underline flex items-center gap-1 font-medium">
-                                                                <span>View Full Match</span>
+                                                                <span>{{ __('user-player-show.view_full_match') }}</span>
                                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                                                 </svg>
@@ -478,8 +478,8 @@
                         </svg>
                     </div>
                     <div>
-                        <span class="text-zinc-900 dark:text-white font-medium">{{ __('Club Transitions') }}</span>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $clubTransitions->count() }} {{ __('transitions') }}</p>
+                        <span class="text-zinc-900 dark:text-white font-medium">{{ __('user-player-show.club_transitions') }}</span>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $clubTransitions->count() }} {{ __('user-player-show.transitions') }}</p>
                     </div>
                 </div>
                 <svg class="w-5 h-5 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

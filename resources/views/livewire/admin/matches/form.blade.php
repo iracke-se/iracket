@@ -124,6 +124,40 @@
             @enderror
         </div>
 
+        <!-- Translation Review: User Match Comment Options -->
+        <div class="rounded-lg border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20 p-4">
+            <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-400 mb-3">
+                Translation Review — User Match Comment Options
+            </h3>
+            <p class="text-xs text-amber-700 dark:text-amber-500 mb-3">
+                These are the preset comment tags shown to users when logging a match. Verify the Swedish translations in <code>lang/sv/user-matches.php</code> under <code>comment_*</code> keys.
+            </p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-left text-amber-700 dark:text-amber-500 border-b border-amber-200 dark:border-amber-700">
+                            <th class="pb-1 pr-4">Key</th>
+                            <th class="pb-1 pr-4">English (EN)</th>
+                            <th class="pb-1">Swedish (SV)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-zinc-700 dark:text-zinc-300">
+                        @foreach([
+                            'comment_good_backhand', 'comment_good_forehand', 'comment_strong_serve',
+                            'comment_fast_footwork', 'comment_excellent_net_play', 'comment_super_sensitive',
+                            'comment_great_sportsmanship', 'comment_consistent_player',
+                        ] as $key)
+                        <tr class="border-b border-amber-100 dark:border-amber-800/50">
+                            <td class="py-1 pr-4 font-mono text-zinc-500 dark:text-zinc-400">{{ $key }}</td>
+                            <td class="py-1 pr-4">{{ __('user-matches.' . $key, [], 'en') }}</td>
+                            <td class="py-1">{{ __('user-matches.' . $key, [], 'sv') }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Submit Button -->
         <div class="flex gap-3">
             <button type="submit" class="px-6 py-3 bg-accent text-white font-medium rounded-lg hover:bg-accent/90 transition-colors">

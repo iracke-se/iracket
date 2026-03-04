@@ -44,7 +44,6 @@ use App\Livewire\Admin\Contacts\Respond as AdminContactsRespond;
 use App\Livewire\Admin\Banners\Index as AdminBannersIndex;
 use App\Livewire\Admin\Banners\Form as AdminBannersForm;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -53,7 +52,12 @@ Route::get('/', PublicHome::class)->name('home');
 // Locale Switching
 Route::get('locale/{locale}', function (string $locale) {
     if (in_array($locale, ['en', 'sv'])) {
-        session(['locale' => $locale]);
+        if (Auth::check()) {
+            Auth::user()->update(['locale' => $locale]);
+            session()->forget('locale');
+        } else {
+            session(['locale' => $locale]);
+        }
     }
     return redirect()->back();
 })->name('locale.switch');

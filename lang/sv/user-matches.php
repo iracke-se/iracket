@@ -17,7 +17,6 @@ return [
     'edit_match' => 'Redigera match',
 
     // Form Page
-    'new_match' => 'Ny match',
     'date' => 'Datum',
     'opponent' => 'Motståndare',
     'search_for_opponent' => 'Sök efter motståndare...',
@@ -32,6 +31,16 @@ return [
     'cancel' => 'Avbryt',
     'update_match' => 'Uppdatera match',
     'create_match' => 'Skapa match',
+
+    // Comment Options
+    'comment_good_backhand' => 'Bra backhand',
+    'comment_good_forehand' => 'Bra forehand',
+    'comment_strong_serve' => 'Stark serve',
+    'comment_fast_footwork' => 'Snabbt fotarbete',
+    'comment_excellent_net_play' => 'Utmärkt nätspel',
+    'comment_super_sensitive' => 'Superkänslig',
+    'comment_great_sportsmanship' => 'Gott sportsmannaskap',
+    'comment_consistent_player' => 'Stabil spelare',
 
     // Validation & Flash Messages
     'cannot_play_yourself' => 'Du kan inte spela mot dig själv.',

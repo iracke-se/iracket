@@ -57,7 +57,7 @@ class VerifyEmail extends Component
         $user = Auth::user();
         $code = $user->generateVerificationCode();
 
-        Mail::to($user->email)->send(new VerificationCodeResent($user, $code));
+        Mail::to($user)->send(new VerificationCodeResent($user, $code));
 
         $this->success = 'A new verification code has been sent to your email.';
         $this->code = '';

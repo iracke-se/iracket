@@ -4,6 +4,9 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetLocale
@@ -13,10 +16,55 @@ class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (session()->has('locale')) {
-            app()->setLocale(session('locale'));
-        }
+        $locale = $this->resolveLocale($request);
+
+        app()->setLocale($locale);
 
         return $next($request);
+    }
+
+    private function resolveLocale(Request $request): string
+    {
+        // Logged-in users: DB is the only source of truth
+        if (Auth::check()) {
+            return Auth::user()->locale ?? $this->detectLocaleFromIp($request);
+        }
+
+        // Guests: session, then IP fallback
+        if (session()->has('locale')) {
+            return session('locale');
+        }
+
+        return $this->detectLocaleFromIp($request);
+    }
+
+    private function detectLocaleFromIp(Request $request): string
+    {
+        $ip = $request->ip();
+
+        // Local / private IPs — default to Swedish (dev / local environment)
+        if ($this->isPrivateIp($ip)) {
+            return 'sv';
+        }
+
+        $country = Cache::remember("ip_country_{$ip}", now()->addDay(), function () use ($ip) {
+            try {
+                $response = Http::timeout(2)->get("https://ipapi.co/{$ip}/country/");
+                return $response->successful() ? trim($response->body()) : null;
+            } catch (\Throwable) {
+                return null;
+            }
+        });
+
+        return $country === 'SE' ? 'sv' : 'en';
+    }
+
+    private function isPrivateIp(string $ip): bool
+    {
+        return filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) === false;
     }
 }

@@ -23,15 +23,16 @@ class Form extends Component
 
     public string $opponentSearch = '';
 
+    // Keys map to lang/user-matches comment_* translation keys; values are stored in DB
     public array $availableComments = [
-        'Good backhand',
-        'Good forehand',
-        'Strong serve',
-        'Fast footwork',
-        'Excellent net play',
-        'Super sensitive',
-        'Great sportsmanship',
-        'Consistent player',
+        'good_backhand'       => 'Good backhand',
+        'good_forehand'       => 'Good forehand',
+        'strong_serve'        => 'Strong serve',
+        'fast_footwork'       => 'Fast footwork',
+        'excellent_net_play'  => 'Excellent net play',
+        'super_sensitive'     => 'Super sensitive',
+        'great_sportsmanship' => 'Great sportsmanship',
+        'consistent_player'   => 'Consistent player',
     ];
 
     protected $rules = [

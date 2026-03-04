@@ -5,6 +5,7 @@ return [
     'years' => 'years',
     'this_month' => 'this month',
     'points' => 'points',
+    'pts' => 'pts',
 
     // Rankings History
     'rankings_history' => 'Rankings History',
@@ -12,4 +13,29 @@ return [
     'month' => 'Month',
     'ranking' => 'Ranking',
     'points_change' => 'Points +/-',
+
+    // Profile — Own
+    'edit' => 'Edit',
+    'about_me' => 'About Me',
+    'club' => 'Club',
+    'not_set' => 'Not set',
+    'age' => 'Age',
+    'my_ranking' => 'My Ranking',
+    'latest_ranking' => 'Latest Ranking',
+    'ranking_history' => 'Ranking history',
+    'position' => 'Position',
+    'top_monitored_players' => 'Top Monitored Players',
+    'add_player' => 'Add Player',
+    'my_monitored_players' => 'My Monitored Players',
+    'latest_matches' => 'Latest Matches',
+    'club_transitions' => 'Club Transitions',
+    'my_matches' => 'My Matches',
+
+    // Profile — Other Player
+    'stop_monitoring' => 'Stop Monitoring',
+    'monitor_player' => 'Monitor Player',
+    'registered_as' => 'Registered as:',
+    'no_matches_for_month' => 'No matches found for this month',
+    'view_full_match' => 'View Full Match',
+    'transitions' => 'transitions',
 ];

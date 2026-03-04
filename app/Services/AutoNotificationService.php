@@ -20,11 +20,25 @@ class AutoNotificationService
     public const TYPE_FOLLOW = 'follow';
 
     /**
+     * Temporarily set app locale to the user's preferred locale,
+     * execute the callback, then restore the previous locale.
+     */
+    private function withLocale(User $user, callable $callback): mixed
+    {
+        $previous = app()->getLocale();
+        app()->setLocale($user->locale ?? config('app.locale'));
+        try {
+            return $callback();
+        } finally {
+            app()->setLocale($previous);
+        }
+    }
+
+    /**
      * Send notification when a new match is created
      */
     public function matchCreated(GameMatch $match, User $creator): void
     {
-        // Notify the opponent
         $opponent = $match->player1_id === $creator->id
             ? User::find($match->player2_id)
             : User::find($match->player1_id);
@@ -33,24 +47,22 @@ class AutoNotificationService
             return;
         }
 
-        $creatorName = $creator->name;
         $score = $match->player1_id === $creator->id
             ? "{$match->player1_sets}-{$match->player2_sets}"
             : "{$match->player2_sets}-{$match->player1_sets}";
 
+        [$title, $message] = $this->withLocale($opponent, fn() => [
+            __('user-notifications.match_created_title'),
+            __('user-notifications.match_created_message', ['name' => $creator->name, 'score' => $score]),
+        ]);
+
         Notification::create([
             'user_id' => $opponent->id,
-            'type' => self::TYPE_MATCH_CREATED,
-            'title' => __('New Match Added'),
-            'message' => __(':name added a match with you (:score). Please confirm or reject it.', [
-                'name' => $creatorName,
-                'score' => $score,
-            ]),
-            'data' => [
-                'match_id' => $match->id,
-                'url' => route('matches.show', $match),
-            ],
-            'icon' => 'assets/images/icon.png',
+            'type'    => self::TYPE_MATCH_CREATED,
+            'title'   => $title,
+            'message' => $message,
+            'data'    => ['match_id' => $match->id, 'url' => route('matches.show', $match)],
+            'icon'    => 'assets/images/icon.png',
         ]);
     }
 
@@ -59,27 +71,24 @@ class AutoNotificationService
      */
     public function matchConfirmed(GameMatch $match, User $confirmer): void
     {
-        // Notify the creator
         $creator = User::find($match->created_by);
 
         if (!$creator || $creator->id === $confirmer->id) {
             return;
         }
 
-        $confirmerName = $confirmer->name;
+        [$title, $message] = $this->withLocale($creator, fn() => [
+            __('user-notifications.match_confirmed_title'),
+            __('user-notifications.match_confirmed_message', ['name' => $confirmer->name]),
+        ]);
 
         Notification::create([
             'user_id' => $creator->id,
-            'type' => self::TYPE_MATCH_CONFIRMED,
-            'title' => __('Match Confirmed'),
-            'message' => __(':name confirmed your match.', [
-                'name' => $confirmerName,
-            ]),
-            'data' => [
-                'match_id' => $match->id,
-                'url' => route('matches.show', $match),
-            ],
-            'icon' => 'assets/images/icon.png',
+            'type'    => self::TYPE_MATCH_CONFIRMED,
+            'title'   => $title,
+            'message' => $message,
+            'data'    => ['match_id' => $match->id, 'url' => route('matches.show', $match)],
+            'icon'    => 'assets/images/icon.png',
         ]);
     }
 
@@ -88,27 +97,24 @@ class AutoNotificationService
      */
     public function matchRejected(GameMatch $match, User $rejecter): void
     {
-        // Notify the creator
         $creator = User::find($match->created_by);
 
         if (!$creator || $creator->id === $rejecter->id) {
             return;
         }
 
-        $rejecterName = $rejecter->name;
+        [$title, $message] = $this->withLocale($creator, fn() => [
+            __('user-notifications.match_rejected_title'),
+            __('user-notifications.match_rejected_message', ['name' => $rejecter->name]),
+        ]);
 
         Notification::create([
             'user_id' => $creator->id,
-            'type' => self::TYPE_MATCH_REJECTED,
-            'title' => __('Match Rejected'),
-            'message' => __(':name rejected your match.', [
-                'name' => $rejecterName,
-            ]),
-            'data' => [
-                'match_id' => $match->id,
-                'url' => route('matches.index'),
-            ],
-            'icon' => 'assets/images/icon.png',
+            'type'    => self::TYPE_MATCH_REJECTED,
+            'title'   => $title,
+            'message' => $message,
+            'data'    => ['match_id' => $match->id, 'url' => route('matches.index')],
+            'icon'    => 'assets/images/icon.png',
         ]);
     }
 
@@ -118,32 +124,27 @@ class AutoNotificationService
     public function rankingUpdate(User $user, int $oldRank, int $newRank, int $pointsChange): void
     {
         $direction = $newRank < $oldRank ? 'up' : 'down';
-        $title = $direction === 'up' ? __('Ranking Improved!') : __('Ranking Changed');
+        $points    = ($pointsChange > 0 ? '+' : '') . $pointsChange;
 
-        $message = $direction === 'up'
-            ? __('You moved up from #:old to #:new! (:points points)', [
-                'old' => $oldRank,
-                'new' => $newRank,
-                'points' => ($pointsChange > 0 ? '+' : '') . $pointsChange,
-            ])
-            : __('You moved from #:old to #:new (:points points)', [
-                'old' => $oldRank,
-                'new' => $newRank,
-                'points' => ($pointsChange > 0 ? '+' : '') . $pointsChange,
-            ]);
+        [$title, $message] = $this->withLocale($user, function () use ($direction, $oldRank, $newRank, $points) {
+            return $direction === 'up'
+                ? [
+                    __('user-notifications.ranking_improved_title'),
+                    __('user-notifications.ranking_improved_message', ['old' => $oldRank, 'new' => $newRank, 'points' => $points]),
+                ]
+                : [
+                    __('user-notifications.ranking_changed_title'),
+                    __('user-notifications.ranking_changed_message', ['old' => $oldRank, 'new' => $newRank, 'points' => $points]),
+                ];
+        });
 
         Notification::create([
             'user_id' => $user->id,
-            'type' => self::TYPE_RANKING_UPDATE,
-            'title' => $title,
+            'type'    => self::TYPE_RANKING_UPDATE,
+            'title'   => $title,
             'message' => $message,
-            'data' => [
-                'old_rank' => $oldRank,
-                'new_rank' => $newRank,
-                'points_change' => $pointsChange,
-                'url' => route('bubbler.index'),
-            ],
-            'icon' => 'assets/images/icon.png',
+            'data'    => ['old_rank' => $oldRank, 'new_rank' => $newRank, 'points_change' => $pointsChange, 'url' => route('bubbler.index')],
+            'icon'    => 'assets/images/icon.png',
         ]);
     }
 
@@ -152,18 +153,18 @@ class AutoNotificationService
      */
     public function achievementUnlocked(User $user, string $achievementName, string $description): void
     {
+        [$title, $message] = $this->withLocale($user, fn() => [
+            __('user-notifications.achievement_title'),
+            __('user-notifications.achievement_message', ['achievement' => $achievementName, 'description' => $description]),
+        ]);
+
         Notification::create([
             'user_id' => $user->id,
-            'type' => self::TYPE_ACHIEVEMENT,
-            'title' => __('Achievement Unlocked!'),
-            'message' => __(':achievement - :description', [
-                'achievement' => $achievementName,
-                'description' => $description,
-            ]),
-            'data' => [
-                'achievement' => $achievementName,
-            ],
-            'icon' => 'assets/images/icon.png',
+            'type'    => self::TYPE_ACHIEVEMENT,
+            'title'   => $title,
+            'message' => $message,
+            'data'    => ['achievement' => $achievementName],
+            'icon'    => 'assets/images/icon.png',
         ]);
     }
 
@@ -172,18 +173,18 @@ class AutoNotificationService
      */
     public function newFollower(User $user, User $follower): void
     {
+        [$title, $message] = $this->withLocale($user, fn() => [
+            __('user-notifications.follow_title'),
+            __('user-notifications.follow_message', ['name' => $follower->name]),
+        ]);
+
         Notification::create([
             'user_id' => $user->id,
-            'type' => self::TYPE_FOLLOW,
-            'title' => __('New Follower'),
-            'message' => __(':name started following you.', [
-                'name' => $follower->name,
-            ]),
-            'data' => [
-                'follower_id' => $follower->id,
-                'url' => route('players.show', $follower),
-            ],
-            'icon' => 'assets/images/icon.png',
+            'type'    => self::TYPE_FOLLOW,
+            'title'   => $title,
+            'message' => $message,
+            'data'    => ['follower_id' => $follower->id, 'url' => route('players.show', $follower)],
+            'icon'    => 'assets/images/icon.png',
         ]);
     }
 

@@ -21,7 +21,7 @@ class AccountVerification extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Welcome to ' . config('app.name') . ' - Verify Your Account',
+            subject: __('emails.account_verification.subject', ['app' => config('app.name')]),
         );
     }
 

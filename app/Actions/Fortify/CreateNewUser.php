@@ -51,11 +51,12 @@ class CreateNewUser implements CreatesNewUsers
             'profile_picture' => $profilePicturePath,
             'terms_accepted' => true,
             'terms_accepted_at' => now(),
+            'locale' => session('locale'),
         ]);
 
         // Generate verification code and send email
         $code = $user->generateVerificationCode();
-        Mail::to($user->email)->send(new AccountVerification($user, $code));
+        Mail::to($user)->send(new AccountVerification($user, $code));
 
         return $user;
     }

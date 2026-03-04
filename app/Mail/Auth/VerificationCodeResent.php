@@ -21,7 +21,7 @@ class VerificationCodeResent extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your New Verification Code - ' . config('app.name'),
+            subject: __('emails.verification_code_resent.subject', ['app' => config('app.name')]),
         );
     }
 

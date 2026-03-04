@@ -27,7 +27,7 @@ class ResetPasswordNotification extends Notification
         ], false));
 
         return (new MailMessage)
-            ->subject('Reset Your Password - ' . config('app.name'))
+            ->subject(__('emails.reset_password.subject', ['app' => config('app.name')]))
             ->view('emails.auth.reset-password', [
                 'url' => $url,
                 'user' => $notifiable,

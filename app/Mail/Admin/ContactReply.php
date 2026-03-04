@@ -20,7 +20,7 @@ class ContactReply extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Re: Your message to ' . config('app.name'),
+            subject: __('emails.contact_reply.subject', ['app' => config('app.name')]),
         );
     }
 

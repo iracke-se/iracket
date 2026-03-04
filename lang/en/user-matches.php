@@ -17,7 +17,6 @@ return [
     'edit_match' => 'Edit Match',
 
     // Form Page
-    'new_match' => 'New Match',
     'date' => 'Date',
     'opponent' => 'Opponent',
     'search_for_opponent' => 'Search for opponent...',
@@ -32,6 +31,16 @@ return [
     'cancel' => 'Cancel',
     'update_match' => 'Update Match',
     'create_match' => 'Create Match',
+
+    // Comment Options
+    'comment_good_backhand' => 'Good backhand',
+    'comment_good_forehand' => 'Good forehand',
+    'comment_strong_serve' => 'Strong serve',
+    'comment_fast_footwork' => 'Fast footwork',
+    'comment_excellent_net_play' => 'Excellent net play',
+    'comment_super_sensitive' => 'Super sensitive',
+    'comment_great_sportsmanship' => 'Great sportsmanship',
+    'comment_consistent_player' => 'Consistent player',
 
     // Validation & Flash Messages
     'cannot_play_yourself' => 'You cannot play against yourself.',

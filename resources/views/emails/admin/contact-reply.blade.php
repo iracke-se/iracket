@@ -1,34 +1,33 @@
-<x-emails.email subject="Re: Your message to {{ config('app.name') }}">
-    <h2 class="email-title">Thank you for contacting us</h2>
+<x-emails.email subject="{{ __('emails.contact_reply.subject', ['app' => config('app.name')]) }}">
+    <h2 class="email-title">{{ __('emails.contact_reply.title') }}</h2>
 
     <p class="email-text">
         Hi {{ $contact->name }},
     </p>
 
     <p class="email-text">
-        Thank you for reaching out to {{ config('app.name') }}. We have received your message and are happy to assist you.
+        {{ __('emails.contact_reply.body', ['app' => config('app.name')]) }}
     </p>
 
     <div class="divider"></div>
 
     <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <p style="font-weight: 600; color: #374151; margin: 0 0 10px 0;">Your original message:</p>
+        <p style="font-weight: 600; color: #374151; margin: 0 0 10px 0;">{{ __('emails.contact_reply.original_message') }}</p>
         <p style="color: #4b5563; margin: 0; font-style: italic;">"{{ $contact->message }}"</p>
     </div>
 
     <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #22c55e;">
-        <p style="font-weight: 600; color: #166534; margin: 0 0 10px 0;">Our response:</p>
+        <p style="font-weight: 600; color: #166534; margin: 0 0 10px 0;">{{ __('emails.contact_reply.our_response') }}</p>
         <p style="color: #166534; margin: 0;">{{ $contact->reply_message }}</p>
     </div>
 
     <div class="divider"></div>
 
     <p class="email-text">
-        If you have any further questions, feel free to reply to this email or contact us again through our website.
+        {{ __('emails.contact_reply.closing') }}
     </p>
 
     <p class="text-muted text-center" style="margin-top: 20px;">
-        Best regards,<br>
-        The {{ config('app.name') }} Team
+        {!! __('emails.contact_reply.regards', ['app' => config('app.name')]) !!}
     </p>
 </x-emails.email>

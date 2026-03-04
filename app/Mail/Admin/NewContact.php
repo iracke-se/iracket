@@ -20,7 +20,7 @@ class NewContact extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'New Contact Form Submission - ' . config('app.name'),
+            subject: __('emails.new_contact.subject', ['app' => config('app.name')]),
         );
     }
 
