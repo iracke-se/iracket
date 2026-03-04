@@ -50,4 +50,8 @@ return [
     'create' => 'Skapa',
     'select_player' => 'Välj spelare',
     'select_winner' => 'Välj vinnare',
+
+    // Flash Messages
+    'updated_successfully' => 'Match uppdaterad.',
+    'created_successfully' => 'Match skapad.',
 ];

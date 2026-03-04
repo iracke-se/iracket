@@ -50,6 +50,11 @@
         .terms-content p {
             line-height: 1.625;
             margin-bottom: 1rem;
+            color: #52525b;
+        }
+
+        .dark .terms-content p {
+            color: #a1a1aa;
         }
 
         .terms-content ul {
@@ -68,6 +73,11 @@
 
         .terms-content li {
             margin-bottom: 0.5rem;
+            color: #52525b;
+        }
+
+        .dark .terms-content li {
+            color: #a1a1aa;
         }
 
         .terms-content a {

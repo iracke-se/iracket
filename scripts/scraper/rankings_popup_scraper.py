@@ -158,7 +158,7 @@ class RankingsScraper:
 
     async def get_rid_for_month(self) -> str:
         """Get ranking ID for target month from dropdown"""
-        target_date = f"{self.config.year}.{self.config.month.zfill(2)}.01"
+        target_date = f"{self.config.year}.{self.config.month.zfill(2)}."
 
         # Navigate to page without rid
         url = f"{self.config.base_url}?gender={self.config.gender}"
@@ -172,14 +172,17 @@ class RankingsScraper:
 
         # Get all options
         options = await select.query_selector_all('option')
+        available = []
 
         for option in options:
             text = await option.text_content()
+            if text:
+                available.append(text.strip())
             if text and text.startswith(target_date):
                 rid = await option.get_attribute('value')
                 return rid
 
-        raise Exception(f"Month {target_date} not found in dropdown")
+        raise Exception(f"Month {target_date} not found in dropdown. Available options: {available}")
 
     async def navigate_to_rankings(self, rid: str):
         """Navigate to rankings page with specific RID"""

@@ -50,4 +50,8 @@ return [
     'create' => 'Create',
     'select_player' => 'Select Player',
     'select_winner' => 'Select Winner',
+
+    // Flash Messages
+    'updated_successfully' => 'Match updated successfully.',
+    'created_successfully' => 'Match created successfully.',
 ];
