@@ -27,19 +27,21 @@
     </div>
 
     <!-- Tabs + Desktop filter button -->
-    <div class="flex gap-2 mb-6 items-center">
-        <button wire:click="setTab('ladies')"
-            class="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors {{ $activeTab === 'ladies' ? 'bg-accent text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700' }}">
-            {{ __('user-bubbler.ladies') }}
-        </button>
-        <button wire:click="setTab('men')"
-            class="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors {{ $activeTab === 'men' ? 'bg-accent text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700' }}">
-            {{ __('user-bubbler.men') }}
-        </button>
-        <button wire:click="setTab('clubs')"
-            class="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors {{ $activeTab === 'clubs' ? 'bg-accent text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700' }}">
-            {{ __('user-bubbler.clubs') }}
-        </button>
+    <div class="flex mb-6 items-center gap-2">
+        <div class="flex flex-1 rounded-lg border-2 border-accent overflow-hidden">
+            <button wire:click="setTab('ladies')"
+                class="flex-1 px-4 py-2.5 text-sm font-medium transition-colors {{ $activeTab === 'ladies' ? 'bg-accent text-white' : 'bg-white dark:bg-zinc-900 text-accent hover:bg-accent/10' }}">
+                {{ __('user-bubbler.ladies') }}
+            </button>
+            <button wire:click="setTab('men')"
+                class="flex-1 px-4 py-2.5 text-sm font-medium transition-colors border-x-2 border-accent {{ $activeTab === 'men' ? 'bg-accent text-white' : 'bg-white dark:bg-zinc-900 text-accent hover:bg-accent/10' }}">
+                {{ __('user-bubbler.men') }}
+            </button>
+            <button wire:click="setTab('clubs')"
+                class="flex-1 px-4 py-2.5 text-sm font-medium transition-colors {{ $activeTab === 'clubs' ? 'bg-accent text-white' : 'bg-white dark:bg-zinc-900 text-accent hover:bg-accent/10' }}">
+                {{ __('user-bubbler.clubs') }}
+            </button>
+        </div>
 
         {{-- Desktop filter button --}}
         <div class="relative hidden md:block" x-data="{ open: false }">

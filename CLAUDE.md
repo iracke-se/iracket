@@ -139,7 +139,10 @@ Route::middleware(['role:Admin'])->group(...)
 
 **Route model binding**: `{user}` (UUID), `{match}` (UUID), `{club:slug}`, `{id}` (admin routes use integer ID)
 
-**Navigation**: Always use `wire:navigate` on internal `<a>` tags.
+**Navigation & `wire:navigate`**:
+- Use `wire:navigate` on internal `<a>` tags **only when source and destination share the same layout**.
+- Do **NOT** use `wire:navigate` when navigating across layout boundaries (e.g., landing → app, app → admin, auth → app).
+- Cross-auth-boundary links (login/logout, landing → dashboard) must never use `wire:navigate`.
 
 ## Localization
 
@@ -150,7 +153,7 @@ Route::middleware(['role:Admin'])->group(...)
 ## Rules — Always / Never
 
 **Always**:
-- Use `wire:navigate` on internal links
+- Use `wire:navigate` on internal links **within the same layout** (same layout = safe, different layout = no wire:navigate)
 - Specify layout in `render()` via `->layout('...')`
 - Use existing Tailwind tokens (zinc scale, accent) — no custom colors unless matching existing palette
 - Use `$rules` or inline `validate()` in Livewire for all form validation

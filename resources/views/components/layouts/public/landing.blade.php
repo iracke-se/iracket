@@ -96,10 +96,10 @@
                 </button>
                 <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95"
                     class="absolute bottom-full left-0 mb-2 w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden">
-                    <a href="{{ route('locale.switch', 'en') }}" class="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100 {{ app()->getLocale() === 'en' ? 'bg-zinc-100 dark:bg-zinc-700' : '' }}">
+                    <a href="{{ route('locale.switch', 'en') }}" wire:navigate class="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100 {{ app()->getLocale() === 'en' ? 'bg-zinc-100 dark:bg-zinc-700' : '' }}">
                         <span>English</span>
                     </a>
-                    <a href="{{ route('locale.switch', 'sv') }}" class="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100 {{ app()->getLocale() === 'sv' ? 'bg-zinc-100 dark:bg-zinc-700' : '' }}">
+                    <a href="{{ route('locale.switch', 'sv') }}" wire:navigate class="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100 {{ app()->getLocale() === 'sv' ? 'bg-zinc-100 dark:bg-zinc-700' : '' }}">
                         <span>Svenska</span>
                     </a>
                 </div>

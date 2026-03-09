@@ -194,6 +194,7 @@ class Form extends Component
             ],
             [
                 'points' => 0,
+                'rank' => 0,
                 'ranking_class' => 'E',
                 'position' => 0,
             ]
@@ -209,6 +210,7 @@ class Form extends Component
             ],
             [
                 'points' => 0,
+                'rank' => 0,
                 'ranking_class' => 'E',
                 'position' => 0,
             ]
