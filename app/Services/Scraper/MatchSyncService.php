@@ -2,12 +2,15 @@
 
 namespace App\Services\Scraper;
 
+use App\Models\Club;
 use App\Models\GameMatch;
 use App\Models\User;
 use App\Models\Scraper\ScrapedMatch;
 use App\Models\Scraper\ScraperRun;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class MatchSyncService
 {
@@ -219,21 +222,29 @@ class MatchSyncService
      */
     protected function parsePlayerIds(ScrapedMatch $scrapedMatch): ?array
     {
-        // Try to find users by player names
-        $player1 = $this->findUserByName($scrapedMatch->player1_name);
-        $player2 = $this->findUserByName($scrapedMatch->player2_name);
+        // Find or create users by player names
+        $player1 = $this->findOrCreateUserByName($scrapedMatch->player1_name ?? $scrapedMatch->player_name);
+        $player2 = $this->findOrCreateUserByName($scrapedMatch->player2_name ?? $scrapedMatch->opponent_name);
 
         if (!$player1 || !$player2) {
             return null;
         }
 
         $winnerId = null;
+        $player1Name = $scrapedMatch->player1_name ?? $scrapedMatch->player_name;
+        $player2Name = $scrapedMatch->player2_name ?? $scrapedMatch->opponent_name;
+
         if ($scrapedMatch->winner) {
-            if (stripos($scrapedMatch->winner, $scrapedMatch->player1_name) !== false) {
+            if (stripos($scrapedMatch->winner, $player1Name) !== false) {
                 $winnerId = $player1->id;
-            } elseif (stripos($scrapedMatch->winner, $scrapedMatch->player2_name) !== false) {
+            } elseif (stripos($scrapedMatch->winner, $player2Name) !== false) {
                 $winnerId = $player2->id;
             }
+        } elseif ($scrapedMatch->result === 'W') {
+            // Rankings popup format: result=W means player1 (player_name) won
+            $winnerId = $player1->id;
+        } elseif ($scrapedMatch->result === 'L') {
+            $winnerId = $player2->id;
         }
 
         return [
@@ -244,20 +255,52 @@ class MatchSyncService
     }
 
     /**
-     * Find user by full name
+     * Find or create user by full name
      */
-    protected function findUserByName(string $fullName): ?User
+    protected function findOrCreateUserByName(?string $fullName): ?User
     {
-        // Parse name (could be "FirstName LastName" or "LastName, FirstName")
+        if (empty($fullName)) {
+            return null;
+        }
+
         $nameParts = $this->parseName($fullName);
 
         if (!$nameParts) {
             return null;
         }
 
-        return User::where('first_name', $nameParts['first_name'])
+        $user = User::where('first_name', $nameParts['first_name'])
             ->where('last_name', $nameParts['last_name'])
             ->first();
+
+        if (!$user) {
+            $email = $this->generateEmail($nameParts['first_name'], $nameParts['last_name']);
+            $user = User::create([
+                'first_name' => $nameParts['first_name'],
+                'last_name' => $nameParts['last_name'],
+                'email' => $email,
+                'password' => Hash::make(Str::random(32)),
+            ]);
+        }
+
+        return $user;
+    }
+
+    /**
+     * Generate a unique email for a new user
+     */
+    protected function generateEmail(string $firstName, string $lastName): string
+    {
+        $baseEmail = Str::slug($firstName . '.' . $lastName) . '@iracket.local';
+        $email = $baseEmail;
+        $counter = 1;
+
+        while (User::where('email', $email)->exists()) {
+            $email = Str::slug($firstName . '.' . $lastName . '.' . $counter) . '@iracket.local';
+            $counter++;
+        }
+
+        return $email;
     }
 
     /**

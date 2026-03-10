@@ -348,9 +348,28 @@ class SyncService
 
             $this->stats['updated']++;
         } else {
-            // Don't create new users - skip if not found
-            Log::info("Skipping ranking sync - user not found: {$ranking->name}");
-            $this->stats['skipped']++;
+            // Create new user from ranking data
+            $email = $this->generateEmail($nameParts['first_name'], $nameParts['last_name']);
+
+            $user = User::create([
+                'first_name' => $nameParts['first_name'],
+                'last_name' => $nameParts['last_name'],
+                'email' => $email,
+                'password' => Hash::make(Str::random(32)),
+                'club_id' => $club?->id,
+                'gender' => $ranking->gender,
+                'birth_year' => $birthYear,
+                'sbtf_player_id' => $ranking->profixio_player_id,
+            ]);
+
+            $this->markUserAsSynced($user);
+
+            $ranking->update([
+                'is_synced' => true,
+                'synced_user_id' => $user->id,
+            ]);
+
+            $this->stats['created']++;
         }
     }
 

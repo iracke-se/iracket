@@ -32,3 +32,5 @@ yarn-error.log
 # Python virtual environment and cache
 /scripts/scraper/venv
 /scripts/scraper/__pycache__
+storage/app/private/iRacket/
+telegram_log.md

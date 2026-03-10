@@ -22,12 +22,13 @@ class ScraperStartCommand extends Command
                             {--limit-divisions= : Limit number of divisions to scrape (for testing)}
                             {--limit-clubs= : Limit number of clubs to scrape (for testing)}
                             {--limit-seasons= : Limit number of seasons to scrape (for testing)}
-                            {--limit-players= : Limit number of players to scrape (for testing)}';
+                            {--limit-players= : Limit number of players to scrape (for testing)}
+                            {--skip-live-center : Skip Live Center scraping and syncing}';
 
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
     protected array $stats = [];
-    protected int $totalSteps = 9; // Rankings (with matches), Players, Sync Players, Sync Rankings, Create Monthly Rankings, Sync Matches, Standings, Verify
+    protected int $totalSteps = 12; // Backup, Rankings M, Rankings F, Players, Sync Players, Sync Rankings, Monthly Rankings, Sync Matches, Standings, Live Center, Sync Live Center, Verify
     protected int $currentStep = 0;
     protected ?string $backupFile = null;
     protected array $executionLog = [];
@@ -107,9 +108,19 @@ class ScraperStartCommand extends Command
             }
         }
 
-        // Adjust totalSteps if --limit-players is set (skips Steps 4 & 5)
+        // Count steps dynamically based on options
+        // Base: Backup + Rankings M + Rankings F + Players + Sync Players
+        //     + Sync Rankings + Monthly Rankings + Sync Matches + Series
+        //     + Live Center + Sync Live Center + Verify = 12
+        $this->totalSteps = 12;
+        if ($skipBackup) {
+            $this->totalSteps--;
+        }
         if ($this->option('limit-players')) {
-            $this->totalSteps = 7; // Skip "Scraping Players" and "Syncing Players"
+            $this->totalSteps -= 2; // Skip "Scraping Players" and "Syncing Players"
+        }
+        if ($this->option('skip-live-center')) {
+            $this->totalSteps -= 2; // Remove Live Center scrape + sync steps
         }
 
         $this->displayHeader($month, $scrapeAll);
@@ -196,7 +207,28 @@ class ScraperStartCommand extends Command
             });
             $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
-            // Step 8: Verify Data
+            // Step 8: Scrape Live Center
+            if (!$this->option('skip-live-center')) {
+                $result = $this->runStep('Scraping Live Center Match Details', function () use ($month, $scrapeAll) {
+                    return $this->scrapeLiveCenter($month, $scrapeAll);
+                });
+                $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+            } else {
+                $this->line("  ⏭️  Skipping Live Center scrape (--skip-live-center)");
+                $this->newLine();
+            }
+
+            // Step 9: Sync Live Center
+            if (!$this->option('skip-live-center')) {
+                $this->runStep('Syncing Live Center → Matches', function () {
+                    return $this->syncLiveCenter();
+                });
+            } else {
+                $this->line("  ⏭️  Skipping Live Center sync (--skip-live-center)");
+                $this->newLine();
+            }
+
+            // Step 10: Verify Data
             $this->runStep('Verifying Data Integrity', function () {
                 return $this->verifyData();
             });
@@ -667,76 +699,25 @@ class ScraperStartCommand extends Command
             ];
         }
 
-        // CLI execution - use Process::start() for background execution with live progress
-        $process = Process::start($command);
+        // Run via Artisan::call() — synchronous, reliable, no race conditions
+        [$artisanCommand, $args] = $this->parseCommand($command);
 
-        // Wait a moment for the scraper run to be created in the database
-        sleep(1);
+        $this->line("  <fg=cyan>Running:</> {$command}");
+        $this->newLine();
 
-        // Get the latest scraper run
-        $run = ScraperRun::latest('id')->first();
+        \Illuminate\Support\Facades\Artisan::call($artisanCommand, $args, $this->output);
+
+        // Find the run that was just created by looking for the latest run
+        // that isn't the parent run and was created after we started
+        $run = ScraperRun::where('id', '!=', $this->parentRun?->id)
+            ->latest('id')
+            ->first();
 
         if (!$run) {
-            throw new \Exception("Failed to find scraper run in database");
+            throw new \Exception("Failed to find scraper run after executing: {$command}");
         }
 
         $this->line("  <fg=cyan>Scraper Run ID: #{$run->id}</>");
-        $this->newLine();
-
-        $lastItemCount = 0;
-        $lastLogId = 0;
-        $dots = 0;
-
-        // Poll the database for progress
-        while ($process->running()) {
-            // Refresh the run to get latest data
-            $run->refresh();
-
-            // Show item progress if count changed
-            if ($run->items_scraped > $lastItemCount) {
-                $this->line("  <fg=green>✓</> Scraped: {$run->items_scraped} items" .
-                    ($run->items_failed > 0 ? " (<fg=red>{$run->items_failed} failed</>)" : ""));
-                $lastItemCount = $run->items_scraped;
-                $dots = 0;
-            }
-
-            // Show latest log messages
-            $newLogs = $run->logs()
-                ->where('id', '>', $lastLogId)
-                ->orderBy('id', 'asc')
-                ->get();
-
-            foreach ($newLogs as $log) {
-                $icon = match($log->level) {
-                    'error' => '<fg=red>✗</>',
-                    'warning' => '<fg=yellow>⚠</>',
-                    default => '<fg=blue>ℹ</>',
-                };
-                $this->line("  {$icon} {$log->message}");
-                $lastLogId = $log->id;
-                $dots = 0;
-            }
-
-            // Show activity dots if nothing new
-            if ($dots < 3 && $newLogs->isEmpty() && $run->items_scraped === $lastItemCount) {
-                $this->output->write('.');
-                $dots++;
-            }
-
-            // Check if scraper finished
-            if (in_array($run->status, [ScraperRun::STATUS_COMPLETED, ScraperRun::STATUS_FAILED])) {
-                break;
-            }
-
-            sleep(1);
-        }
-
-        // Make sure process has finished
-        $result = $process->wait();
-
-        // Final refresh
-        $run->refresh();
-
         $this->newLine();
 
         // Show final status
@@ -854,6 +835,52 @@ class ScraperStartCommand extends Command
         $command .= $this->buildLimitOptions();
 
         return $this->runScraperWithProgress($command, 'Series Standings');
+    }
+
+    protected function scrapeLiveCenter(string $month, bool $scrapeAll): array
+    {
+        $command = 'php artisan scraper:run live_center';
+
+        if (!$scrapeAll) {
+            $command .= " --month={$month}";
+        } else {
+            $command .= " --from-matches";
+        }
+
+        return $this->runScraperWithProgress($command, 'Live Center');
+    }
+
+    protected function syncLiveCenter(): array
+    {
+        $this->line("  🔄 Syncing Live Center games → matches...");
+        $this->newLine();
+
+        $run = $this->parentRun;
+        $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
+
+        $liveCenterSyncService = app(\App\Services\Scraper\LiveCenterSyncService::class);
+
+        $this->syncWithProgress(function () use ($liveCenterSyncService, $run) {
+            return $liveCenterSyncService->syncMatches(null, $run);
+        }, $run, $lastLogId);
+
+        $stats = $liveCenterSyncService->getStats();
+
+        $this->newLine();
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Games synced', number_format($stats['games_synced'])],
+                ['Matches created', number_format($stats['matches_created'])],
+                ['Matches linked', number_format($stats['matches_linked'])],
+                ['Skipped', number_format($stats['skipped'])],
+                ['Errors', number_format($stats['errors'])],
+            ]
+        );
+
+        $this->stats['live_center'] = $stats;
+
+        return $stats;
     }
 
     protected function syncData(SyncService $syncService, string $type): array

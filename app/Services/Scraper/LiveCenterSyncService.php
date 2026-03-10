@@ -7,7 +7,9 @@ use App\Models\Scraper\LiveMatchGame;
 use App\Models\Scraper\ScraperRun;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class LiveCenterSyncService
 {
@@ -76,21 +78,14 @@ class LiveCenterSyncService
      */
     protected function syncGame(LiveMatchGame $game): void
     {
-        // Find existing players (do NOT create new ones)
-        $player1 = $this->findUserByName($game->player1_name);
-        $player2 = $this->findUserByName($game->player2_name);
+        // Find or create players
+        $player1 = $this->findOrCreateUserByName($game->player1_name);
+        $player2 = $this->findOrCreateUserByName($game->player2_name);
 
         if (!$player1 || !$player2) {
-            // Skip if both players are not already in the database
+            // Skip if names are empty/unparseable
             $game->update(['is_synced' => true]);
             $this->stats['skipped']++;
-            Log::info("Skipped Live Center game - player(s) not found", [
-                'game_id' => $game->id,
-                'player1_name' => $game->player1_name,
-                'player2_name' => $game->player2_name,
-                'player1_found' => $player1 ? 'yes' : 'no',
-                'player2_found' => $player2 ? 'yes' : 'no',
-            ]);
             return;
         }
 
@@ -105,7 +100,26 @@ class LiveCenterSyncService
         }
 
         // Find existing match for same players + date
+        $parsedDate = Carbon::parse($playedAt)->format('Y-m-d');
         $existingMatch = $this->findMatchingMatch($player1->id, $player2->id, $playedAt);
+
+        if (!$existingMatch) {
+            $candidateCount = GameMatch::where(function ($q) use ($player1, $player2) {
+                $q->where(function ($q2) use ($player1, $player2) {
+                    $q2->where('player1_id', $player1->id)->where('player2_id', $player2->id);
+                })->orWhere(function ($q2) use ($player1, $player2) {
+                    $q2->where('player1_id', $player2->id)->where('player2_id', $player1->id);
+                });
+            })->count();
+
+            Log::warning("LiveCenterSync: no match found for game #{$game->id}", [
+                'player1' => "{$game->player1_name} (id:{$player1->id})",
+                'player2' => "{$game->player2_name} (id:{$player2->id})",
+                'date_raw'    => $playedAt,
+                'date_parsed' => $parsedDate,
+                'matches_for_these_players_total' => $candidateCount,
+            ]);
+        }
 
         if ($existingMatch) {
             // Link the existing match to this live center game
@@ -116,7 +130,7 @@ class LiveCenterSyncService
             // Create new match from live center data
             $winnerId = null;
             if ($game->winner_name) {
-                $winner = $this->findUserByName($game->winner_name);
+                $winner = $this->findOrCreateUserByName($game->winner_name);
                 $winnerId = $winner?->id;
             }
 
@@ -232,6 +246,39 @@ class LiveCenterSyncService
      * Find user by full name (handles "Lastname, Firstname" and "Firstname Lastname" formats)
      * Uses multiple strategies: exact match, partial match, case-insensitive match
      */
+    protected function findOrCreateUserByName(?string $fullName): ?User
+    {
+        if (empty($fullName)) {
+            return null;
+        }
+
+        // Try to find existing user first
+        $user = $this->findUserByName($fullName);
+        if ($user) {
+            return $user;
+        }
+
+        // Create new user
+        $nameParts = $this->parseName($fullName);
+        if (!$nameParts) {
+            return null;
+        }
+
+        $email = Str::slug($nameParts['first_name'] . '.' . $nameParts['last_name']) . '@iracket.local';
+        $counter = 1;
+        while (User::where('email', $email)->exists()) {
+            $email = Str::slug($nameParts['first_name'] . '.' . $nameParts['last_name'] . '.' . $counter) . '@iracket.local';
+            $counter++;
+        }
+
+        return User::create([
+            'first_name' => $nameParts['first_name'],
+            'last_name' => $nameParts['last_name'],
+            'email' => $email,
+            'password' => Hash::make(Str::random(32)),
+        ]);
+    }
+
     protected function findUserByName(string $fullName): ?User
     {
         $nameParts = $this->parseName($fullName);

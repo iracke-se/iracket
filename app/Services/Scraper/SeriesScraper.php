@@ -108,25 +108,30 @@ class SeriesScraper extends BaseScraperService
 
             // Apply period filter if specified
             if ($periodFilter) {
-                $seasonYear = $this->extractYearFromPeriod($season['label'] ?? '');
+                $label = $season['label'] ?? '';
+                $filterYear = (int)date('Y', strtotime($periodFilter));
+                $seasonStartYear = $this->extractYearFromPeriod($label);
 
-                $this->info("Evaluating season {$season['label']}: extracted year = " . ($seasonYear ?? 'NULL'));
+                // Extract end year: "Säsongen 2025-2026" → 2026, fallback to startYear+1
+                $seasonEndYear = null;
+                if (preg_match('/(\d{4})-(\d{4})/', $label, $m)) {
+                    $seasonEndYear = (int)$m[2];
+                } elseif ($seasonStartYear) {
+                    $seasonEndYear = $seasonStartYear + 1;
+                }
 
-                if ($seasonYear) {
-                    // Convert "2024-12-01" → 2024 (extract year from filter)
-                    $filterYear = (int)date('Y', strtotime($periodFilter));
+                $this->info("Evaluating season {$label}: years {$seasonStartYear}–{$seasonEndYear}, filter year: {$filterYear}");
 
-                    $this->info("Filter year: {$filterYear}, Season year: {$seasonYear}");
-
-                    if ($seasonYear > $filterYear) {
-                        $this->info("⊘ Skipping season {$season['label']} (year {$seasonYear} > {$filterYear}) - newer than target year");
-                        continue; // Skip newer seasons
-                    } elseif ($seasonYear < $filterYear) {
-                        $this->info("✗ Stopping at season {$season['label']} (year {$seasonYear} < {$filterYear}) - older than target year, stopping");
-                        break; // Stop at older seasons
+                if ($seasonStartYear && $seasonEndYear) {
+                    if ($seasonStartYear > $filterYear) {
+                        $this->info("⊘ Skipping season {$label} (starts {$seasonStartYear} > {$filterYear}) - newer than target");
+                        continue;
+                    } elseif ($seasonEndYear < $filterYear) {
+                        $this->info("✗ Stopping at season {$label} (ends {$seasonEndYear} < {$filterYear}) - older than target");
+                        break;
                     }
 
-                    $this->info("✓ Processing season {$season['label']} (matches target year {$filterYear})");
+                    $this->info("✓ Processing season {$label} (range {$seasonStartYear}–{$seasonEndYear} includes {$filterYear})");
                 }
             }
 

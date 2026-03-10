@@ -65,6 +65,10 @@ class SyncScrapedDataCommand extends Command
                 $rankingStats = $syncService->syncRankings($runId);
                 $this->displayStats('Rankings', $rankingStats);
                 $stats['rankings'] = $rankingStats;
+
+                $this->info('Creating monthly rankings...');
+                $monthlyStats = $syncService->createMonthlyRankings($runId);
+                $this->displayStats('Monthly Rankings', $monthlyStats);
             }
 
             if ($type === 'matches' || $type === 'all') {

@@ -39,7 +39,7 @@ class MonthlyRanking extends Model
         return (string) $this->points_change;
     }
 
-    public static function getCurrentMonthRankings(string $gender = null)
+    public static function getCurrentMonthRankings(?string $gender = null)
     {
         $query = self::where('year', now()->year)
             ->where('month', now()->month)

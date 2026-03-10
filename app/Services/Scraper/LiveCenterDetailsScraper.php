@@ -166,7 +166,10 @@ class LiveCenterDetailsScraper extends BaseScraperService
             $arguments[] = '--skip-points';
         }
 
-        $process = new Process($arguments);
+        $env = array_merge(getenv(), [
+            'PUPPETEER_EXECUTABLE_PATH' => config('scraper.browser.chrome_path', '/usr/bin/chromium'),
+        ]);
+        $process = new Process($arguments, null, $env);
         $process->setTimeout(null); // No timeout - allow unlimited execution time
 
         $this->info("Executing Python script: " . $process->getCommandLine());

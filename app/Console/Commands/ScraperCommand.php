@@ -213,6 +213,7 @@ class ScraperCommand extends Command
             'players' => \App\Services\Scraper\PlayerListScraper::class,
             'transitions' => \App\Services\Scraper\TransitionsScraper::class,
             'series' => \App\Services\Scraper\SeriesScraper::class,
+            'series_matches' => \App\Services\Scraper\SeriesMatchScraper::class,
             'live_center' => \App\Services\Scraper\LiveCenterDetailsScraper::class,
             default => null,
         };

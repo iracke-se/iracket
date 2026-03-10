@@ -113,19 +113,21 @@ class PlayerListScraper extends BaseScraperService
             $this->info("Applying year filter: {$filterYear}");
 
             $periods = array_filter($periods, function($period) use ($filterYear) {
-                $periodYear = $this->extractYearFromPeriod($period['text']);
+                $periodStartYear = $this->extractYearFromPeriod($period['text']);
 
-                if (!$periodYear) {
+                if (!$periodStartYear) {
                     return false; // Skip periods where year can't be extracted
                 }
 
-                // Keep only periods matching the filter year
-                $matches = ($periodYear === $filterYear);
+                // License periods span two years: "Licens 2025-26" covers 2025 and 2026.
+                // Keep the period if filterYear falls within [startYear, startYear+1].
+                $periodEndYear = $periodStartYear + 1;
+                $matches = ($filterYear >= $periodStartYear && $filterYear <= $periodEndYear);
 
                 if (!$matches) {
-                    $this->info("⊘ Filtered out period {$period['text']} (year {$periodYear} != {$filterYear})");
+                    $this->info("⊘ Filtered out period {$period['text']} (year {$periodStartYear} != {$filterYear})");
                 } else {
-                    $this->info("✓ Keeping period {$period['text']} (year {$periodYear} matches {$filterYear})");
+                    $this->info("✓ Keeping period {$period['text']} (year {$periodStartYear} matches {$filterYear})");
                 }
 
                 return $matches;

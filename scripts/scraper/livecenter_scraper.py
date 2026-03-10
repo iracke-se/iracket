@@ -63,8 +63,16 @@ class LiveCenterScraper:
     async def run(self) -> Dict:
         """Execute scraping workflow"""
         async with async_playwright() as p:
-            # Use system Chromium if available (DDEV container), otherwise Playwright's bundled one
+            # Use system Chromium if available — check env var and common paths
             chrome_path = os.environ.get('PUPPETEER_EXECUTABLE_PATH', None)
+            if not chrome_path or not os.path.exists(chrome_path):
+                for candidate in ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']:
+                    if os.path.exists(candidate):
+                        chrome_path = candidate
+                        break
+                else:
+                    chrome_path = None
+
             launch_args = {
                 'headless': True,
                 'args': [
@@ -74,7 +82,7 @@ class LiveCenterScraper:
                     '--disable-setuid-sandbox'
                 ]
             }
-            if chrome_path and os.path.exists(chrome_path):
+            if chrome_path:
                 launch_args['executable_path'] = chrome_path
                 log_info(f"Using system Chromium: {chrome_path}")
 

@@ -26,6 +26,7 @@ Output:
 import argparse
 import asyncio
 import json
+import os
 import sys
 import re
 from typing import List, Dict, Optional
@@ -41,7 +42,7 @@ class RankingsScraperConfig:
         self.gender = gender  # 'm' or 'k'
         self.limit_players = limit_players
         self.base_url = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php"
-        self.timeout = 60000  # 60 seconds
+        self.timeout = 120000  # 120 seconds
 
     def get_rankings_url(self, rid: str) -> str:
         return f"{self.base_url}?gender={self.gender}&rid={rid}"
@@ -60,21 +61,36 @@ class RankingsScraper:
     async def run(self) -> Dict:
         """Execute scraping workflow"""
         async with async_playwright() as p:
-            # Launch browser with additional stability arguments
-            self.browser = await p.chromium.launch(
-                headless=True,
-                args=[
+            # Use system Chromium if available — check env var and common paths
+            chrome_path = os.environ.get('PUPPETEER_EXECUTABLE_PATH', None)
+            if not chrome_path or not os.path.exists(chrome_path):
+                # Check common system Chromium locations
+                for candidate in ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']:
+                    if os.path.exists(candidate):
+                        chrome_path = candidate
+                        break
+                else:
+                    chrome_path = None
+
+            launch_args = {
+                'headless': True,
+                'args': [
                     '--disable-blink-features=AutomationControlled',
                     '--disable-dev-shm-usage',
                     '--no-sandbox',
                     '--disable-setuid-sandbox'
                 ]
-            )
+            }
+            if chrome_path:
+                launch_args['executable_path'] = chrome_path
+                print(f"[INFO] Using system Chromium: {chrome_path}", file=sys.stderr, flush=True)
+
+            self.browser = await p.chromium.launch(**launch_args)
             self.context = await self.browser.new_context()
             self.page = await self.context.new_page()
 
             # Set longer default timeout
-            self.page.set_default_timeout(30000)
+            self.page.set_default_timeout(120000)
 
             try:
                 # Step 1: Get RID for target month
@@ -162,7 +178,7 @@ class RankingsScraper:
 
         # Navigate to page without rid
         url = f"{self.config.base_url}?gender={self.config.gender}"
-        await self.page.goto(url, wait_until="domcontentloaded")
+        await self.page.goto(url, wait_until="domcontentloaded", timeout=120000)
         await self.page.wait_for_timeout(2000)  # Wait for dynamic content to load
 
         # Find select element and get options
@@ -187,7 +203,7 @@ class RankingsScraper:
     async def navigate_to_rankings(self, rid: str):
         """Navigate to rankings page with specific RID"""
         url = self.config.get_rankings_url(rid)
-        await self.page.goto(url, wait_until="domcontentloaded")
+        await self.page.goto(url, wait_until="domcontentloaded", timeout=120000)
         await self.page.wait_for_timeout(2000)  # Extra wait for stability
 
     async def extract_players_from_table(self) -> List[Dict]:

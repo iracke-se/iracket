@@ -93,9 +93,12 @@ class RankingsScraper extends BaseScraperService
             $arguments[] = (string) $limitPlayers;
         }
 
-        // Create process with timeout
+        // Create process with timeout and ensure Chromium path is passed
         $timeout = config('scraper.python.timeout', 3600); // Default 1 hour
-        $process = new Process($arguments);
+        $env = array_merge(getenv(), [
+            'PUPPETEER_EXECUTABLE_PATH' => config('scraper.browser.chrome_path', '/usr/bin/chromium'),
+        ]);
+        $process = new Process($arguments, null, $env);
         $process->setTimeout($timeout);
 
         $this->info("Executing Python script: " . $process->getCommandLine());
@@ -116,6 +119,8 @@ class RankingsScraper extends BaseScraperService
             // Parse JSON output from stdout
             $output = $process->getOutput();
 
+            $this->info("Python stdout size: " . strlen($output) . " bytes");
+
             if (empty($output)) {
                 throw new \Exception("Python script produced no output");
             }
@@ -123,7 +128,8 @@ class RankingsScraper extends BaseScraperService
             $result = json_decode($output, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception("Failed to parse Python script output as JSON: " . json_last_error_msg() . "\nOutput: " . $output);
+                // Log first 200 chars to help debug
+                throw new \Exception("Failed to parse Python output: " . json_last_error_msg() . " | First 200 chars: " . substr($output, 0, 200));
             }
 
             return $result;
@@ -201,7 +207,7 @@ class RankingsScraper extends BaseScraperService
                 'player2_name' => $match['opponent_name'],
                 'score' => '',
                 'sets' => null,
-                'played_at' => $match['match_date'],
+                'played_at' => \Carbon\Carbon::parse($match['match_date'])->format('Y-m-d'),
                 'winner' => $match['result'] === 'W' ? $match['player_name'] : $match['opponent_name'],
                 'created_at' => now(),
                 'updated_at' => now(),
