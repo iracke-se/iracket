@@ -23,7 +23,8 @@ class ScraperStartCommand extends Command
                             {--limit-clubs= : Limit number of clubs to scrape (for testing)}
                             {--limit-seasons= : Limit number of seasons to scrape (for testing)}
                             {--limit-players= : Limit number of players to scrape (for testing)}
-                            {--skip-live-center : Skip Live Center scraping and syncing}';
+                            {--skip-live-center : Skip Live Center scraping and syncing}
+                            {--skip-series : Skip Series Standings scraping}';
 
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
@@ -109,10 +110,10 @@ class ScraperStartCommand extends Command
         }
 
         // Count steps dynamically based on options
-        // Base: Backup + Rankings M + Rankings F + Players + Sync Players
+        // Base: Backup + Rankings M+F (parallel) + Players + Sync Players
         //     + Sync Rankings + Monthly Rankings + Sync Matches + Series
-        //     + Live Center + Sync Live Center + Verify = 12
-        $this->totalSteps = 12;
+        //     + Live Center + Sync Live Center + Verify = 11
+        $this->totalSteps = 11;
         if ($skipBackup) {
             $this->totalSteps--;
         }
@@ -121,6 +122,9 @@ class ScraperStartCommand extends Command
         }
         if ($this->option('skip-live-center')) {
             $this->totalSteps -= 2; // Remove Live Center scrape + sync steps
+        }
+        if ($this->option('skip-series')) {
+            $this->totalSteps--; // Remove Series Standings step
         }
 
         $this->displayHeader($month, $scrapeAll);
@@ -151,17 +155,11 @@ class ScraperStartCommand extends Command
                 $this->newLine();
             }
 
-            // Step 1: Scrape Rankings with Popup Interaction (includes matches)
-            // This now scrapes both rankings and matches from popup for both genders
-            $result = $this->runStep('Scraping Rankings & Matches (Male)', function () use ($month, $scrapeAll) {
-                return $this->scrapeRankingsWithPopup('m', $month, $scrapeAll);
+            // Step 1: Scrape Rankings with Popup Interaction (Male + Female in parallel)
+            $result = $this->runStep('Scraping Rankings & Matches (Male + Female parallel)', function () use ($month, $scrapeAll) {
+                return $this->scrapeRankingsParallel($month, $scrapeAll);
             });
             $this->latestRunId = $result['run_id'] ?? null;
-
-            $result = $this->runStep('Scraping Rankings & Matches (Female)', function () use ($month, $scrapeAll) {
-                return $this->scrapeRankingsWithPopup('k', $month, $scrapeAll);
-            });
-            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
 
             // Step 2: Scrape Players
             // Skip this step if --limit-players is set, since players will be created from rankings
@@ -202,10 +200,14 @@ class ScraperStartCommand extends Command
             });
 
             // Step 7: Scrape Series Standings
-            $result = $this->runStep('Scraping Series Standings', function () use ($month, $scrapeAll) {
-                return $this->scrapeSeries($month, $scrapeAll);
-            });
-            $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+            if (!$this->option('skip-series')) {
+                $result = $this->runStep('Scraping Series Standings', function () use ($month, $scrapeAll) {
+                    return $this->scrapeSeries($month, $scrapeAll);
+                });
+                $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+            } else {
+                $this->info('  ⏭  Skipping Series Standings (--skip-series)');
+            }
 
             // Step 8: Scrape Live Center
             if (!$this->option('skip-live-center')) {
@@ -790,6 +792,101 @@ class ScraperStartCommand extends Command
         }
 
         return [$commandName, $args];
+    }
+
+    /**
+     * Scrape rankings for both genders in parallel using separate OS processes
+     */
+    protected function scrapeRankingsParallel(string $month, bool $scrapeAll): array
+    {
+        [$year, $monthNum] = explode('-', $month);
+
+        $buildArgs = function (string $gender) use ($year, $monthNum): array {
+            $args = [
+                PHP_BINARY,
+                base_path('artisan'),
+                'scraper:run',
+                'rankings',
+                "--year={$year}",
+                "--month={$monthNum}",
+                "--gender={$gender}",
+            ];
+
+            if ($this->option('limit-players')) {
+                $args[] = '--limit-players=' . $this->option('limit-players');
+            }
+
+            return $args;
+        };
+
+        $startId = ScraperRun::max('id') ?? 0;
+
+        $mProcess = new \Symfony\Component\Process\Process($buildArgs('m'));
+        $fProcess = new \Symfony\Component\Process\Process($buildArgs('k'));
+        $mProcess->setTimeout(3600);
+        $fProcess->setTimeout(3600);
+
+        $this->line("  <fg=cyan>Starting Male rankings process...</>");
+        $mProcess->start();
+        $this->line("  <fg=cyan>Starting Female rankings process...</>");
+        $fProcess->start();
+        $this->newLine();
+
+        // Poll both processes, streaming output until both finish
+        $mBuffer = '';
+        $fBuffer = '';
+        while (!$mProcess->isTerminated() || !$fProcess->isTerminated()) {
+            // Flush incremental output from male process
+            $mNew = $mProcess->getIncrementalOutput() . $mProcess->getIncrementalErrorOutput();
+            foreach (explode("\n", $mBuffer . $mNew) as $line) {
+                $line = trim($line);
+                if ($line !== '') {
+                    $this->line("  <fg=blue>[M]</> {$line}");
+                }
+            }
+            $mBuffer = '';
+
+            // Flush incremental output from female process
+            $fNew = $fProcess->getIncrementalOutput() . $fProcess->getIncrementalErrorOutput();
+            foreach (explode("\n", $fBuffer . $fNew) as $line) {
+                $line = trim($line);
+                if ($line !== '') {
+                    $this->line("  <fg=magenta>[F]</> {$line}");
+                }
+            }
+            $fBuffer = '';
+
+            usleep(500000); // 0.5s
+        }
+
+        // Check exit codes
+        $errors = [];
+        if (!$mProcess->isSuccessful()) {
+            $errors[] = "Male rankings failed (exit {$mProcess->getExitCode()}): " . $mProcess->getErrorOutput();
+        }
+        if (!$fProcess->isSuccessful()) {
+            $errors[] = "Female rankings failed (exit {$fProcess->getExitCode()}): " . $fProcess->getErrorOutput();
+        }
+        if (!empty($errors)) {
+            throw new \Exception(implode("\n", $errors));
+        }
+
+        // Find the two new ScraperRun records created by the sub-processes
+        $runs = ScraperRun::where('id', '>', $startId)
+            ->where('type', ScraperRun::TYPE_RANKINGS)
+            ->get();
+
+        foreach ($runs as $run) {
+            $gender = ($run->parameters['gender'] ?? '') === 'k' ? 'Female' : 'Male';
+            $this->line("  <fg=green>✓</> {$gender} Run #{$run->id}: {$run->items_scraped} items scraped");
+        }
+
+        return [
+            'run_id' => $runs->last()?->id,
+            'runs' => $runs->pluck('id')->toArray(),
+            'items_scraped' => $runs->sum('items_scraped'),
+            'items_failed' => $runs->sum('items_failed'),
+        ];
     }
 
     /**

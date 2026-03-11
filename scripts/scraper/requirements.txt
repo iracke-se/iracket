@@ -1,1 +1,5 @@
+# rankings_popup_scraper.py — still uses Playwright for popup automation
 playwright==1.48.0
+
+# livecenter_scraper.py — uses only Python stdlib (urllib, html.parser)
+# no extra packages needed

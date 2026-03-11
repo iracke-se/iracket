@@ -179,7 +179,7 @@ class RankingsScraper:
         # Navigate to page without rid
         url = f"{self.config.base_url}?gender={self.config.gender}"
         await self.page.goto(url, wait_until="domcontentloaded", timeout=120000)
-        await self.page.wait_for_timeout(2000)  # Wait for dynamic content to load
+        await self.page.wait_for_selector('select[name="rid"]', timeout=10000)
 
         # Find select element and get options
         select = await self.page.query_selector('select[name="rid"]')
@@ -204,7 +204,11 @@ class RankingsScraper:
         """Navigate to rankings page with specific RID"""
         url = self.config.get_rankings_url(rid)
         await self.page.goto(url, wait_until="domcontentloaded", timeout=120000)
-        await self.page.wait_for_timeout(2000)  # Extra wait for stability
+        try:
+            await self.page.wait_for_selector('table tr span.rml_poeng', timeout=30000)
+        except Exception:
+            # No clickable player spans — page may have no rankings for this period/gender
+            log_info("No span.rml_poeng found — rankings table may be empty for this period/gender")
 
     async def extract_players_from_table(self) -> List[Dict]:
         """Extract player data from rankings table"""
@@ -282,12 +286,12 @@ class RankingsScraper:
             timeout=15000
         )
 
-        # Extra wait for content to load
-        await self.page.wait_for_timeout(2000)
+        # Short stabilization wait for AJAX content inside popup to render
+        await self.page.wait_for_timeout(500)
 
     async def scrape_ranking_history(self, player: Dict) -> List[Dict]:
-        """Scrape ranking history from popup"""
-        rankings = []
+        """Scrape ranking for the target month only from popup"""
+        target_date = f"{self.config.year}-{self.config.month.zfill(2)}"
 
         # Get popup content
         popup = await self.page.query_selector("#multipurpose")
@@ -304,6 +308,11 @@ class RankingsScraper:
 
             # Extract data
             date_text = await cells[0].text_content()
+
+            # Only process the row matching the target month
+            if not date_text.strip().startswith(target_date):
+                continue
+
             position_text = await cells[2].text_content()
             points_diff_text = await cells[3].text_content()
 
@@ -319,7 +328,7 @@ class RankingsScraper:
             cleaned_points = points_text.strip().replace(' ', '').replace('.', '').replace(',', '')
             cleaned_position = position_text.strip()
 
-            rankings.append({
+            return [{
                 "profixio_player_id": player['profixio_id'],
                 "player_name": player['name'],
                 "born": player.get('born', ''),
@@ -329,9 +338,10 @@ class RankingsScraper:
                 "position": int(cleaned_position) if cleaned_position else 0,
                 "points_diff": points_diff_text.strip(),
                 "rmld_id": rmld_id
-            })
+            }]
 
-        return rankings
+        # No row found for this month — player has no ranking this month
+        return []
 
     async def scrape_matches_for_month(self, player: Dict) -> List[Dict]:
         """Click on current month points to get matches"""
@@ -361,7 +371,7 @@ class RankingsScraper:
                             if (span) span.click();
                         }}
                     """)
-                    await self.page.wait_for_timeout(2000)
+                    await self.page.wait_for_timeout(700)
                     break
 
         if not points_span:
@@ -369,11 +379,14 @@ class RankingsScraper:
             return []
 
         # Parse match data from updated popup
+        # Use only direct children of the first table to avoid nested table row duplicates
         matches = []
-        rows = await popup.query_selector_all("table tr")
+        seen = set()  # deduplicate by (match_date, opponent, result)
+        table = await popup.query_selector("table")
+        rows = await table.query_selector_all(":scope > tbody > tr, :scope > tr") if table else []
 
         for row in rows:
-            cells = await row.query_selector_all("td")
+            cells = await row.query_selector_all(":scope > td")
             if len(cells) < 5:
                 continue
 
@@ -387,6 +400,12 @@ class RankingsScraper:
             opponent_points = await cells[2].text_content()
             match_points = await cells[3].text_content()
             match_date = await cells[4].text_content()
+
+            # Deduplicate by date + opponent + result
+            key = (match_date.strip(), opponent_name.strip(), result)
+            if key in seen:
+                continue
+            seen.add(key)
 
             # Clean and parse numeric values (handle empty strings)
             cleaned_opp_points = opponent_points.strip().replace('+', '').replace(' ', '').replace('.', '').replace(',', '')
@@ -417,7 +436,7 @@ class RankingsScraper:
                 if (backButton) backButton.click();
             }
         """)
-        await self.page.wait_for_timeout(1000)
+        await self.page.wait_for_timeout(500)
 
     async def close_popup(self):
         """Close popup by clicking close button"""
@@ -428,7 +447,7 @@ class RankingsScraper:
                 if (closeButton) closeButton.click();
             }
         """)
-        await self.page.wait_for_timeout(1000)
+        await self.page.wait_for_timeout(500)
 
 
 def log_info(message: str):

@@ -370,7 +370,10 @@
                                                         $opponentName = $isPlayerMatch ? $match->opponent_name : $match->player_name;
                                                         $myMatchPoints = $isPlayerMatch ? $match->match_points : null;
                                                         $matchDate = $match->match_date ? \Carbon\Carbon::parse($match->match_date) : null;
-                                                        $won = $match->result === 'W' || ($match->winner && $match->winner === $playerFullName);
+                                                        // result is always from the stored player's perspective:
+                                                        // if this record IS the player's own → W means player won
+                                                        // if this record is the opponent's → L means opponent lost = player won
+                                                        $won = $isPlayerMatch ? ($match->result === 'W') : ($match->result === 'L');
                                                         $score = $match->score ?? '-';
                                                         $myPointsChange = null;
                                                     } else {
@@ -378,7 +381,9 @@
                                                         $opponent = $isPlayer1 ? $match->player2 : $match->player1;
                                                         $opponentName = $opponent->name;
                                                         $myPointsChange = $isPlayer1 ? $match->player1_points_change : $match->player2_points_change;
-                                                        $myMatchPoints = $isPlayer1 ? $match->player1_match_points : $match->player2_match_points;
+                                                        // Use DB field if populated, else fall back to cross-referenced scraped value
+                                                        $dbMatchPoints = $isPlayer1 ? $match->player1_match_points : $match->player2_match_points;
+                                                        $myMatchPoints = $dbMatchPoints ?? $match->match_points_scraped ?? null;
                                                         $matchDate = $match->played_at;
                                                         $won = $match->winner_id === $player->id;
                                                         if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {

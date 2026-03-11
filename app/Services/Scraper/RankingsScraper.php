@@ -152,8 +152,12 @@ class RankingsScraper extends BaseScraperService
      */
     protected function saveRankingsToDatabase(array $rankings): void
     {
+        $rows = [];
+        $now = now();
+        $gender = $this->options['gender'] === 'm' ? 'male' : 'female';
+
         foreach ($rankings as $ranking) {
-            DB::table('scraped_rankings')->insert([
+            $rows[] = [
                 'scraper_run_id' => $this->run->id,
                 'profixio_player_id' => $ranking['profixio_player_id'],
                 'ranking_date' => $ranking['ranking_date'],
@@ -165,18 +169,22 @@ class RankingsScraper extends BaseScraperService
                 // Legacy fields for backward compatibility
                 'period' => date('Y-m', strtotime($ranking['ranking_date'])),
                 'division' => '',
-                'gender' => $this->options['gender'] === 'm' ? 'male' : 'female',
+                'gender' => $gender,
                 'position_change' => '',
                 'name' => $ranking['player_name'] ?? '',
                 'born' => $ranking['born'] ?? '',
                 'club' => $ranking['club'] ?? '',
                 'points_change' => $ranking['points_diff'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $this->run->incrementScraped();
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('scraped_rankings')->insert($chunk);
+        }
+
+        $this->run->incrementScraped(count($rows));
     }
 
     /**
@@ -184,8 +192,19 @@ class RankingsScraper extends BaseScraperService
      */
     protected function saveMatchesToDatabase(array $matches): void
     {
+        $rows = [];
+        $now = now();
+
+        $seen = [];
         foreach ($matches as $match) {
-            DB::table('scraped_matches')->insert([
+            // Deduplicate by player + opponent + date — skip if already queued this run
+            $key = $match['profixio_player_id'] . '|' . $match['opponent_name'] . '|' . $match['match_date'];
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $rows[] = [
                 'scraper_run_id' => $this->run->id,
                 'profixio_player_id' => $match['profixio_player_id'],
                 'player_name' => $match['player_name'],
@@ -209,11 +228,15 @@ class RankingsScraper extends BaseScraperService
                 'sets' => null,
                 'played_at' => \Carbon\Carbon::parse($match['match_date'])->format('Y-m-d'),
                 'winner' => $match['result'] === 'W' ? $match['player_name'] : $match['opponent_name'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $this->run->incrementScraped();
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('scraped_matches')->insertOrIgnore($chunk);
+        }
+
+        $this->run->incrementScraped(count($rows));
     }
 }

@@ -38,8 +38,18 @@ class LiveCenterDetailsScraper extends BaseScraperService
         $label = $date ? "date: {$date}" : ($month ? "month: {$month}" : "year: {$year}");
         $this->info("Starting Live Center details scraper for {$label}");
 
+        // Query tracked players using the ranking month (period X contains players who played in month X-1)
+        $playerNames = !$skipPoints ? $this->getTrackedPlayerNames($month, $year) : null;
+
+        // Rankings for month X reflect matches played in month X-1, so scrape Live Center for X-1
+        $liveMonth = $month;
+        if ($month && !$date) {
+            $liveMonth = \Carbon\Carbon::createFromFormat('Y-m', $month)->subMonth()->format('Y-m');
+            $this->info("Live Center date range adjusted: ranking {$month} → play month {$liveMonth}");
+        }
+
         // Call Python scraper script
-        $result = $this->executePythonScraper($date, $limitMatches, $skipPoints, $year, $month);
+        $result = $this->executePythonScraper($date, $limitMatches, $skipPoints, $year, $liveMonth, $playerNames);
 
         if (!$result['success']) {
             throw new \Exception("Python Live Center scraper failed: " . json_encode($result['errors']));
@@ -96,6 +106,9 @@ class LiveCenterDetailsScraper extends BaseScraperService
 
         $this->info("Found " . count($dates) . " distinct dates with matches");
 
+        // Query tracked players once before the loop to limit set-detail API calls
+        $playerNames = !$skipPoints ? $this->getTrackedPlayerNames($month, $year) : null;
+
         $totalScraped = 0;
         $totalGames = 0;
         $totalSets = 0;
@@ -105,7 +118,7 @@ class LiveCenterDetailsScraper extends BaseScraperService
             $this->info("--- Scraping date " . ($index + 1) . "/" . count($dates) . ": {$date} ---");
 
             // Call Python scraper for this specific date
-            $result = $this->executePythonScraper($date, $limitMatches, $skipPoints, null, null);
+            $result = $this->executePythonScraper($date, $limitMatches, $skipPoints, null, null, $playerNames);
 
             if (!$result['success']) {
                 $this->warning("Failed to scrape date {$date}: " . json_encode($result['errors']));
@@ -130,9 +143,39 @@ class LiveCenterDetailsScraper extends BaseScraperService
     }
 
     /**
+     * Query distinct player names from scraped_matches for a given period.
+     * Returns null if no names found (Python will scrape all games).
+     */
+    protected function getTrackedPlayerNames(?string $month, ?string $year): ?array
+    {
+        // Use scraped_month (the ranking period, e.g. '2026-01') not period (the play month, e.g. '2025-12').
+        // Rankings for month X contain matches played in X-1, so scraped_month is the correct filter here.
+        $p1 = DB::table('scraped_matches')
+            ->whereNotNull('player1_name')->where('player1_name', '!=', '')
+            ->when($month, fn($q) => $q->where('scraped_month', 'like', $month . '%'))
+            ->when($year && !$month, fn($q) => $q->where('scraped_month', 'like', $year . '%'))
+            ->distinct()->pluck('player1_name');
+
+        $p2 = DB::table('scraped_matches')
+            ->whereNotNull('player2_name')->where('player2_name', '!=', '')
+            ->when($month, fn($q) => $q->where('scraped_month', 'like', $month . '%'))
+            ->when($year && !$month, fn($q) => $q->where('scraped_month', 'like', $year . '%'))
+            ->distinct()->pluck('player2_name');
+
+        $names = $p1->merge($p2)->unique()->filter()->values()->toArray();
+
+        if (empty($names)) {
+            return null;
+        }
+
+        $this->info("Loaded " . count($names) . " tracked player names from scraped_matches");
+        return $names;
+    }
+
+    /**
      * Execute Python scraper script
      */
-    protected function executePythonScraper(?string $date, ?int $limitMatches, bool $skipPoints, ?string $year = null, ?string $month = null): array
+    protected function executePythonScraper(?string $date, ?int $limitMatches, bool $skipPoints, ?string $year = null, ?string $month = null, ?array $playerNames = null): array
     {
         $pythonBinary = config('scraper.python.binary', 'python3');
         $scriptPath = base_path('scripts/scraper/livecenter_scraper.py');
@@ -164,6 +207,11 @@ class LiveCenterDetailsScraper extends BaseScraperService
 
         if ($skipPoints) {
             $arguments[] = '--skip-points';
+        }
+
+        if (!empty($playerNames)) {
+            $arguments[] = '--player-names';
+            $arguments[] = implode('|', $playerNames);
         }
 
         $env = array_merge(getenv(), [
@@ -246,83 +294,86 @@ class LiveCenterDetailsScraper extends BaseScraperService
                 continue;
             }
 
-            // Insert team match detail
-            $detailId = DB::table('live_match_details')->insertGetId([
-                'scraper_run_id' => $this->run->id,
-                'division' => $teamMatch['division'] ?? null,
-                'team1_name' => $teamMatch['team1_name'],
-                'team2_name' => $teamMatch['team2_name'],
-                'team1_score' => $teamMatch['team1_score'] ?? null,
-                'team2_score' => $teamMatch['team2_score'] ?? null,
-                'played_at' => $matchDate,
-                'profixio_match_id' => $teamMatch['profixio_match_id'] ?? null,
-                'status' => $teamMatch['status'] ?? 'completed',
-                'is_synced' => false,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $this->run->incrementScraped();
-
-            // Insert games for this team match
-            $games = $teamMatch['games'] ?? [];
-            foreach ($games as $game) {
-                $gameId = DB::table('live_match_games')->insertGetId([
-                    'live_match_detail_id' => $detailId,
-                    'game_number' => $game['game_number'],
-                    'game_type' => $game['game_type'] ?? 'singles',
-                    'player1_name' => $game['player1_name'] ?? '',
-                    'player2_name' => $game['player2_name'] ?? '',
-                    'player1_partner_name' => $game['player1_partner_name'] ?? null,
-                    'player2_partner_name' => $game['player2_partner_name'] ?? null,
-                    'player1_sets' => $game['player1_sets'] ?? null,
-                    'player2_sets' => $game['player2_sets'] ?? null,
-                    'winner_name' => $game['winner_name'] ?? null,
-                    'profixio_game_id' => $game['profixio_game_id'] ?? null,
+            // Wrap entire team match save in a transaction — prevents orphaned records if save fails mid-way
+            DB::transaction(function () use ($teamMatch, $matchDate, $matchNum, $totalMatches) {
+                // Insert team match detail
+                $detailId = DB::table('live_match_details')->insertGetId([
+                    'scraper_run_id' => $this->run->id,
+                    'division' => $teamMatch['division'] ?? null,
+                    'team1_name' => $teamMatch['team1_name'],
+                    'team2_name' => $teamMatch['team2_name'],
+                    'team1_score' => $teamMatch['team1_score'] ?? null,
+                    'team2_score' => $teamMatch['team2_score'] ?? null,
+                    'played_at' => $matchDate,
+                    'profixio_match_id' => $teamMatch['profixio_match_id'] ?? null,
+                    'status' => $teamMatch['status'] ?? 'completed',
                     'is_synced' => false,
-                    'synced_match_id' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
 
-                // Insert sets for this game
-                $sets = $game['sets'] ?? [];
-                foreach ($sets as $set) {
-                    $setId = DB::table('live_match_sets')->insertGetId([
-                        'live_match_game_id' => $gameId,
-                        'set_number' => $set['set_number'],
-                        'player1_points' => $set['player1_points'],
-                        'player2_points' => $set['player2_points'],
+                $this->run->incrementScraped();
+
+                // Insert games for this team match
+                $games = $teamMatch['games'] ?? [];
+                foreach ($games as $game) {
+                    $gameId = DB::table('live_match_games')->insertGetId([
+                        'live_match_detail_id' => $detailId,
+                        'game_number' => $game['game_number'],
+                        'game_type' => $game['game_type'] ?? 'singles',
+                        'player1_name' => $game['player1_name'] ?? '',
+                        'player2_name' => $game['player2_name'] ?? '',
+                        'player1_partner_name' => $game['player1_partner_name'] ?? null,
+                        'player2_partner_name' => $game['player2_partner_name'] ?? null,
+                        'player1_sets' => $game['player1_sets'] ?? null,
+                        'player2_sets' => $game['player2_sets'] ?? null,
+                        'winner_name' => $game['winner_name'] ?? null,
+                        'profixio_game_id' => $game['profixio_game_id'] ?? null,
+                        'is_synced' => false,
+                        'synced_match_id' => null,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
 
-                    // Insert points for this set (batch insert for performance)
-                    $points = $set['points'] ?? [];
-                    if (!empty($points)) {
-                        $pointRows = [];
-                        foreach ($points as $point) {
-                            $pointRows[] = [
-                                'live_match_set_id' => $setId,
-                                'point_number' => $point['point_number'],
-                                'player1_points' => $point['player1_points'],
-                                'player2_points' => $point['player2_points'],
-                                'serve' => $point['serve'] ?? null,
-                                'comment' => $point['comment'] ?? null,
-                                'created_at' => now(),
-                                'updated_at' => now(),
-                            ];
-                        }
+                    // Insert sets for this game
+                    $sets = $game['sets'] ?? [];
+                    foreach ($sets as $set) {
+                        $setId = DB::table('live_match_sets')->insertGetId([
+                            'live_match_game_id' => $gameId,
+                            'set_number' => $set['set_number'],
+                            'player1_points' => $set['player1_points'],
+                            'player2_points' => $set['player2_points'],
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
 
-                        // Batch insert points in chunks of 500
-                        foreach (array_chunk($pointRows, 500) as $chunk) {
-                            DB::table('live_match_points')->insert($chunk);
+                        // Insert points for this set (batch insert for performance)
+                        $points = $set['points'] ?? [];
+                        if (!empty($points)) {
+                            $pointRows = [];
+                            foreach ($points as $point) {
+                                $pointRows[] = [
+                                    'live_match_set_id' => $setId,
+                                    'point_number' => $point['point_number'],
+                                    'player1_points' => $point['player1_points'],
+                                    'player2_points' => $point['player2_points'],
+                                    'serve' => $point['serve'] ?? null,
+                                    'comment' => $point['comment'] ?? null,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ];
+                            }
+
+                            // Batch insert points in chunks of 500
+                            foreach (array_chunk($pointRows, 500) as $chunk) {
+                                DB::table('live_match_points')->insert($chunk);
+                            }
                         }
                     }
                 }
-            }
 
-            $this->info("[{$matchNum}/{$totalMatches}] Saved: {$teamMatch['team1_name']} vs {$teamMatch['team2_name']} ({$teamMatch['team1_score']}-{$teamMatch['team2_score']}) with " . count($games) . " games");
+                $this->info("[{$matchNum}/{$totalMatches}] Saved: {$teamMatch['team1_name']} vs {$teamMatch['team2_name']} ({$teamMatch['team1_score']}-{$teamMatch['team2_score']}) with " . count($games) . " games");
+            });
         }
     }
 }

@@ -16,11 +16,16 @@ class MatchSyncService
 {
     protected array $stats = [
         'created' => 0,
+        'updated' => 0,
         'comments_migrated' => 0,
         'manual_matches_replaced' => 0,
         'manual_matches_marked_unofficial' => 0,
         'errors' => 0,
     ];
+
+    // Performance cache: avoid N+1 DB queries during sync
+    protected array $usersCache = [];   // keyed by "firstname|lastname" → User
+    protected array $emailsCache = [];  // keyed by email → true
 
     /**
      * Sync matches from scraped data
@@ -41,6 +46,17 @@ class MatchSyncService
         if ($run) {
             $run->log('info', "Starting match sync: {$totalCount} matches to process");
         }
+
+        // Pre-load all users into memory to avoid N+1 queries
+        User::select(['id', 'first_name', 'last_name', 'email'])->chunk(1000, function ($users) {
+            foreach ($users as $user) {
+                $key = strtolower($user->first_name) . '|' . strtolower($user->last_name);
+                if (!isset($this->usersCache[$key])) {
+                    $this->usersCache[$key] = $user;
+                }
+                $this->emailsCache[$user->email] = true;
+            }
+        });
 
         $processed = 0;
         $batchSize = 100;
@@ -92,6 +108,40 @@ class MatchSyncService
             return;
         }
 
+        // Check if a scraped GameMatch already exists for same players + date
+        // (happens when both players were scraped independently from the rankings popup)
+        $existingScrapedMatch = GameMatch::where('source', 'scraped')
+            ->whereDate('played_at', Carbon::parse($scrapedMatch->played_at)->format('Y-m-d'))
+            ->where(function ($q) use ($players) {
+                $q->where(function ($q2) use ($players) {
+                    $q2->where('player1_id', $players['player1_id'])
+                       ->where('player2_id', $players['player2_id']);
+                })->orWhere(function ($q2) use ($players) {
+                    $q2->where('player1_id', $players['player2_id'])
+                       ->where('player2_id', $players['player1_id']);
+                });
+            })
+            ->first();
+
+        if ($existingScrapedMatch) {
+            // Match already created from the other player's scrape — just link and enrich
+            $isPlayer1 = $existingScrapedMatch->player1_id === $players['player1_id'];
+            $matchPoints = $scrapedMatch->match_points;
+            $updateData = $isPlayer1
+                ? ['player1_match_points' => $matchPoints]
+                : ['player2_match_points' => $matchPoints];
+
+            $existingScrapedMatch->update($updateData);
+
+            $scrapedMatch->update([
+                'is_synced' => true,
+                'synced_match_id' => $existingScrapedMatch->id,
+            ]);
+
+            $this->stats['updated']++;
+            return;
+        }
+
         // Check if manual match exists for same players on same date
         $existingManualMatch = $this->findMatchingManualMatch(
             $players['player1_id'],
@@ -102,7 +152,7 @@ class MatchSyncService
         // Parse score to get player1_sets and player2_sets
         $sets = $this->parseScore($scrapedMatch->score);
 
-        // Always create official scraped match
+        // Create official scraped match, storing ranking points for player1 (the scraped player)
         $officialMatch = GameMatch::create([
             'source' => 'scraped',
             'player1_id' => $players['player1_id'],
@@ -110,8 +160,9 @@ class MatchSyncService
             'winner_id' => $players['winner_id'],
             'player1_sets' => $sets['player1_sets'],
             'player2_sets' => $sets['player2_sets'],
+            'player1_match_points' => $scrapedMatch->match_points,
             'played_at' => $scrapedMatch->played_at,
-            'created_by' => null, // System-created
+            'created_by' => null,
         ]);
 
         // If manual match exists, migrate comments and soft delete it
@@ -255,7 +306,7 @@ class MatchSyncService
     }
 
     /**
-     * Find or create user by full name
+     * Find or create user by full name (uses in-memory cache to avoid N+1)
      */
     protected function findOrCreateUserByName(?string $fullName): ?User
     {
@@ -269,6 +320,13 @@ class MatchSyncService
             return null;
         }
 
+        $key = strtolower($nameParts['first_name']) . '|' . strtolower($nameParts['last_name']);
+
+        if (isset($this->usersCache[$key])) {
+            return $this->usersCache[$key];
+        }
+
+        // Not in cache — check DB (could have been created by a concurrent sync or before cache init)
         $user = User::where('first_name', $nameParts['first_name'])
             ->where('last_name', $nameParts['last_name'])
             ->first();
@@ -281,13 +339,16 @@ class MatchSyncService
                 'email' => $email,
                 'password' => Hash::make(Str::random(32)),
             ]);
+            $this->emailsCache[$email] = true;
         }
+
+        $this->usersCache[$key] = $user;
 
         return $user;
     }
 
     /**
-     * Generate a unique email for a new user
+     * Generate a unique email for a new user (uses in-memory cache to avoid N+1)
      */
     protected function generateEmail(string $firstName, string $lastName): string
     {
@@ -295,7 +356,7 @@ class MatchSyncService
         $email = $baseEmail;
         $counter = 1;
 
-        while (User::where('email', $email)->exists()) {
+        while (isset($this->emailsCache[$email])) {
             $email = Str::slug($firstName . '.' . $lastName . '.' . $counter) . '@iracket.local';
             $counter++;
         }
@@ -341,11 +402,15 @@ class MatchSyncService
     {
         $this->stats = [
             'created' => 0,
+            'updated' => 0,
             'comments_migrated' => 0,
             'manual_matches_replaced' => 0,
             'manual_matches_marked_unofficial' => 0,
             'errors' => 0,
         ];
+
+        $this->usersCache = [];
+        $this->emailsCache = [];
     }
 
     public function getStats(): array

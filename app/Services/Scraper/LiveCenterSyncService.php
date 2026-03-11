@@ -47,7 +47,7 @@ class LiveCenterSyncService
         $processed = 0;
         $batchSize = 100;
 
-        $query->with('detail')->chunk($batchSize, function ($games) use (&$processed, $totalCount, $run) {
+        $query->with('detail')->chunkById($batchSize, function ($games) use (&$processed, $totalCount, $run) {
             foreach ($games as $game) {
                 try {
                     $this->syncGame($game);
@@ -84,6 +84,12 @@ class LiveCenterSyncService
 
         if (!$player1 || !$player2) {
             // Skip if names are empty/unparseable
+            $game->update(['is_synced' => true]);
+            $this->stats['skipped']++;
+            return;
+        }
+
+        if (!$game->detail) {
             $game->update(['is_synced' => true]);
             $this->stats['skipped']++;
             return;
