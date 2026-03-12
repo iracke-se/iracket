@@ -18,6 +18,7 @@ return [
     'edit' => 'Edit',
     'about_me' => 'About Me',
     'club' => 'Club',
+    'district' => 'District',
     'not_set' => 'Not set',
     'age' => 'Age',
     'my_ranking' => 'My Ranking',

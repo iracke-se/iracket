@@ -4,6 +4,7 @@ namespace App\Livewire\User\Bubbler;
 
 use App\Models\Club;
 use App\Models\ClubTransition;
+use App\Models\District;
 use App\Models\MonthlyRanking;
 use App\Models\User;
 use Carbon\Carbon;
@@ -43,8 +44,8 @@ class Index extends Component
             $this->activeTab = 'ladies';
         }
 
-        if ($user && $user->is_connected && ! empty($user->district)) {
-            $this->filterDistrict = $user->district;
+        if ($user && $user->is_connected && $user->district_id) {
+            $this->filterDistrict = (string) $user->district_id;
         }
 
         $latestRanking = MonthlyRanking::orderBy('year', 'desc')
@@ -119,14 +120,9 @@ class Index extends Component
         return $months ?: range(1, 12);
     }
 
-    public function getAvailableDistrictsProperty(): array
+    public function getAvailableDistrictsProperty()
     {
-        return User::whereNotNull('district')
-            ->where('district', '!=', '')
-            ->distinct()
-            ->orderBy('district')
-            ->pluck('district')
-            ->toArray();
+        return District::orderBy('name')->get(['id', 'name']);
     }
 
     public function getActiveFilterCountProperty(): int
@@ -174,7 +170,7 @@ class Index extends Component
             $q->where('gender', $gender);
 
             if ($this->filterDistrict !== '') {
-                $q->where('district', $this->filterDistrict);
+                $q->where('district_id', (int) $this->filterDistrict);
             }
 
             if ($this->filterAgeFrom !== '' || $this->filterAgeTo !== '') {

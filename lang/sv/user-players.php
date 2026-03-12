@@ -20,6 +20,8 @@ return [
     'name_desc' => 'Namn Ö-A',
     'place' => 'Plats',
     'all_of_sweden' => 'Hela Sverige',
+    'district' => 'Distrikt',
+    'all_districts' => 'Alla distrikt',
     'rankings' => 'Rankning',
     'from' => 'Från',
     'to' => 'Till',

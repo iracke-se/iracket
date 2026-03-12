@@ -20,6 +20,11 @@ class Index extends Component
 
     public function switchLanguage(string $locale)
     {
+        $user = auth()->user();
+        if ($user) {
+            $user->update(['locale' => $locale]);
+        }
+
         session(['locale' => $locale]);
         $this->locale = $locale;
         app()->setLocale($locale);

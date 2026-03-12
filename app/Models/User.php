@@ -74,6 +74,7 @@ class User extends Authenticatable implements HasLocalePreference
         'verification_code',
         'verification_code_expires_at',
         'club_id',
+        'district_id',
         'visible_in_players',
         'fcm_token',
         'device_type',
@@ -199,6 +200,14 @@ class User extends Authenticatable implements HasLocalePreference
     public function club(): BelongsTo
     {
         return $this->belongsTo(Club::class);
+    }
+
+    /**
+     * Get the district the user belongs to
+     */
+    public function district(): BelongsTo
+    {
+        return $this->belongsTo(District::class);
     }
 
     /**

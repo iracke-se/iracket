@@ -41,6 +41,7 @@ class ScraperRun extends Model
     const TYPE_SERIES_MATCHES = 'series_matches';
     const TYPE_LIVE_CENTER = 'live_center';
     const TYPE_FULL_SCRAPE = 'full_scrape';
+    const TYPE_DISTRICTS = 'districts';
 
     public function logs(): HasMany
     {

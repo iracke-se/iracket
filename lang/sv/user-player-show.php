@@ -18,6 +18,7 @@ return [
     'edit' => 'Redigera',
     'about_me' => 'Om mig',
     'club' => 'Klubb',
+    'district' => 'Distrikt',
     'not_set' => 'Ej angivet',
     'age' => 'Ålder',
     'my_ranking' => 'Min rankning',

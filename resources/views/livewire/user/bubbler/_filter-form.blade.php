@@ -37,7 +37,7 @@
                 class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent">
                 <option value="">{{ __('user-bubbler.all_districts') }}</option>
                 @foreach($availableDistricts as $district)
-                    <option value="{{ $district }}">{{ $district }}</option>
+                    <option value="{{ $district->id }}">{{ $district->name }}</option>
                 @endforeach
             </select>
         </div>

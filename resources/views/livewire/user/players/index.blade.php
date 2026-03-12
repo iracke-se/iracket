@@ -68,22 +68,17 @@
                 </select>
             </div>
 
-            <!-- Location -->
+            <!-- District -->
             <div>
-                <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.place') }}</label>
+                <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.district') }}</label>
                 <select
-                    wire:model.live="location"
-                    class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    wire:model.live="filterDistrict"
+                    class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 >
-                    <option value="">{{ __('user-players.all_of_sweden') }}</option>
-                    <option value="stockholm">Stockholm</option>
-                    <option value="gothenburg">Gothenburg</option>
-                    <option value="malmo">Malmö</option>
-                    <option value="uppsala">Uppsala</option>
-                    <option value="vasteras">Västerås</option>
-                    <option value="orebro">Örebro</option>
-                    <option value="linkoping">Linköping</option>
-                    <option value="helsingborg">Helsingborg</option>
+                    <option value="">{{ __('user-players.all_districts') }}</option>
+                    @foreach($availableDistricts as $district)
+                        <option value="{{ $district->id }}">{{ $district->name }}</option>
+                    @endforeach
                 </select>
             </div>
 
@@ -217,6 +212,9 @@
                                         </span>
                                     @endif
                                 </div>
+                            @endif
+                            @if($player->district)
+                                <div class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{{ $player->district->name }}</div>
                             @endif
                             <div class="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
                                 @if($player->age)

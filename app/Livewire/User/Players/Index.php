@@ -2,6 +2,7 @@
 
 namespace App\Livewire\User\Players;
 
+use App\Models\District;
 use App\Models\MonthlyRanking;
 use App\Models\User;
 use App\Traits\HasSearchableQueries;
@@ -18,7 +19,7 @@ class Index extends Component
 
     // Advanced filters
     public string $sortBy = 'points_desc';
-    public string $location = '';
+    public string $filterDistrict = '';
     public ?int $rankingFrom = null;
     public ?int $rankingTo = null;
     public ?int $ageFrom = null;
@@ -26,8 +27,9 @@ class Index extends Component
     public ?string $selectedMonth = null;
 
     protected $queryString = [
-        'search' => ['except' => ''],
-        'gender' => ['except' => ''],
+        'search'         => ['except' => ''],
+        'gender'         => ['except' => ''],
+        'filterDistrict' => ['except' => ''],
     ];
 
     public function mount()
@@ -53,12 +55,12 @@ class Index extends Component
 
     public function clearFilters()
     {
-        $this->sortBy = 'points_desc';
-        $this->location = '';
-        $this->rankingFrom = null;
-        $this->rankingTo = null;
-        $this->ageFrom = null;
-        $this->ageTo = null;
+        $this->sortBy        = 'points_desc';
+        $this->filterDistrict = '';
+        $this->rankingFrom   = null;
+        $this->rankingTo     = null;
+        $this->ageFrom       = null;
+        $this->ageTo         = null;
         $this->selectedMonth = null;
     }
 
@@ -83,6 +85,7 @@ class Index extends Component
 
         $query = User::query()
             ->where('visible_in_players', true)
+            ->with('district')
             ->with(['club.monthlyRankings' => function ($q) use ($selectedYear, $selectedMonth) {
                 if ($selectedYear && $selectedMonth) {
                     $q->where('year', $selectedYear)
@@ -132,6 +135,11 @@ class Index extends Component
         // Filter by gender
         if ($this->gender) {
             $query->where('gender', $this->gender);
+        }
+
+        // Filter by district
+        if ($this->filterDistrict !== '') {
+            $query->where('district_id', (int) $this->filterDistrict);
         }
 
         // Filter by age range
@@ -289,8 +297,9 @@ class Index extends Component
         }
 
         return view('livewire.user.players.index', [
-            'players' => $players,
+            'players'          => $players,
             'rankingPositions' => $rankingPositions,
+            'availableDistricts' => District::orderBy('name')->get(['id', 'name']),
         ])->layout('components.layouts.app');
     }
 }

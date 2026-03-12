@@ -52,6 +52,15 @@
                 </div>
 
                 <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
+                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.district') }}</span>
+                    @if($player->district)
+                        <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $player->district->name }}</span>
+                    @else
+                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
+                    @endif
+                </div>
+
+                <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
                     <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.age') }}</span>
                     @php
                         $displayAge = $player->birth_year
@@ -298,6 +307,10 @@
                     </a>
                 @endif
 
+                @if($player->district)
+                    <span class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{{ $player->district->name }}</span>
+                @endif
+
                 <div class="flex items-center gap-4 mt-3 text-sm text-zinc-500 dark:text-zinc-400">
                     @if($player->age)
                         <span>{{ $player->age }} {{ __('user-player-show.years') }}</span>
@@ -360,7 +373,7 @@
                                     @if($expandedRankingMatches->isEmpty())
                                         <p class="text-sm text-center text-zinc-500 dark:text-zinc-400 py-4">{{ __('user-player-show.no_matches_for_month') }}</p>
                                     @else
-                                        <div class="space-y-2">
+                                        <div class="space-y-4">
                                             @foreach($expandedRankingMatches as $match)
                                                 @php
                                                     $isScrapedMatch = $match instanceof \App\Models\Scraper\ScrapedMatch;
@@ -370,88 +383,146 @@
                                                         $opponentName = $isPlayerMatch ? $match->opponent_name : $match->player_name;
                                                         $myMatchPoints = $isPlayerMatch ? $match->match_points : null;
                                                         $matchDate = $match->match_date ? \Carbon\Carbon::parse($match->match_date) : null;
-                                                        // result is always from the stored player's perspective:
-                                                        // if this record IS the player's own → W means player won
-                                                        // if this record is the opponent's → L means opponent lost = player won
                                                         $won = $isPlayerMatch ? ($match->result === 'W') : ($match->result === 'L');
-                                                        $score = $match->score ?? '-';
                                                         $myPointsChange = null;
+                                                        $opponent = null;
+                                                        $sets = collect();
+                                                        $playerSets = null;
+                                                        $opponentSets = null;
                                                     } else {
                                                         $isPlayer1 = $match->player1_id === $player->id;
                                                         $opponent = $isPlayer1 ? $match->player2 : $match->player1;
-                                                        $opponentName = $opponent->name;
+                                                        $opponentName = $opponent?->name ?? '—';
                                                         $myPointsChange = $isPlayer1 ? $match->player1_points_change : $match->player2_points_change;
-                                                        // Use DB field if populated, else fall back to cross-referenced scraped value
-                                                        $dbMatchPoints = $isPlayer1 ? $match->player1_match_points : $match->player2_match_points;
+                                                        $oppPointsChange = $isPlayer1 ? $match->player2_points_change : $match->player1_points_change;
+                                                        $dbMatchPoints = $isPlayer1 ? ($match->player1_match_points ?? null) : ($match->player2_match_points ?? null);
                                                         $myMatchPoints = $dbMatchPoints ?? $match->match_points_scraped ?? null;
                                                         $matchDate = $match->played_at;
                                                         $won = $match->winner_id === $player->id;
+                                                        $sets = collect();
                                                         if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
+                                                            $sets = $match->liveMatchGame->sets->sortBy('set_number');
                                                             $mySetsWon = 0; $opponentSetsWon = 0;
-                                                            foreach ($match->liveMatchGame->sets as $set) {
+                                                            foreach ($sets as $set) {
                                                                 $mySetPoints = $isPlayer1 ? $set->player1_points : $set->player2_points;
                                                                 $oppSetPoints = $isPlayer1 ? $set->player2_points : $set->player1_points;
                                                                 if ($mySetPoints > $oppSetPoints) { $mySetsWon++; } else { $opponentSetsWon++; }
                                                             }
-                                                            $mySets = $mySetsWon; $opponentSets = $opponentSetsWon;
+                                                            $playerSets = $mySetsWon;
+                                                            $opponentSets = $opponentSetsWon;
                                                         } else {
-                                                            $mySets = $isPlayer1 ? $match->player1_sets : $match->player2_sets;
+                                                            $playerSets = $isPlayer1 ? $match->player1_sets : $match->player2_sets;
                                                             $opponentSets = $isPlayer1 ? $match->player2_sets : $match->player1_sets;
                                                         }
-                                                        $score = "$mySets - $opponentSets";
                                                     }
+                                                    $pointsToShow = $myMatchPoints ?? $myPointsChange ?? null;
+                                                    $oppPointsToShow = isset($oppPointsChange) ? $oppPointsChange : ($pointsToShow !== null ? -$pointsToShow : null);
                                                 @endphp
-                                                <div class="block p-3 bg-white dark:bg-zinc-800 rounded-lg">
-                                                    <div class="flex items-center justify-between mb-2">
-                                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                                            {{ $matchDate ? $matchDate->format('d M Y') : 'N/A' }}
-                                                        </span>
-                                                        @php $pointsToShow = $myMatchPoints ?? $myPointsChange ?? null; @endphp
-                                                        @if($pointsToShow !== null)
-                                                            <span class="text-xs font-bold px-2.5 py-1 rounded {{ $pointsToShow > 0 ? 'bg-green-500/20 text-green-600 dark:text-green-400' : ($pointsToShow < 0 ? 'bg-red-500/20 text-red-600 dark:text-red-400' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400') }}">
-                                                                {{ $pointsToShow > 0 ? '+' : '' }}{{ $pointsToShow }} {{ __('user-player-show.pts') }}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                    <div class="flex items-center justify-between mb-2">
-                                                        <div class="flex items-center gap-2">
-                                                            <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-                                                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ substr($opponentName, 0, 2) }}</span>
+
+                                                <div class="bg-white dark:bg-zinc-800 rounded-xl overflow-hidden">
+
+                                                    {{-- Large score --}}
+                                                    <div class="text-center pt-3 pb-1">
+                                                        @if(!$isScrapedMatch && $playerSets !== null && ($playerSets + $opponentSets) > 0)
+                                                            <div class="text-4xl font-bold text-zinc-900 dark:text-white">
+                                                                {{ $playerSets }} - {{ $opponentSets }}
                                                             </div>
-                                                            <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ $opponentName }}</span>
-                                                        </div>
-                                                        @php $hasSetData = !$isScrapedMatch && $score !== '0 - 0' && $score !== '-'; @endphp
-                                                        @if($hasSetData)
-                                                            <span class="text-sm font-bold {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">
-                                                                {{ $score }} <span class="text-xs ml-1">{{ $won ? 'W' : 'L' }}</span>
-                                                            </span>
                                                         @else
-                                                            <span class="text-lg font-bold px-3 py-1 rounded {{ $won ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-red-500/20 text-red-600 dark:text-red-400' }}">
+                                                            <span class="inline-block px-6 py-2 rounded-lg text-3xl font-bold {{ $won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">
                                                                 {{ $won ? 'W' : 'L' }}
                                                             </span>
                                                         @endif
                                                     </div>
 
-                                                    @if(!$isScrapedMatch && $match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty())
-                                                        <div class="flex items-center gap-1.5 mb-2 flex-wrap">
-                                                            @foreach($match->liveMatchGame->sets->sortBy('set_number') as $set)
-                                                                @php
-                                                                    $isPlayer1 = $match->player1_id === $player->id;
-                                                                    $myPoints = $isPlayer1 ? $set->player1_points : $set->player2_points;
-                                                                    $opponentPoints = $isPlayer1 ? $set->player2_points : $set->player1_points;
-                                                                    $wonSet = $myPoints > $opponentPoints;
-                                                                @endphp
-                                                                <div class="px-2 py-1 rounded text-xs {{ $wonSet ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400' }}">
-                                                                    <span class="font-medium">{{ $myPoints }}</span>
-                                                                    <span class="opacity-50">-</span>
-                                                                    <span class="font-medium">{{ $opponentPoints }}</span>
-                                                                </div>
-                                                            @endforeach
+                                                    {{-- Date --}}
+                                                    <div class="text-center pb-2">
+                                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">
+                                                            {{ $matchDate ? $matchDate->format('d M Y') : 'N/A' }}
+                                                        </span>
+                                                    </div>
+
+                                                    {{-- Player vs Opponent --}}
+                                                    <div class="flex items-center justify-between px-6 pb-4">
+                                                        {{-- Player (left) --}}
+                                                        <div class="flex-1 flex flex-col items-center text-center">
+                                                            <div class="relative mb-2">
+                                                                @if($player->profile_picture)
+                                                                    <img src="{{ Storage::url($player->profile_picture) }}" alt="{{ $player->name }}" class="w-16 h-16 rounded-full object-cover">
+                                                                @else
+                                                                    <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                                                        <span class="text-xl font-semibold text-zinc-600 dark:text-zinc-300">{{ $player->initials() }}</span>
+                                                                    </div>
+                                                                @endif
+                                                                @if($pointsToShow !== null)
+                                                                    <span class="absolute -top-1 -right-1 text-xs font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-zinc-800 {{ $pointsToShow > 0 ? 'bg-green-500 text-white' : ($pointsToShow < 0 ? 'bg-red-500 text-white' : 'bg-zinc-400 text-white') }}">
+                                                                        {{ $pointsToShow > 0 ? '+' : '' }}{{ $pointsToShow }}
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+                                                            <a href="{{ route('players.show', $player) }}" wire:navigate class="text-xs font-semibold text-zinc-900 dark:text-white hover:text-accent leading-tight">{{ $player->name }}</a>
+                                                            @if($player->club)
+                                                                <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $player->club->name }}</span>
+                                                            @endif
+                                                        </div>
+
+                                                        {{-- VS --}}
+                                                        <div class="px-3">
+                                                            <span class="text-sm font-medium text-zinc-400 dark:text-zinc-500">VS</span>
+                                                        </div>
+
+                                                        {{-- Opponent (right) --}}
+                                                        <div class="flex-1 flex flex-col items-center text-center">
+                                                            <div class="relative mb-2">
+                                                                @if(!$isScrapedMatch && $opponent?->profile_picture)
+                                                                    <img src="{{ Storage::url($opponent->profile_picture) }}" alt="{{ $opponentName }}" class="w-16 h-16 rounded-full object-cover">
+                                                                @else
+                                                                    <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                                                        <span class="text-xl font-semibold text-zinc-600 dark:text-zinc-300">{{ substr($opponentName, 0, 2) }}</span>
+                                                                    </div>
+                                                                @endif
+                                                                @if($oppPointsToShow !== null)
+                                                                    <span class="absolute -top-1 -right-1 text-xs font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-zinc-800 {{ $oppPointsToShow > 0 ? 'bg-green-500 text-white' : ($oppPointsToShow < 0 ? 'bg-red-500 text-white' : 'bg-zinc-400 text-white') }}">
+                                                                        {{ $oppPointsToShow > 0 ? '+' : '' }}{{ $oppPointsToShow }}
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+                                                            @if(!$isScrapedMatch && $opponent)
+                                                                <a href="{{ route('players.show', $opponent) }}" wire:navigate class="text-xs font-semibold text-zinc-900 dark:text-white hover:text-accent leading-tight">{{ $opponentName }}</a>
+                                                                @if($opponent->club)
+                                                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $opponent->club->name }}</span>
+                                                                @endif
+                                                            @else
+                                                                <span class="text-xs font-semibold text-zinc-900 dark:text-white leading-tight">{{ $opponentName }}</span>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- Set scores --}}
+                                                    @if(!$isScrapedMatch && $sets->isNotEmpty())
+                                                        <div class="border-t border-zinc-100 dark:border-zinc-700 px-4 py-3">
+                                                            <div class="flex items-center justify-center gap-2 flex-wrap">
+                                                                @foreach($sets as $set)
+                                                                    @php
+                                                                        $mySetPts  = $isPlayer1 ? $set->player1_points : $set->player2_points;
+                                                                        $oppSetPts = $isPlayer1 ? $set->player2_points : $set->player1_points;
+                                                                        $wonSet    = $mySetPts > $oppSetPts;
+                                                                    @endphp
+                                                                    <div class="text-center">
+                                                                        <div class="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Set {{ $set->set_number }}</div>
+                                                                        <div class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-700">
+                                                                            <span class="{{ $wonSet ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $mySetPts }}</span>
+                                                                            <span class="text-zinc-400 mx-0.5">-</span>
+                                                                            <span class="{{ !$wonSet ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $oppSetPts }}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                @endforeach
+                                                            </div>
                                                         </div>
                                                     @endif
 
+                                                    {{-- View Full Match --}}
                                                     @if(!$isScrapedMatch)
-                                                        <div class="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700">
+                                                        <div class="border-t border-zinc-100 dark:border-zinc-700 px-4 py-2.5">
                                                             <a href="{{ route('matches.show', $match) }}" wire:navigate class="text-xs text-accent hover:underline flex items-center gap-1 font-medium">
                                                                 <span>{{ __('user-player-show.view_full_match') }}</span>
                                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
