@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class AdminUserSeeder extends Seeder
 {
@@ -21,6 +22,9 @@ class AdminUserSeeder extends Seeder
                 'terms_accepted_at' => now(),
             ]
         );
+
+        Role::firstOrCreate(['name' => 'Admin']);
+        Role::firstOrCreate(['name' => 'Manager']);
 
         $admin->assignRole('Admin');
     }
