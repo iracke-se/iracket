@@ -145,9 +145,8 @@ class Show extends Component
 
         // Data for own profile
         $topMonitoredPlayers = collect();
-        $monitoredPlayersMatches = collect();
-
         $playerLatestMatches = collect();
+
         if ($isOwnProfile) {
             // Get the player's own last 10 matches
             $playerLatestMatches = GameMatch::where(function ($query) {
@@ -179,29 +178,6 @@ class Show extends Component
                     return $player->monthlyRankings->first()?->points ?? 0;
                 })
                 ->take(10);
-
-            // Get last 10 matches from monitored players
-            $monitoredPlayerIds = auth()->user()->monitoring()->pluck('users.id');
-
-            if ($monitoredPlayerIds->isNotEmpty()) {
-                $monitoredPlayersMatches = GameMatch::query()
-                    ->where(function ($query) use ($monitoredPlayerIds) {
-                        $query->whereIn('player1_id', $monitoredPlayerIds)
-                              ->orWhereIn('player2_id', $monitoredPlayerIds);
-                    })
-                    ->with([
-                        'player1',
-                        'player2',
-                        'winner',
-                        'liveMatchGame.sets' => function ($query) {
-                            $query->orderBy('set_number');
-                        },
-                        'liveMatchGame.detail'
-                    ])
-                    ->orderBy('played_at', 'desc')
-                    ->take(10)
-                    ->get();
-            }
         }
 
         // Get player's ranking position in their gender category
@@ -234,7 +210,6 @@ class Show extends Component
             'isMonitoring' => $isMonitoring,
             'topMonitoredPlayers' => $topMonitoredPlayers,
             'playerLatestMatches' => $playerLatestMatches,
-            'monitoredPlayersMatches' => $monitoredPlayersMatches,
             'rankingPosition' => $rankingPosition,
             'rankingCategory' => $rankingCategory,
             'clubTransitions' => $clubTransitions,

@@ -16,6 +16,9 @@ return [
     'match_notes' => 'Matchanteckningar',
     'status' => 'Status',
     'edit_match' => 'Redigera match',
+    'points_change' => 'Poängförändring',
+    'delete_match' => 'Ta bort match',
+    'delete_confirm' => 'Är du säker på att du vill ta bort denna match? Detta går inte att ångra.',
 
     // Form Page
     'date' => 'Datum',

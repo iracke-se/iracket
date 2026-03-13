@@ -176,7 +176,8 @@
                     @php
                         $isPlayer1 = $match->player1_id === $player->id;
                         $opponent = $isPlayer1 ? $match->player2 : $match->player1;
-                        $won = $match->winner_id === $player->id;
+                        $myPointsChange = $isPlayer1 ? $match->player1_points_change : $match->player2_points_change;
+                        $oppPointsChange = $isPlayer1 ? $match->player2_points_change : $match->player1_points_change;
                         $p1Sets = 0; $p2Sets = 0;
                         if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
                             foreach ($match->liveMatchGame->sets as $set) {
@@ -188,11 +189,17 @@
                         }
                         $mySets = $isPlayer1 ? $p1Sets : $p2Sets;
                         $oppSets = $isPlayer1 ? $p2Sets : $p1Sets;
+                        $hasScore = ($mySets + $oppSets) > 0;
+                        $won = $match->winner_id === $player->id;
                     @endphp
                     <a href="{{ route('matches.show', $match) }}" wire:navigate
-                       class="flex-shrink-0 w-40 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-3 flex flex-col items-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                       class="flex-shrink-0 w-44 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-3 flex flex-col items-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                        <!-- Date -->
+                        <p class="text-xs text-zinc-400 dark:text-zinc-500">{{ $match->played_at ? \Carbon\Carbon::parse($match->played_at)->format('d M Y') : '' }}</p>
+                        <!-- Avatars + Score -->
                         <div class="flex items-center justify-center gap-2 w-full">
-                            <div class="flex flex-col items-center gap-1">
+                            <!-- Me -->
+                            <div class="relative flex-shrink-0">
                                 @if($player->profile_picture)
                                     <img src="{{ Storage::url($player->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
                                 @else
@@ -200,10 +207,20 @@
                                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $player->initials() }}</span>
                                     </div>
                                 @endif
-                                <span class="text-xs font-bold {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">{{ $won ? 'W' : 'L' }}</span>
+                                @if($myPointsChange !== null)
+                                    <span class="absolute -top-1 -right-1 text-xs font-bold px-1 py-0.5 rounded-full text-white {{ $myPointsChange >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
+                                        {{ $myPointsChange >= 0 ? '+' : '' }}{{ $myPointsChange }}
+                                    </span>
+                                @endif
                             </div>
-                            <span class="text-base font-bold text-zinc-900 dark:text-white">{{ $mySets }}-{{ $oppSets }}</span>
-                            <div class="flex flex-col items-center gap-1">
+                            <!-- Score -->
+                            @if($hasScore)
+                                <span class="text-base font-bold text-zinc-900 dark:text-white">{{ $mySets }} - {{ $oppSets }}</span>
+                            @else
+                                <span class="text-base font-bold {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">{{ $won ? 'W' : 'L' }}</span>
+                            @endif
+                            <!-- Opponent -->
+                            <div class="relative flex-shrink-0">
                                 @if($opponent?->profile_picture)
                                     <img src="{{ Storage::url($opponent->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
                                 @else
@@ -211,81 +228,17 @@
                                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $opponent?->initials() ?? '?' }}</span>
                                     </div>
                                 @endif
-                                <span class="text-xs text-zinc-400 dark:text-zinc-500">vs</span>
-                            </div>
-                        </div>
-                        <div class="text-center w-full">
-                            <p class="text-xs font-medium text-zinc-900 dark:text-white truncate">{{ $opponent?->name ?? '—' }}</p>
-                            <p class="text-xs text-zinc-400 dark:text-zinc-500">{{ $match->played_at ? \Carbon\Carbon::parse($match->played_at)->format('d M') : '' }}</p>
-                        </div>
-                    </a>
-                @endforeach
-            </div>
-        </div>
-        @endif
-
-        <!-- Latest Matches from Monitored Players -->
-        @if($monitoredPlayersMatches->isNotEmpty())
-        <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.monitored_latest_matches') }}</p>
-            <div class="flex gap-3 overflow-x-auto px-4 pb-2" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
-                @foreach($monitoredPlayersMatches as $match)
-                    @php
-                        $p1 = $match->player1;
-                        $p2 = $match->player2;
-                        $p1Sets = $match->player1_sets ?? 0;
-                        $p2Sets = $match->player2_sets ?? 0;
-                        $p1Change = $match->player1_points_change;
-                        $p2Change = $match->player2_points_change;
-                        if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
-                            $s1 = 0; $s2 = 0;
-                            foreach ($match->liveMatchGame->sets as $set) {
-                                if ($set->player1_points > $set->player2_points) { $s1++; } else { $s2++; }
-                            }
-                            $p1Sets = $s1; $p2Sets = $s2;
-                        }
-                    @endphp
-                    <a href="{{ route('matches.show', $match) }}" wire:navigate
-                       class="flex-shrink-0 w-40 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-3 flex flex-col items-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-                        <!-- Players row -->
-                        <div class="flex items-center justify-center gap-2 w-full">
-                            <!-- Player 1 -->
-                            <div class="relative flex flex-col items-center gap-1">
-                                @if($p1 && $p1->profile_picture)
-                                    <img src="{{ Storage::url($p1->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
-                                @else
-                                    <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-                                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $p1?->initials() ?? '?' }}</span>
-                                    </div>
-                                @endif
-                                @if($p1Change !== null)
-                                    <span class="text-xs font-bold px-1.5 py-0.5 rounded-full {{ $p1Change >= 0 ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-red-500/20 text-red-600 dark:text-red-400' }}">
-                                        {{ $p1Change >= 0 ? '+' : '' }}{{ $p1Change }}
-                                    </span>
-                                @endif
-                            </div>
-                            <!-- Score -->
-                            <span class="text-base font-bold text-zinc-900 dark:text-white">{{ $p1Sets }}-{{ $p2Sets }}</span>
-                            <!-- Player 2 -->
-                            <div class="relative flex flex-col items-center gap-1">
-                                @if($p2 && $p2->profile_picture)
-                                    <img src="{{ Storage::url($p2->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
-                                @else
-                                    <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-                                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $p2?->initials() ?? '?' }}</span>
-                                    </div>
-                                @endif
-                                @if($p2Change !== null)
-                                    <span class="text-xs font-bold px-1.5 py-0.5 rounded-full {{ $p2Change >= 0 ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-red-500/20 text-red-600 dark:text-red-400' }}">
-                                        {{ $p2Change >= 0 ? '+' : '' }}{{ $p2Change }}
+                                @if($oppPointsChange !== null)
+                                    <span class="absolute -top-1 -right-1 text-xs font-bold px-1 py-0.5 rounded-full text-white {{ $oppPointsChange >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
+                                        {{ $oppPointsChange >= 0 ? '+' : '' }}{{ $oppPointsChange }}
                                     </span>
                                 @endif
                             </div>
                         </div>
                         <!-- Names -->
-                        <div class="text-center w-full">
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ $p1?->name ?? '—' }}</p>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ $p2?->name ?? '—' }}</p>
+                        <div class="flex justify-between w-full gap-1">
+                            <p class="text-xs font-medium text-zinc-900 dark:text-white truncate flex-1 text-center">{{ $player->first_name }}</p>
+                            <p class="text-xs font-medium text-zinc-900 dark:text-white truncate flex-1 text-center">{{ $opponent?->first_name ?? '—' }}</p>
                         </div>
                     </a>
                 @endforeach

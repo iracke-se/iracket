@@ -16,6 +16,9 @@ return [
     'match_notes' => 'Match Notes',
     'status' => 'Status',
     'edit_match' => 'Edit Match',
+    'points_change' => 'Points Change',
+    'delete_match' => 'Delete Match',
+    'delete_confirm' => 'Are you sure you want to delete this match? This action cannot be undone.',
 
     // Form Page
     'date' => 'Date',

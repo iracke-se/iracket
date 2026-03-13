@@ -14,6 +14,17 @@ class Show extends Component
         $this->match = $match->loadMissing(['liveMatchGame.sets', 'liveMatchGame.detail']);
     }
 
+    public function deleteMatch(): void
+    {
+        $user = auth()->user();
+
+        abort_if($this->match->created_by !== $user->id, 403);
+
+        $this->match->delete();
+
+        $this->redirect(route('matches.index'), navigate: true);
+    }
+
     public function render()
     {
         // Get other matches between these two players

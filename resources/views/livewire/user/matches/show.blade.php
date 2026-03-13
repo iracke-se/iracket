@@ -95,14 +95,21 @@
         <div class="flex items-start justify-between">
             <!-- Player 1 -->
             <div class="flex-1 text-center">
-                @if($player1->profile_picture)
-                    <img src="{{ Storage::url($player1->profile_picture) }}" alt="{{ $player1->name }}" class="w-16 h-16 rounded-full object-cover mx-auto mb-2">
-                @else
-                    <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mx-auto mb-2">
-                        <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player1->initials() }}</span>
-                    </div>
-                @endif
-                <a href="{{ route('players.show', $player1) }}" wire:navigate class="font-medium text-zinc-900 dark:text-white hover:text-accent">
+                <div class="relative inline-block mb-2">
+                    @if($player1->profile_picture)
+                        <img src="{{ Storage::url($player1->profile_picture) }}" alt="{{ $player1->name }}" class="w-16 h-16 rounded-full object-cover">
+                    @else
+                        <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                            <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player1->initials() }}</span>
+                        </div>
+                    @endif
+                    @if($match->player1_points_change !== null)
+                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full text-xs font-bold text-white {{ $match->player1_points_change >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
+                            {{ $match->player1_points_change >= 0 ? '+' : '' }}{{ $match->player1_points_change }}
+                        </span>
+                    @endif
+                </div>
+                <a href="{{ route('players.show', $player1) }}" wire:navigate class="block font-medium text-zinc-900 dark:text-white hover:text-accent">
                     {{ $player1->name }}
                 </a>
                 @if($player1->club)
@@ -117,14 +124,21 @@
 
             <!-- Player 2 -->
             <div class="flex-1 text-center">
-                @if($player2->profile_picture)
-                    <img src="{{ Storage::url($player2->profile_picture) }}" alt="{{ $player2->name }}" class="w-16 h-16 rounded-full object-cover mx-auto mb-2">
-                @else
-                    <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mx-auto mb-2">
-                        <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player2->initials() }}</span>
-                    </div>
-                @endif
-                <a href="{{ route('players.show', $player2) }}" wire:navigate class="font-medium text-zinc-900 dark:text-white hover:text-accent">
+                <div class="relative inline-block mb-2">
+                    @if($player2->profile_picture)
+                        <img src="{{ Storage::url($player2->profile_picture) }}" alt="{{ $player2->name }}" class="w-16 h-16 rounded-full object-cover">
+                    @else
+                        <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                            <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player2->initials() }}</span>
+                        </div>
+                    @endif
+                    @if($match->player2_points_change !== null)
+                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full text-xs font-bold text-white {{ $match->player2_points_change >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
+                            {{ $match->player2_points_change >= 0 ? '+' : '' }}{{ $match->player2_points_change }}
+                        </span>
+                    @endif
+                </div>
+                <a href="{{ route('players.show', $player2) }}" wire:navigate class="block font-medium text-zinc-900 dark:text-white hover:text-accent">
                     {{ $player2->name }}
                 </a>
                 @if($player2->club)
@@ -177,6 +191,44 @@
         </div>
     @endif
 
+    <!-- Comments / Tags -->
+    @php
+        $p1Comments = $match->player1_comments ?? [];
+        $p2Comments = $match->player2_comments ?? [];
+        $hasComments = !empty($p1Comments) || !empty($p2Comments);
+    @endphp
+    @if($hasComments)
+        <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
+            <h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">{{ __('user-matches.comments_on_opponent') }}</h3>
+            <div class="space-y-3">
+                @if(!empty($p1Comments))
+                    <div>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ $player1->name }}</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($p1Comments as $comment)
+                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                                    {{ __('user-matches.' . $comment) }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+                @if(!empty($p2Comments))
+                    <div>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ $player2->name }}</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($p2Comments as $comment)
+                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                                    {{ __('user-matches.' . $comment) }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     <!-- Match Status -->
     <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
         <div class="flex items-center justify-between">
@@ -189,10 +241,58 @@
 
     <!-- Actions -->
     @if($match->created_by === $user->id)
-        <div class="flex gap-3 mb-6">
+        <div x-data="{ showDeleteModal: false }" class="flex gap-3 mb-6">
+            <button
+                @click="showDeleteModal = true"
+                class="flex-1 px-4 py-3 bg-red-500/10 text-red-600 dark:text-red-400 text-center rounded-lg hover:bg-red-500/20 transition-colors"
+            >
+                {{ __('user-matches.delete_match') }}
+            </button>
             <a href="{{ route('matches.edit', $match) }}" wire:navigate class="flex-1 px-4 py-3 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-center rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">
                 {{ __('user-matches.edit_match') }}
             </a>
+
+            <!-- Delete Confirmation Modal -->
+            <div
+                x-show="showDeleteModal"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                @click.self="showDeleteModal = false"
+                x-cloak
+            >
+                <div
+                    x-show="showDeleteModal"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-sm shadow-xl"
+                >
+                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-white mb-2">{{ __('user-matches.delete_match') }}</h3>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{{ __('user-matches.delete_confirm') }}</p>
+                    <div class="flex gap-3">
+                        <button
+                            @click="showDeleteModal = false"
+                            class="flex-1 px-4 py-3 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors text-sm font-medium"
+                        >
+                            {{ __('user-matches.cancel') }}
+                        </button>
+                        <button
+                            wire:click="deleteMatch"
+                            class="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                        >
+                            {{ __('user-matches.delete_match') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 
