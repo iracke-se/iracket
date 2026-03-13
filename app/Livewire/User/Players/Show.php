@@ -13,7 +13,7 @@ class Show extends Component
 
     public function mount(User $user)
     {
-        $this->player = $user->load('district');
+        $this->player = $user->load('districtModel');
     }
 
     public function toggleMonitor()

@@ -97,7 +97,7 @@ class Index extends Component
 
     public function render()
     {
-        $player = auth()->user()->load('district');
+        $player = auth()->user()->load('districtModel');
 
         $currentRanking = $player->currentMonthRanking();
 

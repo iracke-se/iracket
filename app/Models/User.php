@@ -205,9 +205,9 @@ class User extends Authenticatable implements HasLocalePreference
     /**
      * Get the district the user belongs to
      */
-    public function district(): BelongsTo
+    public function districtModel(): BelongsTo
     {
-        return $this->belongsTo(District::class);
+        return $this->belongsTo(District::class, 'district_id');
     }
 
     /**

@@ -53,8 +53,8 @@
 
                 <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
                     <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.district') }}</span>
-                    @if($player->district)
-                        <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $player->district->name }}</span>
+                    @if($player->districtModel)
+                        <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $player->districtModel->name }}</span>
                     @else
                         <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
                     @endif
@@ -322,8 +322,8 @@
                     </a>
                 @endif
 
-                @if($player->district)
-                    <span class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{{ $player->district->name }}</span>
+                @if($player->districtModel)
+                    <span class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{{ $player->districtModel->name }}</span>
                 @endif
 
                 <div class="flex items-center gap-4 mt-3 text-sm text-zinc-500 dark:text-zinc-400">

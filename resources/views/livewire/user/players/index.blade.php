@@ -213,8 +213,8 @@
                                     @endif
                                 </div>
                             @endif
-                            @if($player->district)
-                                <div class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{{ $player->district->name }}</div>
+                            @if($player->districtModel)
+                                <div class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{{ $player->districtModel->name }}</div>
                             @endif
                             <div class="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
                                 @if($player->age)

@@ -85,7 +85,7 @@ class Index extends Component
 
         $query = User::query()
             ->where('visible_in_players', true)
-            ->with('district')
+            ->with('districtModel')
             ->with(['club.monthlyRankings' => function ($q) use ($selectedYear, $selectedMonth) {
                 if ($selectedYear && $selectedMonth) {
                     $q->where('year', $selectedYear)
