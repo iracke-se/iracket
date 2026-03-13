@@ -142,6 +142,7 @@ class LiveCenterSyncService
 
             $newMatch = GameMatch::create([
                 'source' => 'scraped',
+                'status' => 'confirmed',
                 'player1_id' => $player1->id,
                 'player2_id' => $player2->id,
                 'winner_id' => $winnerId,

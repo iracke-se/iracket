@@ -29,6 +29,7 @@ return [
     'add_player' => 'Lägg till spelare',
     'my_monitored_players' => 'Mina bevakade spelare',
     'latest_matches' => 'Senaste matcher',
+    'monitored_latest_matches' => 'Bevakade spelares matcher',
     'club_transitions' => 'Klubbyten',
     'my_matches' => 'Mina matcher',
 

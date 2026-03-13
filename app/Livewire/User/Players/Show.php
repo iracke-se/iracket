@@ -119,6 +119,22 @@ class Show extends Component
     {
         $currentRanking = $this->player->currentMonthRanking();
 
+        // Sum points from manual matches this month (not stored in monthly_rankings)
+        $manualPointsDelta = GameMatch::where(function ($q) {
+                $q->where('player1_id', $this->player->id)
+                  ->orWhere('player2_id', $this->player->id);
+            })
+            ->where('is_manual', true)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->get()
+            ->sum(fn($m) => $m->player1_id === $this->player->id
+                ? $m->player1_points_change
+                : $m->player2_points_change
+            );
+
+        $currentRankingPoints = ($currentRanking?->points ?? 0) + $manualPointsDelta;
+
         $rankingsHistory = $this->player->monthlyRankings()
             ->orderBy('year', 'desc')
             ->orderBy('month', 'desc')
@@ -131,7 +147,26 @@ class Show extends Component
         $topMonitoredPlayers = collect();
         $monitoredPlayersMatches = collect();
 
+        $playerLatestMatches = collect();
         if ($isOwnProfile) {
+            // Get the player's own last 10 matches
+            $playerLatestMatches = GameMatch::where(function ($query) {
+                $query->where('player1_id', $this->player->id)
+                      ->orWhere('player2_id', $this->player->id);
+            })
+            ->with([
+                'player1',
+                'player2',
+                'winner',
+                'liveMatchGame.sets' => function ($query) {
+                    $query->orderBy('set_number');
+                },
+                'liveMatchGame.detail'
+            ])
+            ->orderBy('played_at', 'desc')
+            ->take(10)
+            ->get();
+
             // Get top monitored players (those with highest points)
             $topMonitoredPlayers = auth()->user()
                 ->monitoring()
@@ -193,10 +228,12 @@ class Show extends Component
 
         return view('livewire.user.players.show', [
             'currentRanking' => $currentRanking,
+            'currentRankingPoints' => $currentRankingPoints,
             'rankingsHistory' => $rankingsHistory,
             'isOwnProfile' => $isOwnProfile,
             'isMonitoring' => $isMonitoring,
             'topMonitoredPlayers' => $topMonitoredPlayers,
+            'playerLatestMatches' => $playerLatestMatches,
             'monitoredPlayersMatches' => $monitoredPlayersMatches,
             'rankingPosition' => $rankingPosition,
             'rankingCategory' => $rankingCategory,

@@ -29,6 +29,7 @@ return [
     'add_player' => 'Add Player',
     'my_monitored_players' => 'My Monitored Players',
     'latest_matches' => 'Latest Matches',
+    'monitored_latest_matches' => 'Followed Players\' Matches',
     'club_transitions' => 'Club Transitions',
     'my_matches' => 'My Matches',
 

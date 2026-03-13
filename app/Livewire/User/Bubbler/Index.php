@@ -5,6 +5,7 @@ namespace App\Livewire\User\Bubbler;
 use App\Models\Club;
 use App\Models\ClubTransition;
 use App\Models\District;
+use App\Models\GameMatch;
 use App\Models\MonthlyRanking;
 use App\Models\User;
 use Carbon\Carbon;
@@ -19,8 +20,7 @@ class Index extends Component
 
     // Player filters
     public string $filterDistrict   = '';
-    public string $filterPointsFrom = '';
-    public string $filterPointsTo   = '';
+    public string $filterPointsClass = ''; // encoded as "min:max" or "min:" for no upper bound
     public string $filterAgeFrom    = '';
     public string $filterAgeTo      = '';
     public string $sortPoints       = 'desc'; // 'asc' | 'desc'
@@ -28,13 +28,25 @@ class Index extends Component
     // Club filter
     public string $sortClubsBy = 'points_gained'; // 'points_gained' | 'new_members' | 'bubblare'
 
-    // SBTF standard point ranges (descending)
-    protected static array $pointRanges = [
-        ['label' => '2000+',       'min' => 2000, 'max' => null],
-        ['label' => '1500 - 1999', 'min' => 1500, 'max' => 1999],
-        ['label' => '750 - 1499',  'min' => 750,  'max' => 1499],
-        ['label' => '500 - 749',   'min' => 500,  'max' => 749],
-        ['label' => '0 - 499',     'min' => 0,    'max' => 499],
+    // SBTF standard point class ranges per gender
+    protected static array $menClassRanges = [
+        ['label' => 'Elite · 2250+',       'min' => 2250, 'max' => null],
+        ['label' => 'Class 1 · 2000–2249', 'min' => 2000, 'max' => 2249],
+        ['label' => 'Class 2 · 1750–1999', 'min' => 1750, 'max' => 1999],
+        ['label' => 'Class 3 · 1500–1749', 'min' => 1500, 'max' => 1749],
+        ['label' => 'Class 4 · 1250–1499', 'min' => 1250, 'max' => 1499],
+        ['label' => 'Class 5 · 1000–1249', 'min' => 1000, 'max' => 1249],
+        ['label' => 'Class 6 · 750–999',   'min' => 750,  'max' => 999],
+        ['label' => 'Class 7 · 0–749',     'min' => 0,    'max' => 749],
+    ];
+
+    protected static array $womenClassRanges = [
+        ['label' => 'Elite · 1750+',       'min' => 1750, 'max' => null],
+        ['label' => 'Class 1 · 1500–1749', 'min' => 1500, 'max' => 1749],
+        ['label' => 'Class 2 · 1250–1499', 'min' => 1250, 'max' => 1499],
+        ['label' => 'Class 3 · 1000–1249', 'min' => 1000, 'max' => 1249],
+        ['label' => 'Class 4 · 750–999',   'min' => 750,  'max' => 999],
+        ['label' => 'Class 5 · 0–749',     'min' => 0,    'max' => 749],
     ];
 
     public function mount(): void
@@ -68,13 +80,12 @@ class Index extends Component
 
     public function clearFilters(): void
     {
-        $this->filterDistrict   = '';
-        $this->filterPointsFrom = '';
-        $this->filterPointsTo   = '';
-        $this->filterAgeFrom    = '';
-        $this->filterAgeTo      = '';
-        $this->sortPoints       = 'desc';
-        $this->sortClubsBy      = 'points_gained';
+        $this->filterDistrict    = '';
+        $this->filterPointsClass = '';
+        $this->filterAgeFrom     = '';
+        $this->filterAgeTo       = '';
+        $this->sortPoints        = 'desc';
+        $this->sortClubsBy       = 'points_gained';
     }
 
     public function updatedSelectedYear(): void  { $this->validatePeriod(); }
@@ -132,19 +143,17 @@ class Index extends Component
         }
 
         $count = 0;
-        if ($this->filterDistrict !== '')   $count++;
-        if ($this->filterPointsFrom !== '') $count++;
-        if ($this->filterPointsTo !== '')   $count++;
-        if ($this->filterAgeFrom !== '')    $count++;
-        if ($this->filterAgeTo !== '')      $count++;
+        if ($this->filterDistrict !== '')    $count++;
+        if ($this->filterPointsClass !== '') $count++;
+        if ($this->filterAgeFrom !== '')     $count++;
+        if ($this->filterAgeTo !== '')       $count++;
         return $count;
     }
 
-    protected function groupByPointRanges(Collection $rankings, string $pointsField = 'points'): array
+    protected function groupByPointRanges(Collection $rankings, string $gender, string $pointsField = 'points'): array
     {
-        $ranges = $this->sortPoints === 'asc'
-            ? array_reverse(static::$pointRanges)
-            : static::$pointRanges;
+        $baseRanges = $gender === 'female' ? static::$womenClassRanges : static::$menClassRanges;
+        $ranges = $this->sortPoints === 'asc' ? array_reverse($baseRanges) : $baseRanges;
 
         $grouped = [];
 
@@ -184,11 +193,12 @@ class Index extends Component
             }
         });
 
-        if ($this->filterPointsFrom !== '') {
-            $query->where('points', '>=', (int) $this->filterPointsFrom);
-        }
-        if ($this->filterPointsTo !== '') {
-            $query->where('points', '<=', (int) $this->filterPointsTo);
+        if ($this->filterPointsClass !== '') {
+            [$min, $max] = explode(':', $this->filterPointsClass);
+            $query->where('points', '>=', (int) $min);
+            if ($max !== '') {
+                $query->where('points', '<=', (int) $max);
+            }
         }
     }
 
@@ -283,12 +293,42 @@ class Index extends Component
         $menRankings = $menQuery->with('user.club')->orderBy('points', 'desc')->get()
             ->filter(fn ($r) => $r->user !== null);
 
+        // For the current month, add manual match deltas to effective_points
+        $isCurrentMonth = $this->selectedYear == now()->year && $this->selectedMonth == now()->month;
+        $deltas = [];
+
+        if ($isCurrentMonth) {
+            $manualMatches = GameMatch::where('is_manual', true)
+                ->whereYear('created_at', $this->selectedYear)
+                ->whereMonth('created_at', $this->selectedMonth)
+                ->get(['player1_id', 'player2_id', 'player1_points_change', 'player2_points_change']);
+
+            foreach ($manualMatches as $m) {
+                $deltas[$m->player1_id] = ($deltas[$m->player1_id] ?? 0) + $m->player1_points_change;
+                $deltas[$m->player2_id] = ($deltas[$m->player2_id] ?? 0) + $m->player2_points_change;
+            }
+        }
+
+        foreach ($ladiesRankings as $r) {
+            $r->effective_points = $r->points + ($deltas[$r->user_id] ?? 0);
+        }
+        foreach ($menRankings as $r) {
+            $r->effective_points = $r->points + ($deltas[$r->user_id] ?? 0);
+        }
+
+        if ($isCurrentMonth) {
+            $ladiesRankings = $ladiesRankings->sortByDesc('effective_points')->values();
+            $menRankings    = $menRankings->sortByDesc('effective_points')->values();
+        }
+
         return view('livewire.user.bubbler.index', [
-            'ladiesGrouped'      => $this->groupByPointRanges($ladiesRankings),
-            'menGrouped'         => $this->groupByPointRanges($menRankings),
+            'ladiesGrouped'       => $this->groupByPointRanges($ladiesRankings, 'female', 'effective_points'),
+            'menGrouped'          => $this->groupByPointRanges($menRankings, 'male', 'effective_points'),
             'clubBubblerRankings' => $this->computeClubBubblerRankings(),
-            'availableDistricts' => $this->availableDistricts,
-            'activeFilterCount'  => $this->activeFilterCount,
+            'availableDistricts'  => $this->availableDistricts,
+            'activeFilterCount'   => $this->activeFilterCount,
+            'menClassRanges'      => static::$menClassRanges,
+            'womenClassRanges'    => static::$womenClassRanges,
         ])->layout('components.layouts.app');
     }
 }

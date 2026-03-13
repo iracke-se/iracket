@@ -6,6 +6,7 @@ return [
     'new_match' => 'New Match',
     'filter_by_opponent' => 'Filter by opponent...',
     'no_matches_in' => 'No matches in',
+    'view_full_match' => 'View Full Match',
 
     // Show Page
     'victory' => 'Victory',

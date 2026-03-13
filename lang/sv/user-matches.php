@@ -6,6 +6,7 @@ return [
     'new_match' => 'Ny match',
     'filter_by_opponent' => 'Filtrera efter motståndare...',
     'no_matches_in' => 'Inga matcher i',
+    'view_full_match' => 'Visa hela matchen',
 
     // Show Page
     'victory' => 'Seger',

@@ -155,6 +155,7 @@ class MatchSyncService
         // Create official scraped match, storing ranking points for player1 (the scraped player)
         $officialMatch = GameMatch::create([
             'source' => 'scraped',
+            'status' => 'confirmed',
             'player1_id' => $players['player1_id'],
             'player2_id' => $players['player2_id'],
             'winner_id' => $players['winner_id'],

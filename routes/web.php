@@ -24,6 +24,7 @@ use App\Livewire\User\MyMonitored\Index as MyMonitored;
 use App\Livewire\User\Players\Index as Players;
 use App\Livewire\User\Players\Show as PlayerShow;
 use App\Livewire\User\Players\Transitions as PlayerTransitions;
+use App\Livewire\User\Rankings\Index as MyRankings;
 use App\Livewire\Admin\Terms\Index as AdminTermsIndex;
 use App\Livewire\Admin\Terms\Form as AdminTermsForm;
 use App\Livewire\Admin\Users\Index as AdminUsersIndex;
@@ -100,6 +101,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('players', Players::class)->middleware(['verified', 'connected'])->name('players.index');
     Route::get('players/{user}', PlayerShow::class)->middleware(['verified', 'connected'])->name('players.show');
     Route::get('players/{user}/transitions', PlayerTransitions::class)->middleware(['verified', 'connected'])->name('players.transitions');
+
+    // My Rankings
+    Route::get('my-rankings', MyRankings::class)->middleware(['verified', 'connected'])->name('my-rankings.index');
 
     // My Monitored Players
     Route::get('my-monitored', MyMonitored::class)->middleware(['verified', 'connected'])->name('my-monitored.index');

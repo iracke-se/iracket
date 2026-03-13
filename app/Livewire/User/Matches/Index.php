@@ -16,7 +16,17 @@ class Index extends Component
 
     public function mount()
     {
-        $this->selectedYear = now()->year;
+        $user = auth()->user();
+
+        $latestYear = GameMatch::where(function ($query) use ($user) {
+            $query->where('player1_id', $user->id)
+                  ->orWhere('player2_id', $user->id);
+        })
+        ->selectRaw('YEAR(played_at) as year')
+        ->orderBy('year', 'desc')
+        ->value('year');
+
+        $this->selectedYear = $latestYear ?? now()->year;
     }
 
     public function selectOpponent(?int $opponentId): void
@@ -40,7 +50,12 @@ class Index extends Component
                   ->orWhere('player2_id', $user->id);
         })
         ->whereYear('played_at', $this->selectedYear)
-        ->with(['player1.club', 'player2.club']);
+        ->with([
+            'player1.club',
+            'player2.club',
+            'liveMatchGame.sets' => fn($q) => $q->orderBy('set_number'),
+            'liveMatchGame.detail',
+        ]);
 
         // Filter by opponent
         if ($this->selectedOpponent) {

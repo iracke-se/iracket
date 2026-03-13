@@ -35,6 +35,7 @@ return [
     'choose_location' => 'Choose Location',
     'all_districts'   => 'All districts',
     'ranking'         => 'Ranking',
+    'all_classes'     => 'All classes',
     'from'            => 'From',
     'to'              => 'To',
     'age'             => 'Age',

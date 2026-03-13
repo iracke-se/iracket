@@ -70,6 +70,8 @@
                     'isSheet'            => false,
                     'availableDistricts' => $availableDistricts,
                     'activeTab'          => $activeTab,
+                    'menClassRanges'     => $menClassRanges,
+                    'womenClassRanges'   => $womenClassRanges,
                 ])
             </div>
         </div>
@@ -95,7 +97,7 @@
             @else
                 @foreach($ladiesGrouped as $group)
                     <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 mt-5 first:mt-0">
-                        {{ $group['label'] }} {{ __('user-bubbler.points') }}
+                        {{ $group['label'] }}
                     </p>
                     <div class="space-y-2 mb-2">
                         @foreach($group['players'] as $i => $ranking)
@@ -118,7 +120,7 @@
                                         <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{{ $ranking->user->club->name }}</div>
                                     @endif
                                     <div class="flex items-center gap-2 mt-1.5">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-400 text-black text-xs font-bold">{{ number_format($ranking->points) }} p</span>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-400 text-black text-xs font-bold">{{ number_format($ranking->effective_points) }} p</span>
                                         @if($ranking->points_change != 0)
                                             <span class="text-xs font-medium {{ $ranking->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
                                                 @if($ranking->points_change > 0)+@endif{{ number_format($ranking->points_change) }}
@@ -148,7 +150,7 @@
             @else
                 @foreach($menGrouped as $group)
                     <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 mt-5 first:mt-0">
-                        {{ $group['label'] }} {{ __('user-bubbler.points') }}
+                        {{ $group['label'] }}
                     </p>
                     <div class="space-y-2 mb-2">
                         @foreach($group['players'] as $i => $ranking)
@@ -171,7 +173,7 @@
                                         <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{{ $ranking->user->club->name }}</div>
                                     @endif
                                     <div class="flex items-center gap-2 mt-1.5">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-400 text-black text-xs font-bold">{{ number_format($ranking->points) }} p</span>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-400 text-black text-xs font-bold">{{ number_format($ranking->effective_points) }} p</span>
                                         @if($ranking->points_change != 0)
                                             <span class="text-xs font-medium {{ $ranking->points_change > 0 ? 'text-green-500' : 'text-red-500' }}">
                                                 @if($ranking->points_change > 0)+@endif{{ number_format($ranking->points_change) }}
@@ -324,6 +326,8 @@
             'isSheet'            => true,
             'availableDistricts' => $availableDistricts,
             'activeTab'          => $activeTab,
+            'menClassRanges'     => $menClassRanges,
+            'womenClassRanges'   => $womenClassRanges,
         ])
     </div>
 </div>

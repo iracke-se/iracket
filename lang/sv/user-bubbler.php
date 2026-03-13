@@ -35,6 +35,7 @@ return [
     'choose_location' => 'Välj plats',
     'all_districts'   => 'Alla distrikt',
     'ranking'         => 'Ranking',
+    'all_classes'     => 'Alla klasser',
     'from'            => 'Från',
     'to'              => 'Till',
     'age'             => 'Ålder',

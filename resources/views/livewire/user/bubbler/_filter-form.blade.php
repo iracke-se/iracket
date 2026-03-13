@@ -1,5 +1,5 @@
 {{-- Shared filter form — used by both mobile bottom sheet and desktop dropdown --}}
-{{-- Variables: $isSheet (bool), $availableDistricts (array), $activeTab (string) --}}
+{{-- Variables: $isSheet (bool), $availableDistricts (array), $activeTab (string), $menClassRanges (array), $womenClassRanges (array) --}}
 
 <div class="{{ $isSheet ? 'px-6 py-4 pb-24 space-y-6 overflow-y-auto max-h-[82vh]' : 'p-4 space-y-5' }}">
 
@@ -42,25 +42,22 @@
             </select>
         </div>
 
-        {{-- ── RANKING / POINT RANGE ── --}}
+        {{-- ── RANKING / POINT CLASS ── --}}
         <div>
             <p class="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">
                 {{ __('user-bubbler.ranking') }}
             </p>
-            <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl divide-y divide-zinc-200 dark:divide-zinc-700">
-                <div class="flex items-center justify-between px-4 py-3">
-                    <span class="text-sm text-zinc-900 dark:text-white">{{ __('user-bubbler.from') }}</span>
-                    <input type="number" wire:model.live="filterPointsFrom" min="0" max="9999"
-                        placeholder="—"
-                        class="w-28 text-right bg-transparent text-sm text-zinc-500 dark:text-zinc-400 focus:outline-none focus:text-accent placeholder-zinc-400 dark:placeholder-zinc-500">
-                </div>
-                <div class="flex items-center justify-between px-4 py-3">
-                    <span class="text-sm text-zinc-900 dark:text-white">{{ __('user-bubbler.to') }}</span>
-                    <input type="number" wire:model.live="filterPointsTo" min="0" max="9999"
-                        placeholder="—"
-                        class="w-28 text-right bg-transparent text-sm text-zinc-500 dark:text-zinc-400 focus:outline-none focus:text-accent placeholder-zinc-400 dark:placeholder-zinc-500">
-                </div>
-            </div>
+            @php
+                $classRanges = $activeTab === 'ladies' ? $womenClassRanges : $menClassRanges;
+            @endphp
+            <select wire:model.live="filterPointsClass"
+                class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent">
+                <option value="">{{ __('user-bubbler.all_classes') }}</option>
+                @foreach($classRanges as $cr)
+                    @php $val = $cr['min'] . ':' . ($cr['max'] ?? ''); @endphp
+                    <option value="{{ $val }}">{{ $cr['label'] }}</option>
+                @endforeach
+            </select>
         </div>
 
         {{-- ── AGE ── --}}

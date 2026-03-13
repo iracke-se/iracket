@@ -74,14 +74,19 @@
                     @endif
                 </div>
 
-                <div class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
+                <a href="{{ route('my-rankings.index') }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                     <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.my_ranking') }}</span>
-                    @if($currentRanking)
-                        <span class="px-3 py-1 bg-accent text-white text-xs font-bold rounded-full">{{ number_format($currentRanking->points) }} {{ __('user-player-show.pts') }}</span>
-                    @else
-                        <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
-                    @endif
-                </div>
+                    <div class="flex items-center gap-2">
+                        @if($currentRanking || $currentRankingPoints > 0)
+                            <span class="px-3 py-1 bg-accent text-white text-xs font-bold rounded-full">{{ number_format($currentRankingPoints) }} {{ __('user-player-show.pts') }}</span>
+                        @else
+                            <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ __('user-player-show.not_set') }}</span>
+                        @endif
+                        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </div>
+                </a>
             </div>
         </div>
 
@@ -162,10 +167,67 @@
             </div>
         </div>
 
+        <!-- Player's Own Latest Matches -->
+        @if($playerLatestMatches->isNotEmpty())
+        <div class="mb-6">
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.latest_matches') }}</p>
+            <div class="flex gap-3 overflow-x-auto px-4 pb-2" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+                @foreach($playerLatestMatches as $match)
+                    @php
+                        $isPlayer1 = $match->player1_id === $player->id;
+                        $opponent = $isPlayer1 ? $match->player2 : $match->player1;
+                        $won = $match->winner_id === $player->id;
+                        $p1Sets = 0; $p2Sets = 0;
+                        if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
+                            foreach ($match->liveMatchGame->sets as $set) {
+                                if ($set->player1_points > $set->player2_points) { $p1Sets++; } else { $p2Sets++; }
+                            }
+                        } else {
+                            $p1Sets = $match->player1_sets ?? 0;
+                            $p2Sets = $match->player2_sets ?? 0;
+                        }
+                        $mySets = $isPlayer1 ? $p1Sets : $p2Sets;
+                        $oppSets = $isPlayer1 ? $p2Sets : $p1Sets;
+                    @endphp
+                    <a href="{{ route('matches.show', $match) }}" wire:navigate
+                       class="flex-shrink-0 w-40 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-3 flex flex-col items-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                        <div class="flex items-center justify-center gap-2 w-full">
+                            <div class="flex flex-col items-center gap-1">
+                                @if($player->profile_picture)
+                                    <img src="{{ Storage::url($player->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
+                                @else
+                                    <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $player->initials() }}</span>
+                                    </div>
+                                @endif
+                                <span class="text-xs font-bold {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">{{ $won ? 'W' : 'L' }}</span>
+                            </div>
+                            <span class="text-base font-bold text-zinc-900 dark:text-white">{{ $mySets }}-{{ $oppSets }}</span>
+                            <div class="flex flex-col items-center gap-1">
+                                @if($opponent?->profile_picture)
+                                    <img src="{{ Storage::url($opponent->profile_picture) }}" class="w-10 h-10 rounded-full object-cover">
+                                @else
+                                    <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $opponent?->initials() ?? '?' }}</span>
+                                    </div>
+                                @endif
+                                <span class="text-xs text-zinc-400 dark:text-zinc-500">vs</span>
+                            </div>
+                        </div>
+                        <div class="text-center w-full">
+                            <p class="text-xs font-medium text-zinc-900 dark:text-white truncate">{{ $opponent?->name ?? '—' }}</p>
+                            <p class="text-xs text-zinc-400 dark:text-zinc-500">{{ $match->played_at ? \Carbon\Carbon::parse($match->played_at)->format('d M') : '' }}</p>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
         <!-- Latest Matches from Monitored Players -->
         @if($monitoredPlayersMatches->isNotEmpty())
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.latest_matches') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.monitored_latest_matches') }}</p>
             <div class="flex gap-3 overflow-x-auto px-4 pb-2" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
                 @foreach($monitoredPlayersMatches as $match)
                     @php

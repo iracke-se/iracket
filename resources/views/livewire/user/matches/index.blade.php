@@ -107,65 +107,136 @@
                                 $user = auth()->user();
                                 $isPlayer1 = $match->player1_id === $user->id;
                                 $opponent = $isPlayer1 ? $match->player2 : $match->player1;
-                                $myClub = $isPlayer1 ? $match->player1->club : $match->player2->club;
-                                $opponentClub = $isPlayer1 ? $match->player2->club : $match->player1->club;
-                                $mySets = $isPlayer1 ? $match->player1_sets : $match->player2_sets;
-                                $opponentSets = $isPlayer1 ? $match->player2_sets : $match->player1_sets;
-                                $won = $match->winner_id === $user->id;
+                                $myPointsChange = $isPlayer1 ? $match->player1_points_change : $match->player2_points_change;
+                                $oppPointsChange = $isPlayer1 ? $match->player2_points_change : $match->player1_points_change;
+                                $sets = collect();
+                                if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
+                                    $sets = $match->liveMatchGame->sets->sortBy('set_number');
+                                    $mySetsWon = 0; $oppSetsWon = 0;
+                                    foreach ($sets as $set) {
+                                        $myPts  = $isPlayer1 ? $set->player1_points : $set->player2_points;
+                                        $oppPts = $isPlayer1 ? $set->player2_points : $set->player1_points;
+                                        if ($myPts > $oppPts) { $mySetsWon++; } else { $oppSetsWon++; }
+                                    }
+                                    $mySets = $mySetsWon;
+                                    $opponentSets = $oppSetsWon;
+                                } else {
+                                    $mySets = $isPlayer1 ? ($match->player1_sets ?? 0) : ($match->player2_sets ?? 0);
+                                    $opponentSets = $isPlayer1 ? ($match->player2_sets ?? 0) : ($match->player1_sets ?? 0);
+                                }
+                                $won = $match->winner_id
+                                    ? $match->winner_id === $user->id
+                                    : $mySets > $opponentSets;
                             @endphp
-                            <a
-                                href="{{ route('matches.show', $match) }}"
-                                wire:navigate
-                                class="block p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                            >
-                                <!-- Date and Result -->
-                                <div class="text-center mb-3">
-                                    <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $match->played_at->format('d M Y') }}</div>
-                                    <div class="text-xl font-bold {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">
-                                        {{ $mySets }} - {{ $opponentSets }}
-                                    </div>
-                                </div>
+                            <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
 
-                                <!-- Players -->
-                                <div class="flex items-center justify-between">
-                                    <!-- Me -->
-                                    <div class="flex-1 text-center">
-                                        @if($user->profile_picture)
-                                            <img src="{{ Storage::url($user->profile_picture) }}" alt="{{ $user->name }}" class="w-10 h-10 rounded-full object-cover mx-auto mb-1">
-                                        @else
-                                            <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mx-auto mb-1">
-                                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $user->initials() }}</span>
-                                            </div>
-                                        @endif
-                                        <div class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $user->first_name }}</div>
-                                        @if($myClub)
-                                            <div class="text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ $myClub->name }}</div>
-                                        @endif
-                                    </div>
-
-                                    <!-- Result Indicator -->
-                                    <div class="px-4">
-                                        <span class="text-xs font-medium {{ $won ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400' }}">
+                                {{-- Large score --}}
+                                <div class="text-center pt-3 pb-1">
+                                    @if($sets->isNotEmpty() || ($mySets + $opponentSets) > 0)
+                                        <div class="text-4xl font-bold text-zinc-900 dark:text-white">
+                                            {{ $mySets }} - {{ $opponentSets }}
+                                        </div>
+                                    @else
+                                        <span class="inline-block px-6 py-2 rounded-lg text-3xl font-bold {{ $won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">
                                             {{ $won ? 'W' : 'L' }}
                                         </span>
+                                    @endif
+                                </div>
+
+                                {{-- Date --}}
+                                <div class="text-center pb-2">
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $match->played_at->format('d M Y') }}</span>
+                                </div>
+
+                                {{-- Player vs Opponent --}}
+                                <div class="flex items-center justify-between px-6 pb-4">
+                                    {{-- Me (left) --}}
+                                    <div class="flex-1 flex flex-col items-center text-center">
+                                        <div class="relative mb-2">
+                                            @if($user->profile_picture)
+                                                <img src="{{ Storage::url($user->profile_picture) }}" alt="{{ $user->name }}" class="w-16 h-16 rounded-full object-cover">
+                                            @else
+                                                <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                                    <span class="text-xl font-semibold text-zinc-600 dark:text-zinc-300">{{ $user->initials() }}</span>
+                                                </div>
+                                            @endif
+                                            @if($myPointsChange !== null)
+                                                <span class="absolute -top-1 -right-1 text-xs font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-zinc-800 {{ $myPointsChange > 0 ? 'bg-green-500 text-white' : ($myPointsChange < 0 ? 'bg-red-500 text-white' : 'bg-zinc-400 text-white') }}">
+                                                    {{ $myPointsChange > 0 ? '+' : '' }}{{ $myPointsChange }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <span class="text-xs font-semibold text-zinc-900 dark:text-white leading-tight">{{ $user->name }}</span>
+                                        @if($user->club)
+                                            <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $user->club->name }}</span>
+                                        @endif
                                     </div>
 
-                                    <!-- Opponent -->
-                                    <div class="flex-1 text-center">
-                                        @if($opponent->profile_picture)
-                                            <img src="{{ Storage::url($opponent->profile_picture) }}" alt="{{ $opponent->name }}" class="w-10 h-10 rounded-full object-cover mx-auto mb-1">
+                                    {{-- VS --}}
+                                    <div class="px-3">
+                                        <span class="text-sm font-medium text-zinc-400 dark:text-zinc-500">VS</span>
+                                    </div>
+
+                                    {{-- Opponent (right) --}}
+                                    <div class="flex-1 flex flex-col items-center text-center">
+                                        <div class="relative mb-2">
+                                            @if($opponent?->profile_picture)
+                                                <img src="{{ Storage::url($opponent->profile_picture) }}" alt="{{ $opponent->name }}" class="w-16 h-16 rounded-full object-cover">
+                                            @else
+                                                <div class="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                                                    <span class="text-xl font-semibold text-zinc-600 dark:text-zinc-300">{{ $opponent?->initials() ?? '?' }}</span>
+                                                </div>
+                                            @endif
+                                            @if($oppPointsChange !== null)
+                                                <span class="absolute -top-1 -right-1 text-xs font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-zinc-800 {{ $oppPointsChange > 0 ? 'bg-green-500 text-white' : ($oppPointsChange < 0 ? 'bg-red-500 text-white' : 'bg-zinc-400 text-white') }}">
+                                                    {{ $oppPointsChange > 0 ? '+' : '' }}{{ $oppPointsChange }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        @if($opponent)
+                                            <a href="{{ route('players.show', $opponent) }}" wire:navigate class="text-xs font-semibold text-zinc-900 dark:text-white hover:text-accent leading-tight">{{ $opponent->name }}</a>
+                                            @if($opponent->club)
+                                                <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $opponent->club->name }}</span>
+                                            @endif
                                         @else
-                                            <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mx-auto mb-1">
-                                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $opponent->initials() }}</span>
-                                            </div>
-                                        @endif
-                                        <div class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $opponent->first_name }}</div>
-                                        @if($opponentClub)
-                                            <div class="text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ $opponentClub->name }}</div>
+                                            <span class="text-xs font-semibold text-zinc-900 dark:text-white leading-tight">—</span>
                                         @endif
                                     </div>
                                 </div>
-                            </a>
+
+                                {{-- Set scores --}}
+                                @if($sets->isNotEmpty())
+                                    <div class="border-t border-zinc-200 dark:border-zinc-700 px-4 py-3">
+                                        <div class="flex items-center justify-center gap-2 flex-wrap">
+                                            @foreach($sets as $set)
+                                                @php
+                                                    $mySetPts  = $isPlayer1 ? $set->player1_points : $set->player2_points;
+                                                    $oppSetPts = $isPlayer1 ? $set->player2_points : $set->player1_points;
+                                                    $wonSet    = $mySetPts > $oppSetPts;
+                                                @endphp
+                                                <div class="text-center">
+                                                    <div class="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Set {{ $set->set_number }}</div>
+                                                    <div class="px-3 py-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-700">
+                                                        <span class="{{ $wonSet ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $mySetPts }}</span>
+                                                        <span class="text-zinc-400 mx-0.5">-</span>
+                                                        <span class="{{ !$wonSet ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $oppSetPts }}</span>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                {{-- View Full Match --}}
+                                <div class="border-t border-zinc-200 dark:border-zinc-700 px-4 py-2.5">
+                                    <a href="{{ route('matches.show', $match) }}" wire:navigate class="text-xs text-accent hover:underline flex items-center gap-1 font-medium">
+                                        <span>{{ __('user-matches.view_full_match') }}</span>
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
                         @endforeach
                     </div>
                 </div>
