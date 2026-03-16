@@ -29,11 +29,12 @@ class AppleController extends Controller
             $isNewUser = false;
 
             if ($user) {
-                // Update existing user with Apple ID and verify email
-                $user->update([
-                    'apple_id' => $appleUser->id,
-                    'email_verified_at' => $user->email_verified_at ?? now(),
-                ]);
+                // Update existing user with Apple ID
+                $user->update(['apple_id' => $appleUser->id]);
+
+                if (!$user->hasVerifiedEmail()) {
+                    $user->markEmailAsVerified();
+                }
             } else {
                 // Split name into first and last name
                 $name = $appleUser->name ?? 'Apple User';
@@ -49,10 +50,10 @@ class AppleController extends Controller
                     'email' => $appleUser->email,
                     'apple_id' => $appleUser->id,
                     'password' => Hash::make(Str::random(24)),
-                    'email_verified_at' => now(),
                     'terms_accepted' => true,
                     'terms_accepted_at' => now(),
                 ]);
+                $user->markEmailAsVerified();
                 $isNewUser = true;
             }
 

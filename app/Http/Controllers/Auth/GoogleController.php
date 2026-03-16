@@ -25,11 +25,12 @@ class GoogleController extends Controller
             $isNewUser = false;
 
             if ($user) {
-                // Update existing user with Google ID and verify email
-                $user->update([
-                    'google_id' => $googleUser->id,
-                    'email_verified_at' => $user->email_verified_at ?? now(),
-                ]);
+                // Update existing user with Google ID
+                $user->update(['google_id' => $googleUser->id]);
+
+                if (!$user->hasVerifiedEmail()) {
+                    $user->markEmailAsVerified();
+                }
             } else {
                 // Split name into first and last name
                 $nameParts = explode(' ', $googleUser->name, 2);
@@ -44,10 +45,10 @@ class GoogleController extends Controller
                     'email' => $googleUser->email,
                     'google_id' => $googleUser->id,
                     'password' => Hash::make(Str::random(24)),
-                    'email_verified_at' => now(),
                     'terms_accepted' => true,
                     'terms_accepted_at' => now(),
                 ]);
+                $user->markEmailAsVerified();
                 $isNewUser = true;
             }
 
