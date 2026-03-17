@@ -5,7 +5,7 @@ return [
     'description' => 'Slutför din profil för att komma igång med iRacket.',
 
     'i_am_active_player' => 'Jag är en aktiv spelare',
-    'active_player_hint' => 'Aktivera detta om du spelar badminton tävlingsmässigt.',
+    'active_player_hint' => 'Aktivera detta om du spelar ping pong tävlingsmässigt.',
     'toggle_active_player' => 'Växla status för aktiv spelare',
 
     'choose_club' => 'Välj din klubb',

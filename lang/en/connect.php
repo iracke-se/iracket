@@ -5,7 +5,7 @@ return [
     'description' => 'Complete your profile to get started with iRacket.',
 
     'i_am_active_player' => 'I am an active player',
-    'active_player_hint' => 'Toggle this if you play badminton competitively.',
+    'active_player_hint' => 'Toggle this if you play ping pong competitively.',
     'toggle_active_player' => 'Toggle active player status',
 
     'choose_player' => 'Find yourself',
