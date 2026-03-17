@@ -75,6 +75,10 @@ Route::post('auth/apple/callback', [AppleController::class, 'callback']);
 // Terms and Privacy Policy
 Route::get('terms/{slug}', TermsShow::class)->name('terms.show');
 
+// Districts (public)
+Route::get('districts', Districts::class)->name('districts.index');
+Route::get('districts/{district}', DistrictShow::class)->name('districts.show');
+
 // Email Verification
 Route::get('verify-email', VerifyEmail::class)
     ->middleware(['auth'])
@@ -120,10 +124,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('matches/create', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.create');
     Route::get('matches/{match}', MatchShow::class)->middleware(['verified', 'connected'])->name('matches.show');
     Route::get('matches/{match}/edit', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.edit');
-
-    // Districts
-    Route::get('districts', Districts::class)->middleware(['verified', 'connected'])->name('districts.index');
-    Route::get('districts/{district}', DistrictShow::class)->middleware(['verified', 'connected'])->name('districts.show');
 
     // Bubbler
     Route::get('bubbler', Bubbler::class)->middleware(['verified', 'connected'])->name('bubbler.index');
