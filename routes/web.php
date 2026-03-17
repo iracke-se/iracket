@@ -114,7 +114,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('clubs/{club:slug}/transitions', ClubTransitions::class)->middleware(['verified', 'connected'])->name('clubs.transitions');
 
     // Matches
-    Route::get('matches', Matches::class)->middleware(['verified', 'connected'])->name('matches.index');
+    Route::get('matches', Matches::class)->middleware(['verified'])->name('matches.index');
     Route::get('matches/create', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.create');
     Route::get('matches/{match}', MatchShow::class)->middleware(['verified', 'connected'])->name('matches.show');
     Route::get('matches/{match}/edit', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.edit');

@@ -46,6 +46,20 @@ return [
     'comment_great_sportsmanship' => 'Gott sportsmannaskap',
     'comment_consistent_player' => 'Stabil spelare',
 
+    // Confirmation Flow
+    'confirm_match'          => 'Bekräfta match',
+    'reject_match'           => 'Avvisa match',
+    'reject_confirm'         => 'Är du säker på att du vill avvisa denna match?',
+    'confirmed_successfully' => 'Match bekräftad.',
+    'rejected_successfully'  => 'Match avvisad.',
+    'awaiting_confirmation'  => 'Väntar på motståndarens bekräftelse',
+
+    // Guest / Not Connected
+    'connect_required_title' => 'Spelarprofil krävs',
+    'connect_to_create' => 'Du måste koppla din spelarprofil innan du kan skapa matcher.',
+    'connect_now' => 'Koppla nu',
+    'maybe_later' => 'Kanske senare',
+
     // Validation & Flash Messages
     'cannot_play_yourself' => 'Du kan inte spela mot dig själv.',
     'cannot_tie' => 'En match kan inte sluta lika.',

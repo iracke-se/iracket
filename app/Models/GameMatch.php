@@ -58,6 +58,7 @@ class GameMatch extends Model
         'player2_comments',
         'description',
         'status',
+        'confirmed_at',
         'is_manual',
         'created_by',
         'live_match_game_id',
@@ -67,6 +68,7 @@ class GameMatch extends Model
         'played_at' => 'date',
         'player1_comments' => 'array',
         'player2_comments' => 'array',
+        'confirmed_at' => 'datetime',
         'is_manual' => 'boolean',
         'is_unofficial' => 'boolean',
     ];

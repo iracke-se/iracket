@@ -31,7 +31,7 @@
             @foreach($notifications as $notification)
                 <div
                     wire:click="markAsRead({{ $notification->id }})"
-                    class="relative p-4 rounded-xl cursor-pointer transition-colors {{ $notification->isRead() ? 'bg-zinc-100/50 dark:bg-zinc-800/50' : 'bg-zinc-100 dark:bg-zinc-800' }}"
+                    class="relative p-4 rounded-xl cursor-pointer transition-colors hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 {{ $notification->isRead() ? 'bg-zinc-100/50 dark:bg-zinc-800/50' : 'bg-zinc-100 dark:bg-zinc-800' }}"
                 >
                     @if(!$notification->isRead())
                         <div class="absolute top-4 right-4 w-2 h-2 rounded-full bg-accent"></div>

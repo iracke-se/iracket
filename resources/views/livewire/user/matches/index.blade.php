@@ -1,13 +1,46 @@
 <div class="max-w-2xl mx-auto">
+
+    {{-- Connect Player Modal (pure Livewire, no Alpine timing issues) --}}
+    @if($showConnectModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div class="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-700 p-6">
+                <div class="flex items-center justify-center w-14 h-14 mx-auto mb-4 rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <svg class="w-7 h-7 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                    </svg>
+                </div>
+                <h2 class="text-lg font-semibold text-zinc-900 dark:text-white text-center mb-2">{{ __('user-matches.connect_required_title') }}</h2>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 text-center mb-6">{{ __('user-matches.connect_to_create') }}</p>
+                <div class="flex flex-col gap-3">
+                    <a href="{{ route('connect-account') }}" class="w-full text-center px-4 py-2.5 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors font-medium text-sm">
+                        {{ __('user-matches.connect_now') }}
+                    </a>
+                    <button wire:click="closeConnectModal" class="w-full text-center px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm">
+                        {{ __('user-matches.maybe_later') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ __('user-matches.my_matches') }}</h1>
 
-        <a href="{{ route('matches.create') }}" wire:navigate class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            {{ __('user-matches.new_match') }}
-        </a>
+        @if(auth()->user()->is_active_player)
+            <a href="{{ route('matches.create') }}" wire:navigate class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                {{ __('user-matches.new_match') }}
+            </a>
+        @else
+            <button wire:click="$set('showConnectModal', true)" class="flex items-center gap-2 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 rounded-lg cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                {{ __('user-matches.new_match') }}
+            </button>
+        @endif
     </div>
 
     <!-- Filters -->
@@ -107,8 +140,21 @@
                                 $user = auth()->user();
                                 $isPlayer1 = $match->player1_id === $user->id;
                                 $opponent = $isPlayer1 ? $match->player2 : $match->player1;
-                                $myPointsChange = $isPlayer1 ? $match->player1_points_change : $match->player2_points_change;
-                                $oppPointsChange = $isPlayer1 ? $match->player2_points_change : $match->player1_points_change;
+
+                                // Use match_points priority (same as show page)
+                                $myPointsRaw = $isPlayer1
+                                    ? ($match->player1_match_points ?? $match->player1_points_change)
+                                    : ($match->player2_match_points ?? $match->player2_points_change);
+                                $oppPointsRaw = $isPlayer1
+                                    ? ($match->player2_match_points ?? $match->player2_points_change)
+                                    : ($match->player1_match_points ?? $match->player1_points_change);
+
+                                // Determine winner (winner_id → points sign → sets)
+                                $won = $match->winner_id === $user->id;
+                                if ($match->winner_id === null && $myPointsRaw !== null) {
+                                    $won = $myPointsRaw > 0;
+                                }
+
                                 $sets = collect();
                                 if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
                                     $sets = $match->liveMatchGame->sets->sortBy('set_number');
@@ -124,9 +170,25 @@
                                     $mySets = $isPlayer1 ? ($match->player1_sets ?? 0) : ($match->player2_sets ?? 0);
                                     $opponentSets = $isPlayer1 ? ($match->player2_sets ?? 0) : ($match->player1_sets ?? 0);
                                 }
-                                $won = $match->winner_id
-                                    ? $match->winner_id === $user->id
-                                    : $mySets > $opponentSets;
+
+                                // Fix reversed sets if inconsistent with the known result
+                                if (($mySets + $opponentSets) > 0) {
+                                    $setsConsistent = $won && $mySets >= $opponentSets || !$won && $mySets <= $opponentSets;
+                                    if (!$setsConsistent) {
+                                        [$mySets, $opponentSets] = [$opponentSets, $mySets];
+                                    }
+                                }
+
+                                // Last resort: derive from sets
+                                if ($match->winner_id === null && $myPointsRaw === null) {
+                                    $won = $mySets > $opponentSets;
+                                }
+
+                                // Normalize badge points: winner gets positive, loser gets negative (same as show page)
+                                $myPointsChange = $myPointsRaw !== null ? ($won ? abs($myPointsRaw) : -abs($myPointsRaw)) : null;
+                                $oppPointsChange = $oppPointsRaw !== null ? ($won ? -abs($oppPointsRaw) : abs($oppPointsRaw)) : null;
+                                if ($myPointsChange !== null && $oppPointsChange === null) { $oppPointsChange = -$myPointsChange; }
+                                elseif ($oppPointsChange !== null && $myPointsChange === null) { $myPointsChange = -$oppPointsChange; }
                             @endphp
                             <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
 
@@ -137,9 +199,11 @@
                                             {{ $mySets }} - {{ $opponentSets }}
                                         </div>
                                     @else
-                                        <span class="inline-block px-6 py-2 rounded-lg text-3xl font-bold {{ $won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">
-                                            {{ $won ? 'W' : 'L' }}
-                                        </span>
+                                        <div class="flex items-center justify-center gap-2">
+                                            <span class="inline-block px-4 py-1.5 rounded-lg text-2xl font-bold {{ $won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">{{ $won ? 'W' : 'L' }}</span>
+                                            <span class="text-zinc-400 dark:text-zinc-500 text-xl font-bold">-</span>
+                                            <span class="inline-block px-4 py-1.5 rounded-lg text-2xl font-bold {{ $won ? 'bg-red-500/20 text-red-700 dark:text-red-400' : 'bg-green-500/20 text-green-700 dark:text-green-400' }}">{{ $won ? 'L' : 'W' }}</span>
+                                        </div>
                                     @endif
                                 </div>
 
@@ -204,28 +268,6 @@
                                     </div>
                                 </div>
 
-                                {{-- Set scores --}}
-                                @if($sets->isNotEmpty())
-                                    <div class="border-t border-zinc-200 dark:border-zinc-700 px-4 py-3">
-                                        <div class="flex items-center justify-center gap-2 flex-wrap">
-                                            @foreach($sets as $set)
-                                                @php
-                                                    $mySetPts  = $isPlayer1 ? $set->player1_points : $set->player2_points;
-                                                    $oppSetPts = $isPlayer1 ? $set->player2_points : $set->player1_points;
-                                                    $wonSet    = $mySetPts > $oppSetPts;
-                                                @endphp
-                                                <div class="text-center">
-                                                    <div class="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Set {{ $set->set_number }}</div>
-                                                    <div class="px-3 py-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-700">
-                                                        <span class="{{ $wonSet ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $mySetPts }}</span>
-                                                        <span class="text-zinc-400 mx-0.5">-</span>
-                                                        <span class="{{ !$wonSet ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400' }}">{{ $oppSetPts }}</span>
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
 
                                 {{-- View Full Match --}}
                                 <div class="border-t border-zinc-200 dark:border-zinc-700 px-4 py-2.5">

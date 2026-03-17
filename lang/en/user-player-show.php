@@ -5,6 +5,8 @@ return [
     'years' => 'years',
     'this_month' => 'this month',
     'points' => 'points',
+    'current_points' => 'Current Points',
+    'official_points' => 'Official Points',
     'pts' => 'pts',
 
     // Rankings History

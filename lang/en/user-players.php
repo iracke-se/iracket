@@ -33,6 +33,7 @@ return [
     // Player Info
     'years' => 'years',
     'points' => 'points',
+    'current_points' => 'Current Points',
     'this_month' => 'this month',
 
     // Player Profile

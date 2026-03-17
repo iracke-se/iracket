@@ -50,6 +50,8 @@ class Form extends Component
             $this->match = $match;
             $user = auth()->user();
 
+            abort_if($match->created_by !== $user->id, 403);
+
             $this->played_at = $match->played_at->format('Y-m-d');
 
             // Determine which player is the current user

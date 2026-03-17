@@ -13,10 +13,15 @@ class Index extends Component
     public int $selectedYear;
     public ?int $selectedOpponent = null;
     public string $opponentSearch = '';
+    public bool $showConnectModal = false;
 
     public function mount()
     {
         $user = auth()->user();
+
+        if (!$user->is_active_player) {
+            $this->showConnectModal = true;
+        }
 
         $latestYear = GameMatch::where(function ($query) use ($user) {
             $query->where('player1_id', $user->id)
@@ -33,6 +38,11 @@ class Index extends Component
     {
         $this->selectedOpponent = $opponentId;
         $this->opponentSearch = '';
+    }
+
+    public function closeConnectModal(): void
+    {
+        $this->showConnectModal = false;
     }
 
     public function clearOpponentFilter(): void

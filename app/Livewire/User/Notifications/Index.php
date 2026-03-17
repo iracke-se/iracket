@@ -13,6 +13,11 @@ class Index extends Component
 
         if ($notification) {
             $notification->markAsRead();
+
+            $url = $notification->data['url'] ?? null;
+            if ($url) {
+                $this->redirect($url, navigate: true);
+            }
         }
     }
 

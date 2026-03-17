@@ -33,6 +33,7 @@ return [
     // Player Info
     'years' => 'år',
     'points' => 'poäng',
+    'current_points' => 'Aktuella poäng',
     'this_month' => 'denna månad',
 
     // Player Profile

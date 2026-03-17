@@ -5,6 +5,8 @@ return [
     'years' => 'år',
     'this_month' => 'denna månad',
     'points' => 'poäng',
+    'current_points' => 'Aktuella poäng',
+    'official_points' => 'Officiella poäng',
     'pts' => 'p',
 
     // Rankings History

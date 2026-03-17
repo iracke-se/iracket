@@ -28,16 +28,13 @@ class Show extends Component
 
     public function getMatchesForRanking($year, $month)
     {
-        // Rankings for month X reflect matches played in month X-1
-        $prevMonth = \Carbon\Carbon::create($year, $month, 1)->subMonth();
-
-        // Live Center matches — played in the previous month (have set scores)
+        // Live Center matches — played in the same month as the accordion
         $gameMatches = GameMatch::where(function ($query) {
             $query->where('player1_id', $this->player->id)
                   ->orWhere('player2_id', $this->player->id);
         })
-        ->whereYear('played_at', $prevMonth->year)
-        ->whereMonth('played_at', $prevMonth->month)
+        ->whereYear('played_at', $year)
+        ->whereMonth('played_at', $month)
         ->with([
             'player1',
             'player2',
@@ -50,16 +47,15 @@ class Show extends Component
         ->orderBy('played_at', 'desc')
         ->get();
 
-        // Rankings popup matches — these are the matches that *contributed* to this
-        // month's ranking (typically played the previous month, stored under scraped_month)
+        // Scraped matches — filter by actual match date month, not scraped_month
         $playerFullName = $this->player->last_name . ', ' . $this->player->first_name;
-        $scrapedMonth = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT);
 
         $scrapedMatches = \App\Models\Scraper\ScrapedMatch::where(function ($query) use ($playerFullName) {
             $query->where('player_name', $playerFullName)
                   ->orWhere('opponent_name', $playerFullName);
         })
-        ->where('scraped_month', $scrapedMonth)
+        ->whereRaw('YEAR(COALESCE(match_date, played_at)) = ?', [$year])
+        ->whereRaw('MONTH(COALESCE(match_date, played_at)) = ?', [$month])
         ->orderByRaw('COALESCE(match_date, played_at) DESC')
         ->get()
         ->unique(function ($m) use ($playerFullName) {
@@ -139,6 +135,14 @@ class Show extends Component
             ->orderBy('year', 'desc')
             ->orderBy('month', 'desc')
             ->get();
+
+        // Since matches are now shown under their actual played month (not the ranking month),
+        // shift points_change one row forward: each month's change reflects the matches played
+        // that month (which appear in the NEXT month's ranking). The most recent row gets null.
+        $originalChanges = $rankingsHistory->pluck('points_change')->all();
+        $rankingsHistory->each(function ($ranking, $index) use ($originalChanges) {
+            $ranking->points_change = $index > 0 ? $originalChanges[$index - 1] : null;
+        });
 
         $isOwnProfile = auth()->id() === $this->player->id;
         $isMonitoring = auth()->user()->isMonitoring($this->player);

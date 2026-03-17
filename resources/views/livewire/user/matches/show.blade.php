@@ -16,69 +16,60 @@
         <!-- Result -->
         <div class="text-center mb-6">
             @php
-                // Calculate sets from live center data if available
                 $player1Sets = $match->player1_sets;
                 $player2Sets = $match->player2_sets;
+                $player1Won = $match->winner_id === $match->player1_id;
+                $player2Won = $match->winner_id === $match->player2_id;
 
-                if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
-                    $player1SetsWon = 0;
-                    $player2SetsWon = 0;
-                    foreach ($match->liveMatchGame->sets as $set) {
-                        if ($set->player1_points > $set->player2_points) {
-                            $player1SetsWon++;
-                        } else {
-                            $player2SetsWon++;
-                        }
-                    }
-                    $player1Sets = $player1SetsWon;
-                    $player2Sets = $player2SetsWon;
+                // Get scraped match data for points + result inference
+                $p1Name = $player1->last_name . ', ' . $player1->first_name;
+                $p2Name = $player2->last_name . ', ' . $player2->first_name;
+                $p1ScrapedPoints = null; $p2ScrapedPoints = null;
+
+                foreach ($match->scrapedMatches as $sm) {
+                    if ($sm->player_name === $p1Name) { $p1ScrapedPoints = $sm->match_points; $p1ScrapedResult = $sm->result ?? null; }
+                    if ($sm->player_name === $p2Name) { $p2ScrapedPoints = $sm->match_points; $p2ScrapedResult = $sm->result ?? null; }
                 }
+
+                // Infer winner when winner_id is not set
+                if ($match->winner_id === null) {
+                    if (isset($p1ScrapedResult) && $p1ScrapedResult === 'W') { $player1Won = true; }
+                    elseif (isset($p2ScrapedResult) && $p2ScrapedResult === 'W') { $player2Won = true; }
+                }
+
+                // Calculate sets from live center data
+                if ($match->liveMatchGame && $match->liveMatchGame->sets->isNotEmpty()) {
+                    $p1SetsWon = 0; $p2SetsWon = 0;
+                    foreach ($match->liveMatchGame->sets as $set) {
+                        if ($set->player1_points > $set->player2_points) { $p1SetsWon++; } else { $p2SetsWon++; }
+                    }
+                    $player1Sets = $p1SetsWon;
+                    $player2Sets = $p2SetsWon;
+                    // Fix reversed player assignment in liveMatchGame
+                    $p1Consistent = ($player1Won && $player1Sets >= $player2Sets) || (!$player1Won && $player1Sets <= $player2Sets);
+                    if (!$p1Consistent) {
+                        [$player1Sets, $player2Sets] = [$player2Sets, $player1Sets];
+                    }
+                }
+
+                // Badge points with correct sign
+                $p1BadgePoints = $match->player1_match_points ?? $p1ScrapedPoints ?? $match->player1_points_change;
+                $p2BadgePoints = $match->player2_match_points ?? $p2ScrapedPoints ?? $match->player2_points_change;
+                if ($p1BadgePoints !== null) { $p1BadgePoints = $player1Won ? abs($p1BadgePoints) : -abs($p1BadgePoints); }
+                if ($p2BadgePoints !== null) { $p2BadgePoints = $player2Won ? abs($p2BadgePoints) : -abs($p2BadgePoints); }
+                if ($p1BadgePoints !== null && $p2BadgePoints === null) { $p2BadgePoints = -$p1BadgePoints; }
+                elseif ($p2BadgePoints !== null && $p1BadgePoints === null) { $p1BadgePoints = -$p2BadgePoints; }
             @endphp
 
             @if($player1Sets > 0 || $player2Sets > 0)
                 <div class="text-4xl font-bold text-zinc-900 dark:text-white">
                     {{ $player1Sets }} - {{ $player2Sets }}
                 </div>
-            @elseif($match->scrapedMatches->isNotEmpty())
-                @php
-                    $player1Name = $match->player1->last_name . ', ' . $match->player1->first_name;
-                    $player2Name = $match->player2->last_name . ', ' . $match->player2->first_name;
-
-                    $player1Points = null;
-                    $player2Points = null;
-
-                    foreach ($match->scrapedMatches as $sm) {
-                        if ($sm->player_name === $player1Name) {
-                            $player1Points = $sm->match_points;
-                        }
-                        if ($sm->player_name === $player2Name) {
-                            $player2Points = $sm->match_points;
-                        }
-                    }
-
-                    if ($player1Points !== null && $player2Points === null) {
-                        $player2Points = -$player1Points;
-                    } elseif ($player2Points !== null && $player1Points === null) {
-                        $player1Points = -$player2Points;
-                    }
-                @endphp
-                @if($player1Points !== null && $player2Points !== null)
-                    <div class="flex items-center justify-center gap-3">
-                        <span class="px-6 py-3 rounded-lg text-3xl font-bold {{ $player1Points > 0 ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">
-                            {{ $player1Points > 0 ? 'W' : 'L' }}
-                        </span>
-                        <span class="px-6 py-3 rounded-lg text-3xl font-bold {{ $player2Points > 0 ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">
-                            {{ $player2Points > 0 ? 'W' : 'L' }}
-                        </span>
-                    </div>
-                @endif
-            @elseif($match->winner_id)
-                @php
-                    $player1Score = $match->winner_id === $match->player1_id ? 2 : 0;
-                    $player2Score = $match->winner_id === $match->player2_id ? 2 : 0;
-                @endphp
-                <div class="text-4xl font-bold text-zinc-900 dark:text-white">
-                    {{ $player1Score }} - {{ $player2Score }}
+            @elseif($player1Won || $player2Won)
+                <div class="flex items-center justify-center gap-3">
+                    <span class="px-6 py-3 rounded-lg text-3xl font-bold {{ $player1Won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">{{ $player1Won ? 'W' : 'L' }}</span>
+                    <span class="text-zinc-400 dark:text-zinc-500 text-2xl font-bold">-</span>
+                    <span class="px-6 py-3 rounded-lg text-3xl font-bold {{ $player2Won ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-500/20 text-red-700 dark:text-red-400' }}">{{ $player2Won ? 'W' : 'L' }}</span>
                 </div>
             @else
                 <div class="text-4xl font-bold text-zinc-400">-</div>
@@ -103,9 +94,9 @@
                             <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player1->initials() }}</span>
                         </div>
                     @endif
-                    @if($match->player1_points_change !== null)
-                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full text-xs font-bold text-white {{ $match->player1_points_change >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
-                            {{ $match->player1_points_change >= 0 ? '+' : '' }}{{ $match->player1_points_change }}
+                    @if(isset($p1BadgePoints) && $p1BadgePoints !== null)
+                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full text-xs font-bold text-white {{ $p1BadgePoints >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
+                            {{ $p1BadgePoints >= 0 ? '+' : '' }}{{ $p1BadgePoints }}
                         </span>
                     @endif
                 </div>
@@ -132,9 +123,9 @@
                             <span class="text-xl font-medium text-zinc-600 dark:text-zinc-300">{{ $player2->initials() }}</span>
                         </div>
                     @endif
-                    @if($match->player2_points_change !== null)
-                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full text-xs font-bold text-white {{ $match->player2_points_change >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
-                            {{ $match->player2_points_change >= 0 ? '+' : '' }}{{ $match->player2_points_change }}
+                    @if(isset($p2BadgePoints) && $p2BadgePoints !== null)
+                        <span class="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full text-xs font-bold text-white {{ $p2BadgePoints >= 0 ? 'bg-green-500' : 'bg-red-500' }}">
+                            {{ $p2BadgePoints >= 0 ? '+' : '' }}{{ $p2BadgePoints }}
                         </span>
                     @endif
                 </div>
@@ -240,7 +231,87 @@
     </div>
 
     <!-- Actions -->
-    @if($match->created_by === $user->id)
+    @php
+        $isCreator = $match->created_by === $user->id;
+        $isOpponent = $isParticipant && !$isCreator;
+        $isPending = $match->status === 'pending';
+    @endphp
+
+    {{-- Opponent: pending match → confirm, reject --}}
+    @if($isOpponent && $isPending)
+        <div x-data="{ showRejectModal: false }" class="space-y-3 mb-6">
+            <div class="flex gap-3">
+                <button
+                    wire:click="confirmMatch"
+                    wire:loading.attr="disabled"
+                    class="flex-1 px-4 py-3 bg-accent text-white text-center rounded-lg hover:opacity-90 transition-opacity font-medium"
+                >
+                    {{ __('user-matches.confirm_match') }}
+                </button>
+                <button
+                    @click="showRejectModal = true"
+                    class="flex-1 px-4 py-3 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-center rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                >
+                    {{ __('user-matches.reject_match') }}
+                </button>
+            </div>
+
+            <!-- Reject Confirmation Modal -->
+            <div
+                x-show="showRejectModal"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                @click.self="showRejectModal = false"
+                x-cloak
+            >
+                <div
+                    x-show="showRejectModal"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-sm shadow-xl"
+                >
+                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-white mb-2">{{ __('user-matches.reject_match') }}</h3>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{{ __('user-matches.reject_confirm') }}</p>
+                    <div class="flex gap-3">
+                        <button
+                            @click="showRejectModal = false"
+                            class="flex-1 px-4 py-3 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors text-sm font-medium"
+                        >
+                            {{ __('user-matches.cancel') }}
+                        </button>
+                        <button
+                            wire:click="rejectMatch"
+                            class="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                        >
+                            {{ __('user-matches.reject_match') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Creator: pending match → waiting notice --}}
+    @if($isCreator && $isPending)
+        <div class="flex items-center gap-2 px-4 py-3 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-lg mb-6 text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            {{ __('user-matches.awaiting_confirmation') }}
+        </div>
+    @endif
+
+    {{-- Creator: pending match → edit + delete --}}
+    @if($isCreator && $isPending)
         <div x-data="{ showDeleteModal: false }" class="flex gap-3 mb-6">
             <button
                 @click="showDeleteModal = true"

@@ -17,14 +17,13 @@ class Index extends Component
     public function getMatchesForRanking($year, $month)
     {
         $player = auth()->user();
-        $prevMonth = \Carbon\Carbon::create($year, $month, 1)->subMonth();
 
         $gameMatches = GameMatch::where(function ($query) use ($player) {
             $query->where('player1_id', $player->id)
                   ->orWhere('player2_id', $player->id);
         })
-        ->whereYear('played_at', $prevMonth->year)
-        ->whereMonth('played_at', $prevMonth->month)
+        ->whereYear('played_at', $year)
+        ->whereMonth('played_at', $month)
         ->with([
             'player1',
             'player2',
@@ -38,13 +37,13 @@ class Index extends Component
         ->get();
 
         $playerFullName = $player->last_name . ', ' . $player->first_name;
-        $scrapedMonth = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT);
 
         $scrapedMatches = \App\Models\Scraper\ScrapedMatch::where(function ($query) use ($playerFullName) {
             $query->where('player_name', $playerFullName)
                   ->orWhere('opponent_name', $playerFullName);
         })
-        ->where('scraped_month', $scrapedMonth)
+        ->whereRaw('YEAR(COALESCE(match_date, played_at)) = ?', [$year])
+        ->whereRaw('MONTH(COALESCE(match_date, played_at)) = ?', [$month])
         ->orderByRaw('COALESCE(match_date, played_at) DESC')
         ->get()
         ->unique(function ($m) use ($playerFullName) {
@@ -101,10 +100,32 @@ class Index extends Component
 
         $currentRanking = $player->currentMonthRanking();
 
+        $manualPointsDelta = GameMatch::where(function ($q) use ($player) {
+                $q->where('player1_id', $player->id)
+                  ->orWhere('player2_id', $player->id);
+            })
+            ->where('is_manual', true)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->get()
+            ->sum(fn($m) => $m->player1_id === $player->id
+                ? $m->player1_points_change
+                : $m->player2_points_change
+            );
+
+        $currentRankingPoints = ($currentRanking?->points ?? 0) + $manualPointsDelta;
+
         $rankingsHistory = $player->monthlyRankings()
             ->orderBy('year', 'desc')
             ->orderBy('month', 'desc')
             ->get();
+
+        // Shift points_change: each month's change reflects matches played that month,
+        // which show in the NEXT month's ranking. Most recent row gets null.
+        $originalChanges = $rankingsHistory->pluck('points_change')->all();
+        $rankingsHistory->each(function ($ranking, $index) use ($originalChanges) {
+            $ranking->points_change = $index > 0 ? $originalChanges[$index - 1] : null;
+        });
 
         $rankingPosition = $player->getCurrentRankingPosition();
         $rankingCategory = $player->getRankingCategory();
@@ -123,6 +144,7 @@ class Index extends Component
         return view('livewire.user.rankings.index', [
             'player' => $player,
             'currentRanking' => $currentRanking,
+            'currentRankingPoints' => $currentRankingPoints,
             'rankingsHistory' => $rankingsHistory,
             'rankingPosition' => $rankingPosition,
             'rankingCategory' => $rankingCategory,

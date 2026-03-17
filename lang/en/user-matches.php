@@ -46,6 +46,20 @@ return [
     'comment_great_sportsmanship' => 'Great sportsmanship',
     'comment_consistent_player' => 'Consistent player',
 
+    // Confirmation Flow
+    'confirm_match'          => 'Confirm Match',
+    'reject_match'           => 'Reject Match',
+    'reject_confirm'         => 'Are you sure you want to reject this match?',
+    'confirmed_successfully' => 'Match confirmed successfully.',
+    'rejected_successfully'  => 'Match rejected.',
+    'awaiting_confirmation'  => 'Awaiting opponent confirmation',
+
+    // Guest / Not Connected
+    'connect_required_title' => 'Player Profile Required',
+    'connect_to_create' => 'You need to connect your player profile before you can create matches.',
+    'connect_now' => 'Connect Now',
+    'maybe_later' => 'Maybe Later',
+
     // Validation & Flash Messages
     'cannot_play_yourself' => 'You cannot play against yourself.',
     'cannot_tie' => 'Match cannot end in a tie.',

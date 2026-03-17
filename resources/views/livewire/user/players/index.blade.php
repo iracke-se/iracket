@@ -230,13 +230,17 @@
                         </div>
 
                         <!-- Points -->
-                        <div class="text-right flex-shrink-0 min-w-[60px]">
+                        <div class="flex-shrink-0">
                             @if($currentRanking)
-                                <div class="text-lg font-bold text-zinc-900 dark:text-white">{{ number_format($currentRanking->points) }}</div>
-                                <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('user-players.points') }}</div>
+                                <div class="flex flex-col items-center px-3 py-1.5 bg-accent rounded-full">
+                                    <span class="text-sm font-bold text-white leading-tight">{{ number_format($currentRanking->points) }}</span>
+                                    <span class="text-xs text-white/80 leading-tight">{{ __('user-players.current_points') }}</span>
+                                </div>
                             @else
-                                <div class="text-lg font-bold text-zinc-500">--</div>
-                                <div class="text-xs text-zinc-500">{{ __('user-players.points') }}</div>
+                                <div class="flex flex-col items-center px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full">
+                                    <span class="text-sm font-bold text-zinc-500 leading-tight">--</span>
+                                    <span class="text-xs text-zinc-400 leading-tight">{{ __('user-players.current_points') }}</span>
+                                </div>
                             @endif
                         </div>
                     </a>
