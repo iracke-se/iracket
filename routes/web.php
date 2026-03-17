@@ -12,6 +12,8 @@ use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\TwoFactor;
 use App\Livewire\User\Bubbler\Index as Bubbler;
+use App\Livewire\User\Districts\Index as Districts;
+use App\Livewire\User\Districts\Show as DistrictShow;
 use App\Livewire\User\Clubs\Index as Clubs;
 use App\Livewire\User\Clubs\Show as ClubShow;
 use App\Livewire\User\Clubs\Transitions as ClubTransitions;
@@ -118,6 +120,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('matches/create', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.create');
     Route::get('matches/{match}', MatchShow::class)->middleware(['verified', 'connected'])->name('matches.show');
     Route::get('matches/{match}/edit', MatchForm::class)->middleware(['verified', 'connected'])->name('matches.edit');
+
+    // Districts
+    Route::get('districts', Districts::class)->middleware(['verified', 'connected'])->name('districts.index');
+    Route::get('districts/{district}', DistrictShow::class)->middleware(['verified', 'connected'])->name('districts.show');
 
     // Bubbler
     Route::get('bubbler', Bubbler::class)->middleware(['verified', 'connected'])->name('bubbler.index');
