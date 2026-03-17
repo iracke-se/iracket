@@ -33,8 +33,8 @@ class ConnectAccount extends Component
     {
         $user = Auth::user();
 
-        // If already connected, redirect to players
-        if ($user->is_connected) {
+        // If already fully connected as an active player, redirect to players
+        if ($user->is_connected && $user->is_active_player) {
             return redirect()->route('players.index');
         }
 
