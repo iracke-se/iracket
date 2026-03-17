@@ -60,7 +60,7 @@
                     </div>
 
                     <div class="flex-1 min-w-0">
-                        <h3 class="font-medium text-zinc-900 dark:text-white">{{ $district->name }}</h3>
+                        <h3 class="font-medium text-zinc-900 dark:text-white truncate">{{ $district->name }}</h3>
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ $district->users_count }} {{ __('players') }}</p>
                     </div>
 
