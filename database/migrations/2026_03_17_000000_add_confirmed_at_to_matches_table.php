@@ -8,9 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('matches', function (Blueprint $table) {
-            $table->timestamp('confirmed_at')->nullable()->after('status');
-        });
+        if (!Schema::hasColumn('matches', 'confirmed_at')) {
+            Schema::table('matches', function (Blueprint $table) {
+                $table->timestamp('confirmed_at')->nullable()->after('status');
+            });
+        }
     }
 
     public function down(): void
