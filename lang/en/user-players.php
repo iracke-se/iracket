@@ -40,6 +40,7 @@ return [
     'rankings_history' => 'Rankings History',
     'no_ranking_history' => 'No ranking history yet',
     'month' => 'Month',
+    'all_months' => 'All months',
     'ranking' => 'Ranking',
     'points_change' => 'Points +/-',
 ];

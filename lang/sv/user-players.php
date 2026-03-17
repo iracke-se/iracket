@@ -40,6 +40,7 @@ return [
     'rankings_history' => 'Rankninghistorik',
     'no_ranking_history' => 'Ingen rankningshistorik ännu',
     'month' => 'Månad',
+    'all_months' => 'Alla månader',
     'ranking' => 'Rankning',
     'points_change' => 'Poäng +/-',
 ];
