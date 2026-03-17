@@ -231,15 +231,18 @@
 
                         <!-- Points -->
                         <div class="flex-shrink-0">
-                            @if($currentRanking)
-                                <div class="flex flex-col items-center px-3 py-1.5 bg-accent rounded-full">
-                                    <span class="text-sm font-bold text-white leading-tight">{{ number_format($currentRanking->points) }}</span>
-                                    <span class="text-xs text-white/80 leading-tight">{{ __('user-players.current_points') }}</span>
+                            @php
+                            $displayPoints = ($currentRanking?->points ?? 0) + ($manualPointsMap[$player->id] ?? 0);
+                        @endphp
+                        @if($displayPoints > 0)
+                                <div class="flex flex-col items-center px-4 py-2 bg-accent rounded-full">
+                                    <span class="text-sm font-bold text-white">{{ number_format($displayPoints) }}</span>
+                                    <span class="text-xs text-white/80">{{ __('user-players.current_points') }}</span>
                                 </div>
                             @else
-                                <div class="flex flex-col items-center px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full">
-                                    <span class="text-sm font-bold text-zinc-500 leading-tight">--</span>
-                                    <span class="text-xs text-zinc-400 leading-tight">{{ __('user-players.current_points') }}</span>
+                                <div class="flex flex-col items-center px-4 py-2 bg-zinc-200 dark:bg-zinc-700 rounded-full">
+                                    <span class="text-sm font-bold text-zinc-500">--</span>
+                                    <span class="text-xs text-zinc-400">{{ __('user-players.current_points') }}</span>
                                 </div>
                             @endif
                         </div>

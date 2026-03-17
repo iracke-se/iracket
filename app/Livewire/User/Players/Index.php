@@ -101,9 +101,8 @@ class Index extends Component
                     $q->where('year', $selectedYear)
                       ->where('month', $selectedMonth);
                 } else {
-                    $q->orderBy('year', 'desc')
-                      ->orderBy('month', 'desc')
-                      ->limit(1);
+                    $q->where('year', now()->year)
+                      ->where('month', now()->month);
                 }
             }]);
 
@@ -244,6 +243,28 @@ class Index extends Component
 
         $players = $query->paginate(20);
 
+        // Load manual points delta for this month (same logic as show page)
+        $playerIds = $players->pluck('id')->toArray();
+        $manualPointsMap = [];
+        if (!$selectedYear && !$selectedMonth && !empty($playerIds)) {
+            \App\Models\GameMatch::where(function ($q) use ($playerIds) {
+                    $q->whereIn('player1_id', $playerIds)
+                      ->orWhereIn('player2_id', $playerIds);
+                })
+                ->where('is_manual', true)
+                ->whereYear('created_at', now()->year)
+                ->whereMonth('created_at', now()->month)
+                ->get()
+                ->each(function ($match) use (&$manualPointsMap, $playerIds) {
+                    if (in_array($match->player1_id, $playerIds)) {
+                        $manualPointsMap[$match->player1_id] = ($manualPointsMap[$match->player1_id] ?? 0) + $match->player1_points_change;
+                    }
+                    if (in_array($match->player2_id, $playerIds)) {
+                        $manualPointsMap[$match->player2_id] = ($manualPointsMap[$match->player2_id] ?? 0) + $match->player2_points_change;
+                    }
+                });
+        }
+
         // Get top 3 positions for men and women (from selected month or most recent rankings)
         if ($selectedYear && $selectedMonth) {
             // Use selected month
@@ -297,9 +318,10 @@ class Index extends Component
         }
 
         return view('livewire.user.players.index', [
-            'players'          => $players,
-            'rankingPositions' => $rankingPositions,
+            'players'            => $players,
+            'rankingPositions'   => $rankingPositions,
             'availableDistricts' => District::orderBy('name')->get(['id', 'name']),
+            'manualPointsMap'    => $manualPointsMap,
         ])->layout('components.layouts.app');
     }
 }
