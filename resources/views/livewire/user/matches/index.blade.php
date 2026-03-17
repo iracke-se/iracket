@@ -10,15 +10,7 @@
                     </svg>
                 </div>
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white text-center mb-2">{{ __('user-matches.connect_required_title') }}</h2>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400 text-center mb-6">{{ __('user-matches.connect_to_create') }}</p>
-                <div class="flex flex-col gap-3">
-                    <a href="{{ route('connect-account') }}" class="w-full text-center px-4 py-2.5 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors font-medium text-sm">
-                        {{ __('user-matches.connect_now') }}
-                    </a>
-                    <button wire:click="closeConnectModal" class="w-full text-center px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm">
-                        {{ __('user-matches.maybe_later') }}
-                    </button>
-                </div>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 text-center">{{ __('user-matches.connect_to_create') }}</p>
             </div>
         </div>
     @endif
