@@ -14,21 +14,31 @@
 
     @if($showRaw)
         <!-- Raw Data View -->
-        <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-            <div class="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 flex items-center gap-3">
-                <span class="text-xs font-mono text-zinc-500 dark:text-zinc-400">#</span>
-                <span class="text-xs font-mono font-semibold text-zinc-500 dark:text-zinc-400 flex-1">name</span>
-                <span class="text-xs font-mono font-semibold text-zinc-500 dark:text-zinc-400 w-24 text-right">profixio_id</span>
-                <span class="text-xs font-mono font-semibold text-zinc-500 dark:text-zinc-400 w-16 text-right">players</span>
-            </div>
-            @foreach($districts as $district)
-                <div class="px-4 py-2.5 flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-700 last:border-0 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-                    <span class="text-xs font-mono text-zinc-400 dark:text-zinc-500 w-6">{{ $district->id }}</span>
-                    <span class="font-mono text-sm text-zinc-900 dark:text-white flex-1">{{ $district->name }}</span>
-                    <span class="font-mono text-sm text-zinc-500 dark:text-zinc-400 w-24 text-right">{{ $district->profixio_id ?? '—' }}</span>
-                    <span class="font-mono text-sm text-zinc-500 dark:text-zinc-400 w-16 text-right">{{ $district->users_count }}</span>
-                </div>
-            @endforeach
+        <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-x-auto">
+            <table class="w-full text-sm font-mono">
+                <thead>
+                    <tr class="bg-zinc-200 dark:bg-zinc-700 text-left">
+                        <th class="px-4 py-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 w-12">id</th>
+                        <th class="px-4 py-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400">name</th>
+                        <th class="px-4 py-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 text-right w-32">profixio_id</th>
+                        <th class="px-4 py-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 text-right w-24">players</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @foreach($districts as $district)
+                        <tr class="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                            <td class="px-4 py-3 text-zinc-400 dark:text-zinc-500">{{ $district->id }}</td>
+                            <td class="px-4 py-3 text-zinc-900 dark:text-white">{{ $district->name }}</td>
+                            <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400 text-right">{{ $district->profixio_id ?? 'null' }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-accent/20 text-accent">
+                                    {{ $district->users_count }}
+                                </span>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
         <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-3 text-right">{{ $districts->count() }} {{ __('districts') }}</p>
     @else
