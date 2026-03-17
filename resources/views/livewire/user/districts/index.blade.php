@@ -12,7 +12,10 @@
             </thead>
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @foreach($districts as $district)
-                    <tr class="bg-zinc-100 dark:bg-zinc-800">
+                    <tr
+                        class="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                        onclick="window.location='{{ route('districts.show', $district) }}'"
+                    >
                         <td class="px-4 py-3 text-zinc-400 dark:text-zinc-500">{{ $district->id }}</td>
                         <td class="px-4 py-3 text-zinc-900 dark:text-white">{{ $district->name }}</td>
                         <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400 text-right">{{ $district->profixio_id ?? 'null' }}</td>

@@ -39,6 +39,7 @@
                 </a>
 
                 <!-- Profile Dropdown -->
+                @auth
                 <flux:dropdown position="bottom" align="end">
                     <button class="flex items-center justify-center w-10 h-10 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
                         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-700 text-sm font-medium text-zinc-900 dark:text-white">
@@ -88,6 +89,13 @@
                         </form>
                     </flux:menu>
                 </flux:dropdown>
+                @else
+                <a href="{{ route('login') }}" class="flex items-center justify-center w-10 h-10 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                    </svg>
+                </a>
+                @endauth
             </div>
         </header>
 
@@ -125,7 +133,7 @@
                 </a>
 
                 <!-- My Profile -->
-                <a href="{{ route('players.show', auth()->user()) }}" class="flex flex-1 flex-col items-center justify-center gap-1 px-2 py-2 {{ request()->routeIs('players.show') && request()->route('user')?->id === auth()->id() ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
+                <a href="{{ auth()->check() ? route('players.show', auth()->user()) : route('login') }}" class="flex flex-1 flex-col items-center justify-center gap-1 px-2 py-2 {{ request()->routeIs('players.show') && request()->route('user')?->id === auth()->id() ? 'text-accent' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' }} transition-colors" wire:navigate>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                     </svg>
