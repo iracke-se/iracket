@@ -93,13 +93,11 @@ class RankingsScraper extends BaseScraperService
             $arguments[] = (string) $limitPlayers;
         }
 
-        // Create process with timeout and ensure Chromium path is passed
-        $timeout = config('scraper.python.timeout', 3600); // Default 1 hour
         $env = array_merge(getenv(), [
             'PUPPETEER_EXECUTABLE_PATH' => config('scraper.browser.chrome_path', '/usr/bin/chromium'),
         ]);
         $process = new Process($arguments, null, $env);
-        $process->setTimeout($timeout);
+        $process->setTimeout(null); // No timeout — rankings scrape can take many hours
 
         $this->info("Executing Python script: " . $process->getCommandLine());
 

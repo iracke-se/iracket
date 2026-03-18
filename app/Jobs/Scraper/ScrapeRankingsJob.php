@@ -13,7 +13,7 @@ class ScrapeRankingsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 3600; // 1 hour
+    public int $timeout = 0; // No timeout — rankings scrape can take many hours
     public int $tries = 3;
     public array $backoff = [60, 300, 600];
 
