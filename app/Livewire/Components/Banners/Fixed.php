@@ -8,12 +8,14 @@ use Livewire\Component;
 class Fixed extends Component
 {
     public string $location;
-    public string $position; // 'top', 'bottom', 'within_page', 'random'
+    public string $position;
+    public ?int $forceBannerId = null;
 
-    public function mount(string $location, string $position = 'top')
+    public function mount(string $location, string $position = 'top', ?int $forceBannerId = null)
     {
         $this->location = $location;
         $this->position = $position;
+        $this->forceBannerId = $forceBannerId;
     }
 
     public function trackClick($bannerId)
@@ -26,15 +28,15 @@ class Fixed extends Component
 
     public function render()
     {
-        $query = Banner::active()->forLocation($this->location);
-
-        if ($this->position === 'random') {
-            $query->whereIn('position', ['top', 'bottom', 'within_page', 'random']);
+        if ($this->forceBannerId) {
+            $banner = Banner::find($this->forceBannerId);
         } else {
-            $query->where('position', $this->position);
+            $banner = Banner::active()
+                ->forLocation($this->location)
+                ->where('position', $this->position)
+                ->inRandomOrder()
+                ->first();
         }
-
-        $banner = $query->inRandomOrder()->first();
 
         if ($banner) {
             $banner->incrementViews();

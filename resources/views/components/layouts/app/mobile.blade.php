@@ -20,6 +20,21 @@
             request()->routeIs('*.edit'), request()->routeIs('settings.*') => 'settings',
             default => 'home',
         };
+
+        $randomBanners = \App\Models\Banner::active()
+            ->forLocation($bannerLocation)
+            ->where('position', 'random')
+            ->get()
+            ->shuffle()
+            ->values();
+
+        $slotNames = ['top', 'bottom', 'within_page'];
+        $randomAssignments = [];
+        foreach ($slotNames as $i => $slotName) {
+            if (isset($randomBanners[$i])) {
+                $randomAssignments[$slotName] = $randomBanners[$i]->id;
+            }
+        }
     @endphp
     <body class="min-h-screen bg-white dark:bg-zinc-900">
         <!-- Top Bar -->
@@ -99,15 +114,24 @@
             </div>
         </header>
 
+        <!-- Top Sticky Banner -->
+        @livewire('components.banners.sticky', ['location' => $bannerLocation, 'position' => 'top'], key('banner-top-sticky-'.$bannerLocation))
+
+        <!-- Bottom Sticky Banner -->
+        @livewire('components.banners.sticky', ['location' => $bannerLocation, 'position' => 'bottom'], key('banner-bottom-sticky-'.$bannerLocation))
+
         <!-- Main Content -->
         <main class="pt-14 pb-20" style="display: flex; flex-direction: column;">
             <!-- Top Fixed Banner -->
-            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'top'], key('banner-top-'.$bannerLocation))
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'top', 'forceBannerId' => $randomAssignments['top'] ?? null], key('banner-top-'.$bannerLocation))
 
             {{ $slot }}
 
+            <!-- Within Page Banner -->
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'within_page', 'forceBannerId' => $randomAssignments['within_page'] ?? null], key('banner-within-'.$bannerLocation))
+
             <!-- Bottom Fixed Banner -->
-            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'bottom'], key('banner-bottom-'.$bannerLocation))
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'bottom', 'forceBannerId' => $randomAssignments['bottom'] ?? null], key('banner-bottom-'.$bannerLocation))
         </main>
 
         <!-- Popup Banner -->

@@ -1,5 +1,5 @@
 <div>
-    @if($banner && $show)
+    @if($banner)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" x-data x-init="$el.classList.remove('hidden')">
             <div class="relative bg-white dark:bg-zinc-800 rounded-xl overflow-hidden shadow-2xl max-w-lg w-full">
                 <!-- Close button -->

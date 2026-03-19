@@ -34,8 +34,7 @@ class Index extends Component
 
     public function mount()
     {
-        // Don't set a default month - show all players with their latest rankings
-        $this->selectedMonth = null;
+        $this->selectedMonth = now()->format('Y-m');
     }
 
     public function updatingSearch()
@@ -61,7 +60,7 @@ class Index extends Component
         $this->rankingTo     = null;
         $this->ageFrom       = null;
         $this->ageTo         = null;
-        $this->selectedMonth = null;
+        $this->selectedMonth = now()->format('Y-m');
     }
 
     public function applyFilters()

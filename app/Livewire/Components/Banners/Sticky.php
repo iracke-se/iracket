@@ -9,11 +9,13 @@ class Sticky extends Component
 {
     public string $location;
     public string $position; // 'top' or 'bottom'
+    public string $offsetClass = '';
 
-    public function mount(string $location, string $position = 'top')
+    public function mount(string $location, string $position = 'top', string $offsetClass = '')
     {
         $this->location = $location;
         $this->position = $position;
+        $this->offsetClass = $offsetClass;
     }
 
     public function trackClick($bannerId)

@@ -1,7 +1,32 @@
 <div>
     @if($banner)
-        <div class="fixed {{ $position === 'top' ? 'top-14' : 'bottom-16' }} left-0 right-0 z-40 pointer-events-none">
-            <div class="px-6 pointer-events-auto">
+        <div
+            class="fixed {{ $offsetClass ?: ($position === 'top' ? 'top-14' : 'bottom-16') }} left-0 right-0 z-40 pointer-events-none"
+            @if($position === 'top')
+            x-data
+            x-init="
+                const headerOffset = {{ $offsetClass ? 0 : 56 }};
+                const updatePadding = () => {
+                    const main = document.querySelector('main');
+                    if (main) main.style.paddingTop = ($el.offsetHeight + headerOffset) + 'px';
+                };
+                updatePadding();
+                new ResizeObserver(updatePadding).observe($el);
+            "
+            @elseif($position === 'bottom')
+            x-data
+            x-init="
+                const navOffset = {{ $offsetClass ? 0 : 64 }};
+                const updatePadding = () => {
+                    const main = document.querySelector('main');
+                    if (main) main.style.paddingBottom = ($el.offsetHeight + navOffset) + 'px';
+                };
+                updatePadding();
+                new ResizeObserver(updatePadding).observe($el);
+            "
+            @endif
+        >
+            <div class="py-2 px-6 pointer-events-auto">
                 <div class="max-w-2xl mx-auto">
                     <a
                         href="{{ $banner->link }}"

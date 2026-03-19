@@ -8,16 +8,23 @@ use Livewire\Component;
 class Popup extends Component
 {
     public string $location;
-    public bool $show = true;
+    public array $bannerIds = [];
+    public int $currentIndex = 0;
 
     public function mount(string $location)
     {
         $this->location = $location;
+
+        $this->bannerIds = Banner::active()
+            ->forLocation($this->location)
+            ->where('position', 'popup')
+            ->pluck('id')
+            ->toArray();
     }
 
     public function close()
     {
-        $this->show = false;
+        $this->currentIndex++;
     }
 
     public function trackClick($bannerId)
@@ -26,20 +33,15 @@ class Popup extends Component
         if ($banner) {
             $banner->incrementClicks();
         }
-        $this->show = false;
+        $this->currentIndex++;
     }
 
     public function render()
     {
         $banner = null;
 
-        if ($this->show) {
-            $banner = Banner::active()
-                ->forLocation($this->location)
-                ->where('position', 'popup')
-                ->inRandomOrder()
-                ->first();
-
+        if ($this->currentIndex < count($this->bannerIds)) {
+            $banner = Banner::find($this->bannerIds[$this->currentIndex]);
             if ($banner) {
                 $banner->incrementViews();
             }
