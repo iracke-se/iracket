@@ -10,12 +10,16 @@ class Sticky extends Component
     public string $location;
     public string $position; // 'top' or 'bottom'
     public string $offsetClass = '';
+    public ?int $selectedBannerId = null;
+    public ?string $selectedBannerPosition = null;
 
-    public function mount(string $location, string $position = 'top', string $offsetClass = '')
+    public function mount(string $location, string $position = 'top', string $offsetClass = '', ?int $selectedBannerId = null, ?string $selectedBannerPosition = null)
     {
         $this->location = $location;
         $this->position = $position;
         $this->offsetClass = $offsetClass;
+        $this->selectedBannerId = $selectedBannerId;
+        $this->selectedBannerPosition = $selectedBannerPosition;
     }
 
     public function trackClick($bannerId)
@@ -28,16 +32,14 @@ class Sticky extends Component
 
     public function render()
     {
+        $banner = null;
         $positionType = $this->position === 'top' ? 'top_sticky' : 'bottom_sticky';
 
-        $banner = Banner::active()
-            ->forLocation($this->location)
-            ->where('position', $positionType)
-            ->inRandomOrder()
-            ->first();
-
-        if ($banner) {
-            $banner->incrementViews();
+        if ($this->selectedBannerId && $this->selectedBannerPosition === $positionType) {
+            $banner = Banner::find($this->selectedBannerId);
+            if ($banner) {
+                $banner->incrementViews();
+            }
         }
 
         return view('livewire.components.banners.sticky', [

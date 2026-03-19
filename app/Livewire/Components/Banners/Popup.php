@@ -11,15 +11,13 @@ class Popup extends Component
     public array $bannerIds = [];
     public int $currentIndex = 0;
 
-    public function mount(string $location)
+    public function mount(string $location, ?int $selectedBannerId = null, ?string $selectedBannerPosition = null)
     {
         $this->location = $location;
 
-        $this->bannerIds = Banner::active()
-            ->forLocation($this->location)
-            ->where('position', 'popup')
-            ->pluck('id')
-            ->toArray();
+        if ($selectedBannerId && $selectedBannerPosition === 'popup') {
+            $this->bannerIds = [$selectedBannerId];
+        }
     }
 
     public function close()

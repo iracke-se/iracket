@@ -47,14 +47,22 @@ class SetLocale
             return 'sv';
         }
 
-        $country = Cache::remember("ip_country_{$ip}", now()->addDay(), function () use ($ip) {
+        $country = Cache::get("ip_country_{$ip}");
+
+        if ($country === null) {
             try {
-                $response = Http::timeout(2)->get("https://ipapi.co/{$ip}/country/");
-                return $response->successful() ? trim($response->body()) : null;
+                $response = Http::timeout(2)->get("http://ip-api.com/json/{$ip}", [
+                    'fields' => 'countryCode',
+                ]);
+                $code = $response->json('countryCode');
+                if ($response->successful() && preg_match('/^[A-Z]{2}$/', (string) $code)) {
+                    $country = $code;
+                    Cache::put("ip_country_{$ip}", $country, now()->addDay());
+                }
             } catch (\Throwable) {
-                return null;
+                // don't cache failures, retry next request
             }
-        });
+        }
 
         return $country === 'SE' ? 'sv' : 'en';
     }

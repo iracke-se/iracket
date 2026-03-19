@@ -123,6 +123,7 @@ class Banner extends Model
     {
         return $query->where(function ($q) use ($location) {
             $q->whereNull('locations')
+                ->orWhereRaw('JSON_LENGTH(locations) = 0')
                 ->orWhereJsonContains('locations', $location);
         });
     }

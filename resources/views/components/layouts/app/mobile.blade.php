@@ -1,3 +1,4 @@
+@props(['title' => null, 'bannerLocation' => 'home', 'selectedBannerId' => null, 'selectedBannerPosition' => null])
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -8,33 +9,6 @@
         $unreadNotificationsCount = auth()->check()
             ? \App\Models\Notification::where('user_id', auth()->id())->whereNull('read_at')->count()
             : 0;
-
-        // Determine current banner location based on route
-        $bannerLocation = match(true) {
-            request()->routeIs('home') => 'home',
-            request()->routeIs('players.*') => 'players',
-            request()->routeIs('matches.*') => 'matches',
-            request()->routeIs('clubs.*') => 'clubs',
-            request()->routeIs('bubbler.*') => 'bubbler',
-            request()->routeIs('profile.*') => 'profile',
-            request()->routeIs('*.edit'), request()->routeIs('settings.*') => 'settings',
-            default => 'home',
-        };
-
-        $randomBanners = \App\Models\Banner::active()
-            ->forLocation($bannerLocation)
-            ->where('position', 'random')
-            ->get()
-            ->shuffle()
-            ->values();
-
-        $slotNames = ['top', 'bottom', 'within_page'];
-        $randomAssignments = [];
-        foreach ($slotNames as $i => $slotName) {
-            if (isset($randomBanners[$i])) {
-                $randomAssignments[$slotName] = $randomBanners[$i]->id;
-            }
-        }
     @endphp
     <body class="min-h-screen bg-white dark:bg-zinc-900">
         <!-- Top Bar -->
@@ -115,27 +89,27 @@
         </header>
 
         <!-- Top Sticky Banner -->
-        @livewire('components.banners.sticky', ['location' => $bannerLocation, 'position' => 'top'], key('banner-top-sticky-'.$bannerLocation))
+        @livewire('components.banners.sticky', ['location' => $bannerLocation, 'position' => 'top', 'selectedBannerId' => $selectedBannerId, 'selectedBannerPosition' => $selectedBannerPosition], key('banner-top-sticky-'.$bannerLocation))
 
         <!-- Bottom Sticky Banner -->
-        @livewire('components.banners.sticky', ['location' => $bannerLocation, 'position' => 'bottom'], key('banner-bottom-sticky-'.$bannerLocation))
+        @livewire('components.banners.sticky', ['location' => $bannerLocation, 'position' => 'bottom', 'selectedBannerId' => $selectedBannerId, 'selectedBannerPosition' => $selectedBannerPosition], key('banner-bottom-sticky-'.$bannerLocation))
 
         <!-- Main Content -->
         <main class="pt-14 pb-20" style="display: flex; flex-direction: column;">
             <!-- Top Fixed Banner -->
-            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'top', 'forceBannerId' => $randomAssignments['top'] ?? null], key('banner-top-'.$bannerLocation))
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'top', 'selectedBannerId' => $selectedBannerId, 'selectedBannerPosition' => $selectedBannerPosition], key('banner-top-'.$bannerLocation))
 
             {{ $slot }}
 
             <!-- Within Page Banner -->
-            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'within_page', 'forceBannerId' => $randomAssignments['within_page'] ?? null], key('banner-within-'.$bannerLocation))
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'within_page', 'selectedBannerId' => $selectedBannerId, 'selectedBannerPosition' => $selectedBannerPosition], key('banner-within-'.$bannerLocation))
 
             <!-- Bottom Fixed Banner -->
-            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'bottom', 'forceBannerId' => $randomAssignments['bottom'] ?? null], key('banner-bottom-'.$bannerLocation))
+            @livewire('components.banners.fixed', ['location' => $bannerLocation, 'position' => 'bottom', 'selectedBannerId' => $selectedBannerId, 'selectedBannerPosition' => $selectedBannerPosition], key('banner-bottom-'.$bannerLocation))
         </main>
 
         <!-- Popup Banner -->
-        @livewire('components.banners.popup', ['location' => $bannerLocation], key('banner-popup-'.$bannerLocation))
+        @livewire('components.banners.popup', ['location' => $bannerLocation, 'selectedBannerId' => $selectedBannerId, 'selectedBannerPosition' => $selectedBannerPosition], key('banner-popup-'.$bannerLocation))
 
         <!-- Bottom Navigation -->
         <nav class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">

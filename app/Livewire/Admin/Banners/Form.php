@@ -67,6 +67,10 @@ class Form extends Component
             unset($validated['image']);
         }
 
+        if (empty($validated['locations'])) {
+            $validated['locations'] = null;
+        }
+
         if ($this->banner) {
             $this->banner->update($validated);
             session()->flash('message', 'Banner updated successfully.');

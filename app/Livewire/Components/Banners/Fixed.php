@@ -9,13 +9,15 @@ class Fixed extends Component
 {
     public string $location;
     public string $position;
-    public ?int $forceBannerId = null;
+    public ?int $selectedBannerId = null;
+    public ?string $selectedBannerPosition = null;
 
-    public function mount(string $location, string $position = 'top', ?int $forceBannerId = null)
+    public function mount(string $location, string $position = 'top', ?int $selectedBannerId = null, ?string $selectedBannerPosition = null)
     {
         $this->location = $location;
         $this->position = $position;
-        $this->forceBannerId = $forceBannerId;
+        $this->selectedBannerId = $selectedBannerId;
+        $this->selectedBannerPosition = $selectedBannerPosition;
     }
 
     public function trackClick($bannerId)
@@ -28,18 +30,13 @@ class Fixed extends Component
 
     public function render()
     {
-        if ($this->forceBannerId) {
-            $banner = Banner::find($this->forceBannerId);
-        } else {
-            $banner = Banner::active()
-                ->forLocation($this->location)
-                ->where('position', $this->position)
-                ->inRandomOrder()
-                ->first();
-        }
+        $banner = null;
 
-        if ($banner) {
-            $banner->incrementViews();
+        if ($this->selectedBannerId && $this->selectedBannerPosition === $this->position) {
+            $banner = Banner::find($this->selectedBannerId);
+            if ($banner) {
+                $banner->incrementViews();
+            }
         }
 
         return view('livewire.components.banners.fixed', [
