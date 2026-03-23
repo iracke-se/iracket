@@ -64,7 +64,7 @@ class SetLocale
             }
         }
 
-        return $country === 'SE' ? 'sv' : 'en';
+        return 'sv';
     }
 
     private function isPrivateIp(string $ip): bool
