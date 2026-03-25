@@ -213,18 +213,20 @@ class Index extends Component
     protected function computeClubBubblerRankings(): Collection
     {
         // All monthly rankings for this period that have a club
-        $allRankings = MonthlyRanking::where('year', $this->selectedYear)
-            ->where('month', $this->selectedMonth)
-            ->whereHas('user', fn ($q) => $q->whereNotNull('club_id'))
-            ->with('user:id,club_id')
-            ->get(['user_id', 'points_change', 'points']);
+        // Join users inline to avoid eager-loading full model objects
+        $allRankings = MonthlyRanking::where('monthly_rankings.year', $this->selectedYear)
+            ->where('monthly_rankings.month', $this->selectedMonth)
+            ->join('users', 'users.id', '=', 'monthly_rankings.user_id')
+            ->whereNotNull('users.club_id')
+            ->select('monthly_rankings.user_id', 'monthly_rankings.points_change', 'monthly_rankings.points', 'users.club_id')
+            ->get();
 
         if ($allRankings->isEmpty()) {
             return collect();
         }
 
         // Group by club_id
-        $byClub = $allRankings->groupBy(fn ($r) => $r->user->club_id);
+        $byClub = $allRankings->groupBy(fn ($r) => $r->club_id);
 
         $clubIds = $byClub->keys()->toArray();
 
@@ -281,22 +283,10 @@ class Index extends Component
 
     public function render()
     {
-        $ladiesQuery = MonthlyRanking::where('year', $this->selectedYear)
-            ->where('month', $this->selectedMonth);
-        $this->applyPlayerFilters($ladiesQuery, 'female');
-        $ladiesRankings = $ladiesQuery->with('user.club')->orderBy('points', 'desc')->get()
-            ->filter(fn ($r) => $r->user !== null);
-
-        $menQuery = MonthlyRanking::where('year', $this->selectedYear)
-            ->where('month', $this->selectedMonth);
-        $this->applyPlayerFilters($menQuery, 'male');
-        $menRankings = $menQuery->with('user.club')->orderBy('points', 'desc')->get()
-            ->filter(fn ($r) => $r->user !== null);
-
-        // For the current month, add manual match deltas to effective_points
         $isCurrentMonth = $this->selectedYear == now()->year && $this->selectedMonth == now()->month;
-        $deltas = [];
 
+        // Build manual match deltas for current month
+        $deltas = [];
         if ($isCurrentMonth) {
             $manualMatches = GameMatch::where('is_manual', true)
                 ->whereYear('created_at', $this->selectedYear)
@@ -309,26 +299,74 @@ class Index extends Component
             }
         }
 
-        foreach ($ladiesRankings as $r) {
-            $r->effective_points = $r->points + ($deltas[$r->user_id] ?? 0);
-        }
-        foreach ($menRankings as $r) {
-            $r->effective_points = $r->points + ($deltas[$r->user_id] ?? 0);
-        }
-
-        if ($isCurrentMonth) {
-            $ladiesRankings = $ladiesRankings->sortByDesc('effective_points')->values();
-            $menRankings    = $menRankings->sortByDesc('effective_points')->values();
-        }
+        $ladiesGrouped = $this->buildGrouped('female', $deltas, $isCurrentMonth);
+        $menGrouped    = $this->buildGrouped('male', $deltas, $isCurrentMonth);
 
         return view('livewire.user.bubbler.index', [
-            'ladiesGrouped'       => $this->groupByPointRanges($ladiesRankings, 'female', 'effective_points'),
-            'menGrouped'          => $this->groupByPointRanges($menRankings, 'male', 'effective_points'),
+            'ladiesGrouped'       => $ladiesGrouped,
+            'menGrouped'          => $menGrouped,
             'clubBubblerRankings' => $this->computeClubBubblerRankings(),
             'availableDistricts'  => $this->availableDistricts,
             'activeFilterCount'   => $this->activeFilterCount,
             'menClassRanges'      => static::$menClassRanges,
             'womenClassRanges'    => static::$womenClassRanges,
         ])->layout('components.layouts.app');
+    }
+
+    protected function buildGrouped(string $gender, array $deltas, bool $isCurrentMonth): array
+    {
+        // Load only the columns needed for grouping — no user/club eager load yet
+        $query = MonthlyRanking::where('year', $this->selectedYear)
+            ->where('month', $this->selectedMonth)
+            ->select(['user_id', 'points', 'points_change']);
+        $this->applyPlayerFilters($query, $gender);
+        $rankings = $query->orderBy('points', 'desc')->get();
+
+        // Apply deltas and re-sort if needed
+        foreach ($rankings as $r) {
+            $r->effective_points = $r->points + ($deltas[$r->user_id] ?? 0);
+        }
+        if ($isCurrentMonth) {
+            $rankings = $rankings->sortByDesc('effective_points')->values();
+        }
+
+        // Group into ranges, taking top 3 per range
+        $baseRanges = $gender === 'female' ? static::$womenClassRanges : static::$menClassRanges;
+        $ranges     = $this->sortPoints === 'asc' ? array_reverse($baseRanges) : $baseRanges;
+
+        $grouped    = [];
+        $neededIds  = [];
+
+        foreach ($ranges as $range) {
+            $players = $rankings->filter(function ($r) use ($range) {
+                $pts = $r->effective_points;
+                return $range['max'] === null
+                    ? $pts >= $range['min']
+                    : $pts >= $range['min'] && $pts <= $range['max'];
+            })->values()->take(3);
+
+            if ($players->isNotEmpty()) {
+                $grouped[]  = ['label' => $range['label'], 'players' => $players];
+                $neededIds  = array_merge($neededIds, $players->pluck('user_id')->all());
+            }
+        }
+
+        if (empty($neededIds)) {
+            return $grouped;
+        }
+
+        // Eager-load user+club only for the ~3 players per range we actually display
+        $users = User::whereIn('id', array_unique($neededIds))
+            ->with('club:id,name,slug')
+            ->get(['id', 'name', 'club_id', 'gender', 'birth_year', 'uuid'])
+            ->keyBy('id');
+
+        foreach ($grouped as &$group) {
+            foreach ($group['players'] as $r) {
+                $r->setRelation('user', $users[$r->user_id] ?? null);
+            }
+        }
+
+        return array_filter($grouped, fn ($g) => $g['players']->contains(fn ($r) => $r->user !== null));
     }
 }
