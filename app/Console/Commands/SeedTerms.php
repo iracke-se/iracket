@@ -19,7 +19,7 @@ class SeedTerms extends Command
      *
      * @var string
      */
-    protected $description = 'Seed all terms content (Terms & Conditions, Privacy Policy, Bubbler, About)';
+    protected $description = 'Seed all terms content (Terms & Conditions, Privacy Policy, Bubbler, About, Matches)';
 
     /**
      * Execute the console command.
@@ -37,6 +37,7 @@ class SeedTerms extends Command
             'TermsSeeder' => 'Terms and Conditions, Privacy Policy',
             'BubblerTermsSeeder' => 'Bubbler',
             'AboutTermsSeeder' => 'About Us',
+            'MatchesTermsSeeder' => 'Matches',
         ];
 
         foreach ($seeders as $seeder => $description) {

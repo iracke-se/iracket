@@ -26,6 +26,7 @@ class ScraperCommand extends Command
                             {--limit-series= : Limit number of series per season to scrape (for testing, series/series_matches)}
                             {--limit-matches= : Limit number of matches to scrape (for testing, series_matches/live_center)}
                             {--limit-players= : Limit number of players to scrape (for testing, rankings popup scraper)}
+                            {--concurrency= : Number of parallel browser tabs for rankings scraper (default: 10)}
                             {--date= : Date to scrape (YYYY-MM-DD format, for live_center)}
                             {--from-matches : Scrape dates from existing matches table (for live_center)}
                             {--skip-points : Skip point-by-point data (for live_center)}
@@ -81,6 +82,9 @@ class ScraperCommand extends Command
             }
             if ($this->option('limit-players')) {
                 $parameters['limit_players'] = (int) $this->option('limit-players');
+            }
+            if ($this->option('concurrency')) {
+                $parameters['concurrency'] = (int) $this->option('concurrency');
             }
         }
 
@@ -160,7 +164,19 @@ class ScraperCommand extends Command
         }
 
         if ($this->option('queue')) {
+            // If both genders requested, queue two separate jobs
+            if ($type === 'rankings' && in_array($parameters['gender'], ['both', 'male+female', 'all'])) {
+                $this->queueJob($type, array_merge($parameters, ['gender' => 'm']));
+                $this->queueJob($type, array_merge($parameters, ['gender' => 'k']));
+                return self::SUCCESS;
+            }
+
             return $this->queueJob($type, $parameters);
+        }
+
+        // If both genders requested, run in parallel (same as scraper:start)
+        if ($type === 'rankings' && in_array($parameters['gender'], ['both', 'male+female', 'all'])) {
+            return $this->runRankingsParallel($parameters);
         }
 
         return $this->runSynchronously($type, $parameters);
@@ -255,5 +271,80 @@ class ScraperCommand extends Command
             $this->error("Scrape failed: " . $e->getMessage());
             return self::FAILURE;
         }
+    }
+
+    /**
+     * Run male and female rankings in parallel as separate OS processes (mirrors scraper:start behaviour)
+     */
+    protected function runRankingsParallel(array $parameters): int
+    {
+        $year  = $parameters['year']  ?? date('Y');
+        $month = $parameters['month'] ?? date('m');
+
+        $buildArgs = function (string $gender) use ($year, $month, $parameters): array {
+            $args = [
+                PHP_BINARY,
+                base_path('artisan'),
+                'scraper:run',
+                'rankings',
+                "--year={$year}",
+                "--month={$month}",
+                "--gender={$gender}",
+            ];
+
+            if (!empty($parameters['limit_players'])) {
+                $args[] = '--limit-players=' . $parameters['limit_players'];
+            }
+
+            return $args;
+        };
+
+        $startId  = \App\Models\Scraper\ScraperRun::max('id') ?? 0;
+
+        $mProcess = new \Symfony\Component\Process\Process($buildArgs('m'));
+        $fProcess = new \Symfony\Component\Process\Process($buildArgs('k'));
+        $mProcess->setTimeout(3600);
+        $fProcess->setTimeout(3600);
+
+        $this->line("  <fg=cyan>Starting Male rankings process...</>");
+        $mProcess->start();
+        $this->line("  <fg=cyan>Starting Female rankings process...</>");
+        $fProcess->start();
+        $this->newLine();
+
+        while (!$mProcess->isTerminated() || !$fProcess->isTerminated()) {
+            foreach (explode("\n", $mProcess->getIncrementalOutput() . $mProcess->getIncrementalErrorOutput()) as $line) {
+                if (trim($line) !== '') $this->line("  <fg=blue>[M]</> " . trim($line));
+            }
+            foreach (explode("\n", $fProcess->getIncrementalOutput() . $fProcess->getIncrementalErrorOutput()) as $line) {
+                if (trim($line) !== '') $this->line("  <fg=magenta>[F]</> " . trim($line));
+            }
+            usleep(500000);
+        }
+
+        $errors = [];
+        if (!$mProcess->isSuccessful()) {
+            $errors[] = "Male rankings failed (exit {$mProcess->getExitCode()}): " . $mProcess->getErrorOutput();
+        }
+        if (!$fProcess->isSuccessful()) {
+            $errors[] = "Female rankings failed (exit {$fProcess->getExitCode()}): " . $fProcess->getErrorOutput();
+        }
+
+        if (!empty($errors)) {
+            $this->error(implode("\n", $errors));
+            return self::FAILURE;
+        }
+
+        $runs = \App\Models\Scraper\ScraperRun::where('id', '>', $startId)
+            ->where('type', \App\Models\Scraper\ScraperRun::TYPE_RANKINGS)
+            ->get();
+
+        $this->newLine();
+        foreach ($runs as $run) {
+            $gender = ($run->parameters['gender'] ?? '') === 'k' ? 'Female' : 'Male';
+            $this->line("  <fg=green>✓</> {$gender} Run #{$run->id}: {$run->items_scraped} items scraped");
+        }
+
+        return self::SUCCESS;
     }
 }

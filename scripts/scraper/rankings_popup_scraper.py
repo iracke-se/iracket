@@ -3,10 +3,9 @@
 Profixio Rankings Popup Scraper
 
 Scrapes player rankings and matches from profixio.com using Playwright.
-Processes players in parallel — each player gets its own browser tab,
-controlled by a semaphore to avoid overloading the server.
-
-No timeouts are set anywhere — the scraper runs until completion.
+All pagination pages are discovered upfront and processed in parallel —
+each page gets its own browser tab. Within each page, players are also
+processed in parallel, controlled by a single global semaphore.
 
 Usage:
     python3 rankings_popup_scraper.py --year 2025 --month 12 --gender m [--limit 10] [--concurrency 10]
@@ -61,9 +60,11 @@ class RankingsScraper:
         self.config = config
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
-        self.page: Optional[Page] = None  # used only for RID lookup and player-list extraction
         self.errors: List[Dict] = []
         self._errors_lock = asyncio.Lock()
+        self._total_processed = 0
+        self._processed_lock = asyncio.Lock()
+        self._stdout_lock = asyncio.Lock()
 
     async def run(self) -> Dict:
         """Execute scraping workflow"""
@@ -94,83 +95,30 @@ class RankingsScraper:
             self.browser = await p.chromium.launch(**launch_args)
             self.context = await self.browser.new_context()
 
-            # Main page — used only for navigation between pagination pages and player-list extraction
-            self.page = await self.context.new_page()
-            self.page.set_default_timeout(0)  # no timeout
+            # Dedicated discovery tab — only used for RID lookup + pagination discovery
+            discovery_page = await self.context.new_page()
 
             try:
                 # Step 1: Resolve the RID for the requested month
-                rid = await self.get_rid_for_month()
+                rid = await self.get_rid_for_month(discovery_page)
                 log_info(f"Found rid={rid} for {self.config.year}-{self.config.month}")
 
-                # Step 2: Navigate to the first rankings page
-                await self.navigate_to_rankings(rid)
+                # Step 2: Discover all pagination page offsets from the first page
+                page_offsets = await self.discover_page_offsets(discovery_page, rid)
+                log_info(f"Found {len(page_offsets)} pagination pages: {page_offsets}")
 
-                all_rankings: List[Dict] = []
-                all_matches: List[Dict] = []
-                total_processed = 0
-                from_offset = 0
-                page_num = 1
+                await discovery_page.close()
 
-                # One semaphore shared across all pages so concurrency is a global cap
+                # Step 3: Process all pages in parallel with a single global semaphore
                 semaphore = asyncio.Semaphore(self.config.concurrency)
+                all_rankings, all_matches = await self._process_all_pages_parallel(rid, page_offsets, semaphore)
 
-                while True:
-                    log_info(f"Extracting player list from pagination page {page_num} (from={from_offset})")
-                    players = await self._extract_players_from_current_page()
-                    log_info(f"Pagination page {page_num}: found {len(players)} players")
-
-                    if not players:
-                        log_info("No players on this page — pagination complete")
-                        break
-
-                    # Apply global player limit
-                    if self.config.limit_players:
-                        remaining = self.config.limit_players - total_processed
-                        if remaining <= 0:
-                            break
-                        players = players[:remaining]
-
-                    # URL of this pagination page — every worker tab navigates here to find the player span
-                    current_page_url = self.config.get_rankings_url(rid, from_offset)
-
-                    log_info(
-                        f"Processing {len(players)} players in parallel "
-                        f"(concurrency={self.config.concurrency}, url={current_page_url})"
-                    )
-
-                    page_rankings, page_matches = await self._process_players_parallel(
-                        players, current_page_url, semaphore, offset=total_processed
-                    )
-
-                    all_rankings.extend(page_rankings)
-                    all_matches.extend(page_matches)
-                    total_processed += len(players)
-
-                    log_info(f"Pagination page {page_num} done — total processed so far: {total_processed}")
-
-                    if self.config.limit_players and total_processed >= self.config.limit_players:
-                        break
-
-                    # Profixio pagination is 1-based: 1, 501, 1001, …
-                    from_offset = total_processed + 1
-                    next_url = self.config.get_rankings_url(rid, from_offset)
-                    log_info(f"Navigating main page to: {next_url}")
-                    await self.page.goto(next_url, wait_until="domcontentloaded", timeout=0)
-                    try:
-                        await self.page.wait_for_selector('table tr span.rml_poeng', timeout=0)
-                    except Exception:
-                        log_info("No players found on next page — all pages done")
-                        break
-
-                    page_num += 1
-
-                log_info(f"Scrape complete. Total players processed: {total_processed}")
+                log_info(f"Scrape complete. Total players processed: {self._total_processed}")
 
                 return {
                     "success": True,
                     "data": {
-                        "players_processed": total_processed,
+                        "players_processed": self._total_processed,
                         "rankings_count": len(all_rankings),
                         "matches_count": len(all_matches),
                         "rankings": all_rankings,
@@ -197,87 +145,18 @@ class RankingsScraper:
                 await self.browser.close()
 
     # -------------------------------------------------------------------------
-    # Parallel worker
+    # Pagination discovery
     # -------------------------------------------------------------------------
 
-    async def _process_players_parallel(
-        self,
-        players: List[Dict],
-        page_url: str,
-        semaphore: asyncio.Semaphore,
-        offset: int,
-    ) -> Tuple[List[Dict], List[Dict]]:
-        """
-        Process every player in the list concurrently.
-        Each player gets its own browser tab that:
-          1. Navigates to page_url (the same pagination page as the main page)
-          2. Finds and clicks the player's span to open the popup
-          3. Scrapes ranking + matches from the popup
-          4. Closes the tab
-
-        Errors for individual players are caught inside process_one and recorded
-        without aborting the rest of the batch.
-        """
-
-        async def process_one(player: Dict, idx: int) -> Tuple[List[Dict], List[Dict]]:
-            async with semaphore:
-                log_info(f"[{offset + idx + 1}] Starting: {player['name']}")
-                tab = await self.context.new_page()
-                tab.set_default_timeout(0)  # no timeout on worker tabs
-                try:
-                    await tab.goto(page_url, wait_until="domcontentloaded", timeout=0)
-                    await tab.wait_for_selector('table tr span.rml_poeng', timeout=0)
-
-                    await self._click_player(tab, player['profixio_id'])
-                    rankings = await self._scrape_ranking_history(tab, player)
-                    matches = await self._scrape_matches(tab, player)
-                    await self._close_popup(tab)
-
-                    log_info(
-                        f"[{offset + idx + 1}] Done: {player['name']} — "
-                        f"{len(rankings)} rankings, {len(matches)} matches"
-                    )
-                    return rankings, matches
-
-                except Exception as e:
-                    async with self._errors_lock:
-                        self.errors.append({"player": player['name'], "error": str(e)})
-                    log_error(f"[{offset + idx + 1}] Error for {player['name']}: {e}")
-                    try:
-                        await self._close_popup(tab)
-                    except Exception:
-                        pass
-                    return [], []
-
-                finally:
-                    try:
-                        await tab.close()
-                    except Exception:
-                        pass
-
-        results = await asyncio.gather(*[process_one(p, i) for i, p in enumerate(players)])
-
-        all_rankings: List[Dict] = []
-        all_matches: List[Dict] = []
-        for rankings, matches in results:
-            all_rankings.extend(rankings)
-            all_matches.extend(matches)
-
-        return all_rankings, all_matches
-
-    # -------------------------------------------------------------------------
-    # Navigation helpers — use self.page (main page only)
-    # -------------------------------------------------------------------------
-
-    async def get_rid_for_month(self) -> str:
+    async def get_rid_for_month(self, page: Page) -> str:
         """Get ranking ID for target month from dropdown"""
         target_date = f"{self.config.year}.{self.config.month.zfill(2)}."
 
         url = f"{self.config.base_url}?gender={self.config.gender}"
-        await self.page.goto(url, wait_until="domcontentloaded", timeout=0)
-        await self.page.wait_for_selector('select[name="rid"]', timeout=0)
+        await page.goto(url, wait_until="domcontentloaded", timeout=0)
+        await page.wait_for_selector('select[name="rid"]', timeout=0)
 
-        select = await self.page.query_selector('select[name="rid"]')
+        select = await page.query_selector('select[name="rid"]')
         if not select:
             raise Exception("Month dropdown not found")
 
@@ -294,19 +173,190 @@ class RankingsScraper:
 
         raise Exception(f"Month {target_date} not found in dropdown. Available: {available}")
 
-    async def navigate_to_rankings(self, rid: str):
-        """Navigate the main page to the first rankings page"""
-        url = self.config.get_rankings_url(rid)
-        await self.page.goto(url, wait_until="domcontentloaded", timeout=0)
-        try:
-            await self.page.wait_for_selector('table tr span.rml_poeng', timeout=0)
-        except Exception:
-            log_info("No span.rml_poeng found — rankings table may be empty for this period/gender")
+    async def discover_page_offsets(self, page: Page, rid: str) -> List[int]:
+        """
+        Navigate to the first rankings page and extract all pagination offsets
+        from the page number links (e.g. 1, 501, 1001, 1501 ...).
+        Returns a sorted list of from= offset values.
+        """
+        url = self.config.get_rankings_url(rid, 0)
+        await page.goto(url, wait_until="domcontentloaded", timeout=0)
 
-    async def _extract_players_from_current_page(self) -> List[Dict]:
-        """Extract all player records from the main page's current pagination page"""
+        try:
+            await page.wait_for_selector('table tr span.rml_poeng', timeout=0)
+        except Exception:
+            log_info("No players found on first page — empty ranking period?")
+            return []
+
+        offsets = set()
+        offsets.add(0)  # Page 1 always has offset 0
+
+        # Pagination links contain from= in their href
+        links = await page.query_selector_all("a[href*='from=']")
+        for link in links:
+            href = await link.get_attribute('href')
+            if href:
+                m = re.search(r'from=(\d+)', href)
+                if m:
+                    offsets.add(int(m.group(1)))
+
+        return sorted(offsets)
+
+    # -------------------------------------------------------------------------
+    # Parallel page processing
+    # -------------------------------------------------------------------------
+
+    async def _process_all_pages_parallel(
+        self,
+        rid: str,
+        offsets: List[int],
+        semaphore: asyncio.Semaphore,
+    ) -> Tuple[List[Dict], List[Dict]]:
+        """
+        Launch one task per pagination page, all running simultaneously.
+        Each page task opens its own browser tab, extracts its player list,
+        then fans out into per-player popup tasks (bounded by semaphore).
+        """
+
+        async def process_page(offset: int) -> Tuple[List[Dict], List[Dict]]:
+            tab = await self.context.new_page()
+            try:
+                url = self.config.get_rankings_url(rid, offset)
+                log_info(f"[page from={offset}] Navigating to {url}")
+                await tab.goto(url, wait_until="domcontentloaded", timeout=0)
+
+                try:
+                    await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
+                except Exception:
+                    log_info(f"[page from={offset}] No players on this page — skipping")
+                    return [], []
+
+                players = await self._extract_players_from_page(tab)
+                log_info(f"[page from={offset}] Extracted {len(players)} players")
+
+                if not players:
+                    return [], []
+
+                # Respect global player limit — slice before processing
+                if self.config.limit_players:
+                    async with self._processed_lock:
+                        remaining = self.config.limit_players - self._total_processed
+                        if remaining <= 0:
+                            return [], []
+                        players = players[:remaining]
+
+                return await self._process_players_parallel(players, url, semaphore, offset)
+
+            finally:
+                await tab.close()
+
+        results = await asyncio.gather(*[process_page(offset) for offset in offsets])
+
+        all_rankings: List[Dict] = []
+        all_matches: List[Dict] = []
+        for rankings, matches in results:
+            all_rankings.extend(rankings)
+            all_matches.extend(matches)
+
+        return all_rankings, all_matches
+
+    # -------------------------------------------------------------------------
+    # Parallel player processing (per page)
+    # -------------------------------------------------------------------------
+
+    async def _process_players_parallel(
+        self,
+        players: List[Dict],
+        page_url: str,
+        semaphore: asyncio.Semaphore,
+        offset: int,
+    ) -> Tuple[List[Dict], List[Dict]]:
+        """
+        Process every player in the list concurrently.
+        Each player gets its own browser tab that:
+          1. Navigates to page_url (the pagination page the player lives on)
+          2. Finds and clicks the player's span to open the popup
+          3. Scrapes ranking + matches from the popup
+          4. Closes the tab
+        """
+
+        async def process_one_inner(player: Dict, tab: Page) -> Tuple[List[Dict], List[Dict]]:
+            await tab.goto(page_url, wait_until="domcontentloaded", timeout=0)
+            await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
+
+            await self._click_player(tab, player['profixio_id'])
+            rankings = await self._scrape_ranking_history(tab, player)
+            matches = await self._scrape_matches(tab, player)
+            await self._close_popup(tab)
+
+            async with self._processed_lock:
+                self._total_processed += 1
+                current = self._total_processed
+
+            log_info(
+                f"[{current}] Done: {player['name']} (page from={offset}) — "
+                f"{len(rankings)} rankings, {len(matches)} matches"
+            )
+
+            # Emit player data immediately so PHP can save it without waiting for full completion
+            await self._emit_player(rankings, matches)
+
+            return rankings, matches
+
+        async def process_one(player: Dict) -> Tuple[List[Dict], List[Dict]]:
+            async with semaphore:
+                tab = await self.context.new_page()
+                try:
+                    return await asyncio.wait_for(
+                        process_one_inner(player, tab),
+                        timeout=60,  # 1 min max per player
+                    )
+                except asyncio.TimeoutError:
+                    async with self._errors_lock:
+                        self.errors.append({"player": player['name'], "error": "Timed out after 1 minute"})
+                    log_error(f"Timed out (1 min): {player['name']} — skipping")
+                    return [], []
+                except Exception as e:
+                    async with self._errors_lock:
+                        self.errors.append({"player": player['name'], "error": str(e)})
+                    log_error(f"Error for {player['name']}: {e}")
+                    try:
+                        await self._close_popup(tab)
+                    except Exception:
+                        pass
+                    return [], []
+                finally:
+                    try:
+                        await tab.close()
+                    except Exception:
+                        pass
+
+        results = await asyncio.gather(*[process_one(p) for p in players])
+
+        all_rankings: List[Dict] = []
+        all_matches: List[Dict] = []
+        for rankings, matches in results:
+            all_rankings.extend(rankings)
+            all_matches.extend(matches)
+
+        return all_rankings, all_matches
+
+    async def _emit_player(self, rankings: List[Dict], matches: List[Dict]) -> None:
+        """Write one NDJSON line to stdout immediately when a player is done.
+        PHP reads each line as it arrives and saves it — no data lost on Ctrl+C."""
+        payload = {"type": "player", "rankings": rankings, "matches": matches}
+        async with self._stdout_lock:
+            sys.stdout.write(json.dumps(payload) + "\n")
+            sys.stdout.flush()
+
+    # -------------------------------------------------------------------------
+    # Page helpers — all accept a Page argument, never use a shared page
+    # -------------------------------------------------------------------------
+
+    async def _extract_players_from_page(self, page: Page) -> List[Dict]:
+        """Extract all player records from the given page tab"""
         players = []
-        rows = await self.page.query_selector_all("table tr")
+        rows = await page.query_selector_all("table tr")
 
         for row in rows:
             cells = await row.query_selector_all("td")
@@ -346,10 +396,6 @@ class RankingsScraper:
             })
 
         return players
-
-    # -------------------------------------------------------------------------
-    # Per-tab popup helpers — all accept a Page argument, never use self.page
-    # -------------------------------------------------------------------------
 
     async def _click_player(self, page: Page, player_id: str):
         """Click the player's span on the given tab to open the popup"""
@@ -545,7 +591,9 @@ async def main():
     scraper = RankingsScraper(config)
     result = await scraper.run()
 
-    print(json.dumps(result, indent=2))
+    result["type"] = "summary"
+    sys.stdout.write(json.dumps(result) + "\n")
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":
