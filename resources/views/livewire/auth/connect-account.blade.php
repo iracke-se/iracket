@@ -148,24 +148,30 @@
 
                     <!-- Player List -->
                     <div class="max-h-96 overflow-y-auto">
-                        @forelse($playersGrouped as $letter => $players)
-                            <div class="sticky top-0 px-4 py-2 bg-zinc-100 dark:bg-zinc-700 text-sm font-semibold text-zinc-600 dark:text-zinc-300">
-                                {{ $letter }}
-                            </div>
-                            @foreach($players as $player)
-                                <button
-                                    type="button"
-                                    wire:click="selectPlayer({{ $player->id }})"
-                                    class="w-full px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700 border-b border-zinc-100 dark:border-zinc-700 last:border-0 {{ $playerId === $player->id ? 'bg-accent/10' : '' }}"
-                                >
-                                    <span class="text-zinc-900 dark:text-white">{{ $player->first_name }} {{ $player->last_name }}</span>
-                                </button>
-                            @endforeach
-                        @empty
+                        @if($playerSearch && strlen(trim($playerSearch)) >= 2)
+                            @forelse($playersGrouped as $letter => $players)
+                                <div class="sticky top-0 px-4 py-2 bg-zinc-100 dark:bg-zinc-700 text-sm font-semibold text-zinc-600 dark:text-zinc-300">
+                                    {{ $letter }}
+                                </div>
+                                @foreach($players as $player)
+                                    <button
+                                        type="button"
+                                        wire:click="selectPlayer({{ $player->id }})"
+                                        class="w-full px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700 border-b border-zinc-100 dark:border-zinc-700 last:border-0 {{ $playerId === $player->id ? 'bg-accent/10' : '' }}"
+                                    >
+                                        <span class="text-zinc-900 dark:text-white">{{ $player->first_name }} {{ $player->last_name }}</span>
+                                    </button>
+                                @endforeach
+                            @empty
+                                <div class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                                    {{ __('connect.no_players_found') }}
+                                </div>
+                            @endforelse
+                        @else
                             <div class="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
-                                {{ __('connect.no_players_found') }}
+                                <p class="text-sm">{{ __('connect.start_typing_to_search') ?? 'Start typing to search for players...' }}</p>
                             </div>
-                        @endforelse
+                        @endif
                     </div>
             </div>
         </div>

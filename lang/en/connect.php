@@ -20,6 +20,7 @@ return [
     'search_player' => 'Search players...',
     'no_clubs_found' => 'No clubs found',
     'no_players_found' => 'No players found',
+    'start_typing_to_search' => 'Start typing to search for players...',
 
     'accept_push_notifications' => 'I accept to receive push notifications',
     'push_notifications_hint' => 'Get notified about ranking changes and match results.',

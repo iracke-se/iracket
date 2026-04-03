@@ -22,6 +22,7 @@ return [
     'search_player' => 'Sök spelare...',
     'no_clubs_found' => 'Inga klubbar hittades',
     'no_players_found' => 'Inga spelare hittades',
+    'start_typing_to_search' => 'Börja skriva för att söka efter spelare...',
 
     'accept_push_notifications' => 'Jag godkänner att ta emot push-notiser',
     'push_notifications_hint' => 'Få meddelanden om rankingändringar och matchresultat.',

@@ -19,8 +19,6 @@ class ConnectAccount extends Component
     public ?int $playerId = null;
     public bool $acceptsPushNotifications = false;
 
-    public $players = [];
-
     // Modal states
     public bool $showPlayerModal = false;
     public string $playerSearch = '';
@@ -40,9 +38,6 @@ class ConnectAccount extends Component
 
         $this->isActivePlayer = $user->is_active_player ?? true;
         $this->acceptsPushNotifications = $user->accepts_push_notifications ?? false;
-
-        // Load all available players
-        $this->loadPlayers();
     }
 
     public function openPlayerModal()
@@ -77,19 +72,6 @@ class ConnectAccount extends Component
         $this->playerSearch = '';
     }
 
-    public function loadPlayers()
-    {
-        // Get all players that are synced from SBTF
-        // and not already connected to another account
-        $this->players = User::where('sbtf_synced', true)
-            ->where(function ($query) {
-                $query->where('is_connected', false)
-                    ->orWhereNull('is_connected');
-            })
-            ->orderBy('first_name')
-            ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'club_id']);
-    }
 
     public function continueAsGuest()
     {
@@ -189,17 +171,19 @@ class ConnectAccount extends Component
 
     public function render()
     {
-        // Get filtered players for modal
-        $playersQuery = User::where('sbtf_synced', true)
-            ->where(function ($query) {
-                $query->where('is_connected', false)
-                    ->orWhereNull('is_connected');
-            })
-            ->orderBy('first_name')
-            ->orderBy('last_name');
+        $playersGrouped = collect();
+        $search = trim($this->playerSearch);
 
-        if ($this->playerSearch) {
-            $search = trim($this->playerSearch);
+        // Only search if we have at least 2 characters to prevent loading too many records
+        if (strlen($search) >= 2) {
+            // Get filtered players for modal
+            $playersQuery = User::where('sbtf_synced', true)
+                ->where(function ($query) {
+                    $query->where('is_connected', false)
+                        ->orWhereNull('is_connected');
+                })
+                ->orderBy('first_name')
+                ->orderBy('last_name');
 
             // If search contains space, split and search first/last name parts
             if (str_contains($search, ' ')) {
@@ -208,23 +192,20 @@ class ConnectAccount extends Component
                 $lastName = trim($parts[1] ?? '');
 
                 if ($firstName && $lastName) {
-                    // Apply search for first name
                     $this->applySearch($playersQuery, $firstName, ['first_name']);
-                    // Apply search for last name (both must match)
                     $this->applySearch($playersQuery, $lastName, ['last_name']);
                 } else {
-                    // If only first part exists, search normally
                     $this->applySearch($playersQuery, $firstName ?: $lastName, ['first_name', 'last_name']);
                 }
             } else {
-                // Single word search - search in both first_name and last_name separately
                 $this->applySearch($playersQuery, $search, ['first_name', 'last_name']);
             }
-        }
 
-        $playersGrouped = $playersQuery->get()->groupBy(function ($player) {
-            return strtoupper(substr($player->first_name, 0, 1));
-        });
+            // Limit to 50 results to ensure performance
+            $playersGrouped = $playersQuery->limit(50)->get()->groupBy(function ($player) {
+                return strtoupper(substr($player->first_name, 0, 1));
+            });
+        }
 
         return view('livewire.auth.connect-account', [
             'playersGrouped' => $playersGrouped,
