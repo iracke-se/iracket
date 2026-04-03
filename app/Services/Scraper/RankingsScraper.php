@@ -20,7 +20,13 @@ class RankingsScraper extends BaseScraperService
     {
         $year = $this->getParameter('year') ?? date('Y');
         $month = $this->getParameter('month') ?? date('m');
-        $gender = $this->getParameter('gender', 'm'); // 'm' = men, 'k' = women
+        $gender = $this->getParameter('gender', 'm');
+        // Normalize gender to Python script format: m/k
+        $gender = match ($gender) {
+            'male', 'man', 'men' => 'm',
+            'female', 'woman', 'women' => 'k',
+            default => $gender,
+        };
 
         // Store options for helper methods
         $this->options = [
@@ -28,12 +34,13 @@ class RankingsScraper extends BaseScraperService
             'month' => $month,
             'gender' => $gender,
             'limit_players' => $this->getParameter('limit_players'),
+            'concurrency' => $this->getParameter('concurrency') ?? config('scraper.python.concurrency', 10),
         ];
 
-        $this->info("Starting Python Playwright rankings scraper for {$year}-{$month}, gender: {$gender}");
+        $this->info("Starting Python Playwright rankings scraper for {$year}-{$month}, gender: {$gender}, concurrency: {$this->options['concurrency']}");
 
         // Call Python scraper script
-        $result = $this->executePythonScraper($year, $month, $gender, $this->options['limit_players']);
+        $result = $this->executePythonScraper($year, $month, $gender, $this->options['limit_players'], (int) $this->options['concurrency']);
 
         if (!$result['success']) {
             throw new \Exception("Python scraper failed: " . json_encode($result['errors']));
@@ -67,7 +74,7 @@ class RankingsScraper extends BaseScraperService
     /**
      * Execute Python scraper script
      */
-    protected function executePythonScraper(string $year, string $month, string $gender, ?int $limitPlayers): array
+    protected function executePythonScraper(string $year, string $month, string $gender, ?int $limitPlayers, int $concurrency = 10): array
     {
         // Get Python binary path from config
         $pythonBinary = config('scraper.python.binary', 'python3');
@@ -93,6 +100,9 @@ class RankingsScraper extends BaseScraperService
             $arguments[] = (string) $limitPlayers;
         }
 
+        $arguments[] = '--concurrency';
+        $arguments[] = (string) $concurrency;
+
         $env = array_merge(getenv(), [
             'PUPPETEER_EXECUTABLE_PATH' => config('scraper.browser.chrome_path', '/usr/bin/chromium'),
         ]);
@@ -101,48 +111,68 @@ class RankingsScraper extends BaseScraperService
 
         $this->info("Executing Python script: " . $process->getCommandLine());
 
-        try {
-            $process->mustRun(function ($type, $buffer) {
-                // Log stderr output (Python script logs go here)
-                if ($type === Process::ERR) {
-                    $lines = explode("\n", trim($buffer));
-                    foreach ($lines as $line) {
-                        if (!empty($line)) {
-                            $this->info("Python: {$line}");
-                        }
+        $stdoutBuffer = '';
+        $finalResult  = null;
+
+        $process->start(function ($type, $buffer) use (&$stdoutBuffer, &$finalResult) {
+            if ($type === Process::ERR) {
+                // stderr = Python log lines
+                foreach (explode("\n", trim($buffer)) as $line) {
+                    if (!empty($line)) {
+                        $this->info("Python: {$line}");
                     }
                 }
-            });
-
-            // Parse JSON output from stdout
-            $output = $process->getOutput();
-
-            $this->info("Python stdout size: " . strlen($output) . " bytes");
-
-            if (empty($output)) {
-                throw new \Exception("Python script produced no output");
+                return;
             }
 
-            $result = json_decode($output, true);
+            // stdout = NDJSON stream — accumulate and process complete lines
+            $stdoutBuffer .= $buffer;
 
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                // Log first 200 chars to help debug
-                throw new \Exception("Failed to parse Python output: " . json_last_error_msg() . " | First 200 chars: " . substr($output, 0, 200));
+            while (($pos = strpos($stdoutBuffer, "\n")) !== false) {
+                $line = trim(substr($stdoutBuffer, 0, $pos));
+                $stdoutBuffer = substr($stdoutBuffer, $pos + 1);
+
+                if (empty($line)) {
+                    continue;
+                }
+
+                $decoded = json_decode($line, true);
+                if (!$decoded || !isset($decoded['type'])) {
+                    continue;
+                }
+
+                if ($decoded['type'] === 'player') {
+                    // Save this player's data immediately — safe even on Ctrl+C
+                    if (!empty($decoded['rankings'])) {
+                        $this->saveRankingsToDatabase($decoded['rankings']);
+                    }
+                    if (!empty($decoded['matches'])) {
+                        $this->saveMatchesToDatabase($decoded['matches']);
+                    }
+                } elseif ($decoded['type'] === 'summary') {
+                    $finalResult = $decoded;
+                }
             }
+        });
 
-            return $result;
+        $process->wait();
 
-        } catch (ProcessFailedException $e) {
-            $errorOutput = $e->getProcess()->getErrorOutput();
-            $standardOutput = $e->getProcess()->getOutput();
-
+        if (!$process->isSuccessful()) {
+            $errorOutput   = $process->getErrorOutput();
+            $standardOutput = $process->getOutput();
             throw new \Exception(
                 "Python scraper process failed:\n" .
-                "Exit Code: {$e->getProcess()->getExitCode()}\n" .
+                "Exit Code: {$process->getExitCode()}\n" .
                 "Error Output: {$errorOutput}\n" .
                 "Standard Output: {$standardOutput}"
             );
         }
+
+        if ($finalResult === null) {
+            throw new \Exception("Python script produced no summary line");
+        }
+
+        return $finalResult;
     }
 
     /**
