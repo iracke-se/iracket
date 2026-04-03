@@ -23,7 +23,7 @@
         </a>
 
         <!-- About Us -->
-        <a href="{{ route('terms.show', 'about') }}" class="flex items-center justify-between p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" wire:navigate>
+        <a href="{{ route('terms.show', 'about-us') }}" class="flex items-center justify-between p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" wire:navigate>
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-200 dark:bg-zinc-700">
                     <svg class="w-5 h-5 text-zinc-600 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,21 +87,21 @@
     <div class="mt-8">
         <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-4">{{ __('user-information.language') }}</h2>
         <div class="flex gap-3">
-            <button
-                wire:click="switchLanguage('en')"
+            <a
+                href="{{ route('locale.switch', 'en') }}"
                 class="flex-1 flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all {{ $locale === 'en' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600' }}"
             >
                 <span class="text-xl">🇬🇧</span>
                 <span class="font-medium">English</span>
-            </button>
+            </a>
 
-            <button
-                wire:click="switchLanguage('sv')"
+            <a
+                href="{{ route('locale.switch', 'sv') }}"
                 class="flex-1 flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all {{ $locale === 'sv' ? 'bg-accent/10 border-accent text-accent' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600' }}"
             >
                 <span class="text-xl">🇸🇪</span>
                 <span class="font-medium">Svenska</span>
-            </button>
+            </a>
         </div>
     </div>
 
