@@ -1,4 +1,93 @@
 <div class="max-w-2xl mx-auto">
+    {{-- Find Players Modal --}}
+    @if($isOwnProfile && $showFindPlayersModal)
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50" wire:click.self="closeFindPlayersModal">
+            <div class="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-2xl sm:rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-700 flex flex-col max-h-[85vh]">
+                <!-- Header -->
+                <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                    <h2 class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('user-player-show.find_players') }}</h2>
+                    <button type="button" wire:click="closeFindPlayersModal" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Search -->
+                <div class="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+                        </svg>
+                        <input
+                            type="text"
+                            wire:model.live.debounce.300ms="findPlayersSearch"
+                            placeholder="{{ __('user-player-show.search_players_placeholder') }}"
+                            class="w-full pl-9 pr-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                        />
+                    </div>
+                    @if($findPlayersSearch === '')
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{{ __('user-player-show.showing_top_10') }}</p>
+                    @endif
+                </div>
+
+                <!-- Results -->
+                <div class="flex-1 overflow-y-auto">
+                    @if($findPlayersResults->isEmpty())
+                        <div class="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                            {{ __('user-player-show.no_players_found') }}
+                        </div>
+                    @else
+                        <ul class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                            @foreach($findPlayersResults as $foundPlayer)
+                                @php
+                                    $latest = $foundPlayer->monthlyRankings->first();
+                                    $isMon = in_array($foundPlayer->id, $monitoringIds);
+                                @endphp
+                                <li class="flex items-center gap-3 px-4 py-3">
+                                    <a href="{{ route('players.show', $foundPlayer) }}" wire:navigate class="flex items-center gap-3 flex-1 min-w-0">
+                                        @if($foundPlayer->profile_picture)
+                                            <img src="{{ Storage::url($foundPlayer->profile_picture) }}" alt="{{ $foundPlayer->name }}" class="w-10 h-10 rounded-full object-cover flex-shrink-0">
+                                        @else
+                                            <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center flex-shrink-0">
+                                                <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-200">{{ $foundPlayer->initials() }}</span>
+                                            </div>
+                                        @endif
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $foundPlayer->name }}</p>
+                                            @if($latest)
+                                                <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ number_format($latest->points) }} {{ __('user-player-show.pts') }}</p>
+                                            @else
+                                                <p class="text-xs text-zinc-400 dark:text-zinc-500">—</p>
+                                            @endif
+                                        </div>
+                                    </a>
+                                    <button
+                                        type="button"
+                                        wire:click="toggleMonitorFor({{ $foundPlayer->id }})"
+                                        class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors {{ $isMon ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50' : 'bg-accent text-white hover:bg-accent/90' }}"
+                                    >
+                                        @if($isMon)
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                            {{ __('user-player-show.stop_monitoring') }}
+                                        @else
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                            </svg>
+                                            {{ __('user-player-show.monitor_player') }}
+                                        @endif
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if($isOwnProfile)
         {{-- ===================== OWN PROFILE — New Design ===================== --}}
 
@@ -106,7 +195,7 @@
                         <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('user-player-show.points') }}</span>
                         <span class="w-10 text-xs font-bold text-zinc-900 dark:text-white text-right">+/-</span>
                     </div>
-                    @foreach($rankingsHistory as $ranking)
+                    @foreach($rankingsHistory->take(5) as $ranking)
                         <div wire:key="ranking-{{ $ranking->id }}" class="flex items-center px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/50">
                             <span class="flex-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $ranking->formatted_date }}</span>
                             <span class="w-20 text-sm text-zinc-600 dark:text-zinc-400 text-center">{{ number_format($ranking->rank) }}</span>
@@ -116,22 +205,36 @@
                             </span>
                         </div>
                     @endforeach
+                    <a href="{{ route('my-rankings.index') }}" wire:navigate class="flex items-center justify-center gap-1 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/50 text-accent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                        <span class="text-sm font-medium">{{ __('user-player-show.view_more') }}</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
                 @endif
             </div>
         </div>
 
         <!-- Top Monitored Players Section -->
         <div class="mb-6">
-            <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 px-4">{{ __('user-player-show.top_monitored_players') }}</p>
+            <div class="flex items-center justify-between mb-2 px-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ __('user-player-show.top_monitored_players') }}</p>
+                <button type="button" wire:click="openFindPlayersModal" class="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80 transition-opacity">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    {{ __('user-player-show.find_players') }}
+                </button>
+            </div>
             @if($topMonitoredPlayers->isEmpty())
                 <div class="px-4">
-                    <a href="{{ route('players.index') }}" wire:navigate
+                    <button type="button" wire:click="openFindPlayersModal"
                        class="flex items-center justify-center gap-2 w-full py-5 bg-zinc-100 dark:bg-zinc-800 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-600 text-accent font-medium text-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
                         {{ __('user-player-show.add_player') }}
-                    </a>
+                    </button>
                 </div>
             @else
                 <div class="flex gap-3 overflow-x-auto px-4 pb-2" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
@@ -270,6 +373,14 @@
                     </a>
                 @endforeach
             </div>
+            <div class="px-4 mt-3">
+                <a href="{{ route('matches.index') }}" wire:navigate class="flex items-center justify-center gap-1 text-accent hover:opacity-80 transition-opacity py-2">
+                    <span class="text-sm font-medium">{{ __('user-player-show.view_more') }}</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
         </div>
         @endif
 
@@ -284,13 +395,6 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                         </svg>
                     </div>
-                </a>
-
-                <a href="{{ route('matches.index') }}" wire:navigate class="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('user-player-show.my_matches') }}</span>
-                    <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
                 </a>
             </div>
         </div>

@@ -55,6 +55,18 @@ class Profile extends Component
     {
         $user = Auth::user();
 
+        // Normalize empty strings to null so `nullable` rules apply
+        // (otherwise '' fails the `in:` rule on gender and aborts the whole save)
+        if ($this->gender === '') {
+            $this->gender = null;
+        }
+        if ($this->phone_number === '') {
+            $this->phone_number = null;
+        }
+        if ($this->user_fullname === '') {
+            $this->user_fullname = null;
+        }
+
         $validated = $this->validate([
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],

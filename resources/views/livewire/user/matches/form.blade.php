@@ -22,38 +22,68 @@
         <!-- Opponent -->
         <div>
             <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-matches.opponent') }}</label>
-            <input
-                type="text"
-                wire:model.live.debounce.300ms="opponentSearch"
-                placeholder="{{ __('user-matches.search_for_opponent') }}"
-                class="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-2"
-            >
 
-            <div class="max-h-48 overflow-y-auto bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-300 dark:border-zinc-700">
-                @forelse($opponents as $opponent)
+            @if($selectedOpponent)
+                <div class="flex items-center gap-3 p-3 bg-zinc-100 dark:bg-zinc-800 border border-accent rounded-lg">
+                    @if($selectedOpponent->profile_picture)
+                        <img src="{{ Storage::url($selectedOpponent->profile_picture) }}" alt="{{ $selectedOpponent->name }}" class="w-10 h-10 rounded-full object-cover">
+                    @else
+                        <div class="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-600 flex items-center justify-center">
+                            <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ $selectedOpponent->initials() }}</span>
+                        </div>
+                    @endif
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $selectedOpponent->name }}</div>
+                        @if($selectedOpponent->club)
+                            <div class="text-xs text-zinc-500 dark:text-zinc-400 truncate">{{ $selectedOpponent->club->name }}</div>
+                        @endif
+                    </div>
                     <button
                         type="button"
-                        wire:click="$set('opponent_id', {{ $opponent->id }})"
-                        class="w-full flex items-center gap-3 p-3 text-left hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors {{ $opponent_id === $opponent->id ? 'bg-accent/20 border-l-2 border-accent' : '' }}"
+                        wire:click="removeOpponent"
+                        class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-lg transition-colors"
                     >
-                        @if($opponent->profile_picture)
-                            <img src="{{ Storage::url($opponent->profile_picture) }}" alt="{{ $opponent->name }}" class="w-8 h-8 rounded-full object-cover">
-                        @else
-                            <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-600 flex items-center justify-center">
-                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $opponent->initials() }}</span>
-                            </div>
-                        @endif
-                        <div>
-                            <div class="text-sm text-zinc-900 dark:text-white">{{ $opponent->name }}</div>
-                            @if($opponent->club)
-                                <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $opponent->club->name }}</div>
-                            @endif
-                        </div>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        {{ __('user-matches.remove') }}
                     </button>
-                @empty
-                    <p class="p-3 text-sm text-zinc-500 dark:text-zinc-400 text-center">{{ __('user-matches.no_players_found') }}</p>
-                @endforelse
-            </div>
+                </div>
+            @else
+                <input
+                    type="text"
+                    wire:model.live.debounce.300ms="opponentSearch"
+                    placeholder="{{ __('user-matches.search_for_opponent') }}"
+                    class="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-2"
+                >
+
+                <div class="max-h-48 overflow-y-auto bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-300 dark:border-zinc-700">
+                    @forelse($opponents as $opponent)
+                        <button
+                            type="button"
+                            wire:click="selectOpponent({{ $opponent->id }})"
+                            class="w-full flex items-center gap-3 p-3 text-left hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                            @if($opponent->profile_picture)
+                                <img src="{{ Storage::url($opponent->profile_picture) }}" alt="{{ $opponent->name }}" class="w-8 h-8 rounded-full object-cover">
+                            @else
+                                <div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-600 flex items-center justify-center">
+                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $opponent->initials() }}</span>
+                                </div>
+                            @endif
+                            <div>
+                                <div class="text-sm text-zinc-900 dark:text-white">{{ $opponent->name }}</div>
+                                @if($opponent->club)
+                                    <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $opponent->club->name }}</div>
+                                @endif
+                            </div>
+                        </button>
+                    @empty
+                        <p class="p-3 text-sm text-zinc-500 dark:text-zinc-400 text-center">{{ __('user-matches.no_players_found') }}</p>
+                    @endforelse
+                </div>
+            @endif
+
             @error('opponent_id')
                 <p class="mt-1 text-sm text-red-500 dark:text-red-400">{{ $message }}</p>
             @enderror

@@ -25,6 +25,7 @@ return [
     'opponent' => 'Motståndare',
     'search_for_opponent' => 'Sök efter motståndare...',
     'no_players_found' => 'Inga spelare hittades',
+    'remove' => 'Ta bort',
     'my_sets_won' => 'Mina vunna set',
     'opponent_sets_won' => 'Motståndarens vunna set',
     'add_custom_comment' => 'Lägg till egen kommentar...',

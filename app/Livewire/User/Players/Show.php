@@ -3,6 +3,7 @@
 namespace App\Livewire\User\Players;
 
 use App\Models\GameMatch;
+use App\Models\MonthlyRanking;
 use App\Models\User;
 use Livewire\Component;
 
@@ -10,6 +11,10 @@ class Show extends Component
 {
     public User $player;
     public ?int $expandedRankingId = null;
+
+    // Find Players modal
+    public bool $showFindPlayersModal = false;
+    public string $findPlayersSearch = '';
 
     public function mount(User $user)
     {
@@ -19,6 +24,26 @@ class Show extends Component
     public function toggleMonitor()
     {
         auth()->user()->toggleMonitoring($this->player);
+    }
+
+    public function openFindPlayersModal()
+    {
+        $this->findPlayersSearch = '';
+        $this->showFindPlayersModal = true;
+    }
+
+    public function closeFindPlayersModal()
+    {
+        $this->showFindPlayersModal = false;
+        $this->findPlayersSearch = '';
+    }
+
+    public function toggleMonitorFor($userId)
+    {
+        $target = User::find($userId);
+        if ($target && $target->id !== auth()->id()) {
+            auth()->user()->toggleMonitoring($target);
+        }
     }
 
     public function toggleRanking($rankingId)
@@ -194,6 +219,49 @@ class Show extends Component
             ->orderByDesc('completion_date')
             ->get();
 
+        // Find Players modal data — top 10 by latest ranking points, or filtered by search
+        $findPlayersResults = collect();
+        $monitoringIds = [];
+        if ($isOwnProfile && $this->showFindPlayersModal) {
+            $monitoringIds = auth()->user()->monitoring()->pluck('users.id')->toArray();
+
+            $latestRanking = MonthlyRanking::orderBy('year', 'desc')
+                ->orderBy('month', 'desc')
+                ->first();
+
+            $playersQuery = User::query()
+                ->where('visible_in_players', true)
+                ->where('users.id', '!=', auth()->id())
+                ->with(['monthlyRankings' => function ($q) {
+                    $q->orderBy('year', 'desc')->orderBy('month', 'desc');
+                }]);
+
+            $search = trim($this->findPlayersSearch);
+            if ($search !== '') {
+                $playersQuery->where(function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                      ->orWhere('last_name', 'like', "%{$search}%")
+                      ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", ["%{$search}%"])
+                      ->orWhereRaw("CONCAT(last_name, ' ', first_name) like ?", ["%{$search}%"]);
+                });
+                $findPlayersResults = $playersQuery->limit(20)->get();
+            } elseif ($latestRanking) {
+                // Top 10 by points from the latest ranking month
+                $findPlayersResults = $playersQuery
+                    ->leftJoin('monthly_rankings', function ($join) use ($latestRanking) {
+                        $join->on('users.id', '=', 'monthly_rankings.user_id')
+                             ->where('monthly_rankings.year', '=', $latestRanking->year)
+                             ->where('monthly_rankings.month', '=', $latestRanking->month);
+                    })
+                    ->orderByRaw('monthly_rankings.points IS NULL, monthly_rankings.points DESC')
+                    ->select('users.*')
+                    ->limit(10)
+                    ->get();
+            } else {
+                $findPlayersResults = $playersQuery->orderBy('first_name')->limit(10)->get();
+            }
+        }
+
         // Get matches for expanded ranking
         $expandedRankingMatches = collect();
         if ($this->expandedRankingId) {
@@ -218,6 +286,8 @@ class Show extends Component
             'rankingCategory' => $rankingCategory,
             'clubTransitions' => $clubTransitions,
             'expandedRankingMatches' => $expandedRankingMatches,
+            'findPlayersResults' => $findPlayersResults,
+            'monitoringIds' => $monitoringIds,
         ])->layout('components.layouts.app');
     }
 }

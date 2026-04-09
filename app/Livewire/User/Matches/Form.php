@@ -73,6 +73,19 @@ class Form extends Component
         }
     }
 
+    public function selectOpponent(int $id): void
+    {
+        $this->opponent_id = $id;
+        $this->opponentSearch = '';
+        $this->resetErrorBag('opponent_id');
+    }
+
+    public function removeOpponent(): void
+    {
+        $this->opponent_id = null;
+        $this->opponentSearch = '';
+    }
+
     public function toggleComment(string $comment)
     {
         if (in_array($comment, $this->opponent_comments)) {
@@ -197,19 +210,27 @@ class Form extends Component
 
     public function render()
     {
-        $opponents = User::where('id', '!=', auth()->id())
-            ->when($this->opponentSearch, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('first_name', 'like', '%' . $this->opponentSearch . '%')
-                      ->orWhere('last_name', 'like', '%' . $this->opponentSearch . '%');
-                });
-            })
-            ->orderBy('first_name')
-            ->limit(20)
-            ->get();
+        $selectedOpponent = $this->opponent_id
+            ? User::with('club')->find($this->opponent_id)
+            : null;
+
+        $opponents = $selectedOpponent
+            ? collect()
+            : User::with('club')
+                ->where('id', '!=', auth()->id())
+                ->when($this->opponentSearch, function ($query) {
+                    $query->where(function ($q) {
+                        $q->where('first_name', 'like', '%' . $this->opponentSearch . '%')
+                          ->orWhere('last_name', 'like', '%' . $this->opponentSearch . '%');
+                    });
+                })
+                ->orderBy('first_name')
+                ->limit(20)
+                ->get();
 
         return view('livewire.user.matches.form', [
             'opponents' => $opponents,
+            'selectedOpponent' => $selectedOpponent,
         ])->layout('components.layouts.app');
     }
 }

@@ -25,6 +25,7 @@ return [
     'opponent' => 'Opponent',
     'search_for_opponent' => 'Search for opponent...',
     'no_players_found' => 'No players found',
+    'remove' => 'Remove',
     'my_sets_won' => 'My Sets Won',
     'opponent_sets_won' => "Opponent's Sets Won",
     'add_custom_comment' => 'Add custom comment...',
