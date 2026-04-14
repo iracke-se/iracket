@@ -11,6 +11,7 @@ class MonthlyRanking extends Model
         'user_id',
         'year',
         'month',
+        'ranking_date',
         'rank',
         'points',
         'points_change',

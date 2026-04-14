@@ -206,6 +206,7 @@ class SyncService
                             'rank' => $ranking->position,
                             'points' => $ranking->points,
                             'points_change' => $this->parsePointsChange($ranking->points_diff),
+                            'ranking_date' => $ranking->ranking_date,
                         ]
                     );
 

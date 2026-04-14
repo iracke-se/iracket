@@ -131,11 +131,14 @@
             <!-- Month -->
             <div>
                 <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.month') }}</label>
-                <input
-                    type="month"
+                <select
                     wire:model.live="selectedMonth"
                     class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 >
+                    @foreach($availableMonths as $month)
+                        <option value="{{ $month['value'] }}">{{ $month['label'] }}</option>
+                    @endforeach
+                </select>
             </div>
 
             <!-- Action Buttons -->

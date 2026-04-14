@@ -34,7 +34,12 @@ class Index extends Component
 
     public function mount()
     {
-        $this->selectedMonth = now()->format('Y-m');
+        // Default to the most recent available ranking_date
+        $latest = MonthlyRanking::whereNotNull('ranking_date')
+            ->orderByDesc('ranking_date')
+            ->value('ranking_date');
+
+        $this->selectedMonth = $latest ?? now()->format('Y-m');
     }
 
     public function updatingSearch()
@@ -60,7 +65,9 @@ class Index extends Component
         $this->rankingTo     = null;
         $this->ageFrom       = null;
         $this->ageTo         = null;
-        $this->selectedMonth = now()->format('Y-m');
+        $this->selectedMonth = MonthlyRanking::whereNotNull('ranking_date')
+            ->orderByDesc('ranking_date')
+            ->value('ranking_date') ?? now()->format('Y-m');
     }
 
     public function applyFilters()
@@ -71,12 +78,12 @@ class Index extends Component
 
     public function render()
     {
-        // Parse selected month for filtering
+        // Parse selected month for filtering — supports both "YYYY-MM" and "YYYY-MM-DD"
         $selectedYear = null;
         $selectedMonth = null;
         if ($this->selectedMonth) {
             $parts = explode('-', $this->selectedMonth);
-            if (count($parts) === 2) {
+            if (count($parts) >= 2) {
                 $selectedYear = (int) $parts[0];
                 $selectedMonth = (int) $parts[1];
             }
@@ -313,11 +320,22 @@ class Index extends Component
             $rankingPositions[$userId] = ['position' => $index + 1, 'category' => 'women'];
         }
 
+        $availableMonths = MonthlyRanking::whereNotNull('ranking_date')
+            ->selectRaw('ranking_date, year, month')
+            ->orderByDesc('ranking_date')
+            ->get()
+            ->unique('ranking_date')
+            ->map(fn ($r) => [
+                'value' => $r->ranking_date,
+                'label' => $r->ranking_date . '  (' . date('F Y', mktime(0, 0, 0, $r->month, 1, $r->year)) . ')',
+            ]);
+
         return view('livewire.user.players.index', [
             'players'            => $players,
             'rankingPositions'   => $rankingPositions,
             'availableDistricts' => District::orderBy('name')->get(['id', 'name']),
             'manualPointsMap'    => $manualPointsMap,
+            'availableMonths'    => $availableMonths,
         ])->layout('components.layouts.app');
     }
 }
