@@ -108,26 +108,23 @@ class Index extends Component
         // Search by name or email (with Nordic character support)
         if ($this->search) {
             $search = trim($this->search);
+            $isSqlite = \DB::connection()->getDriverName() === 'sqlite';
 
-            // If search contains space, split and search first/last name parts
-            if (str_contains($search, ' ')) {
-                $parts = explode(' ', $search, 2);
-                $firstName = trim($parts[0]);
-                $lastName = trim($parts[1] ?? '');
+            $query->where(function ($q) use ($search, $isSqlite) {
+                // Search individual fields
+                $q->where('first_name', 'like', '%' . $search . '%')
+                  ->orWhere('last_name', 'like', '%' . $search . '%')
+                  ->orWhere('email', 'like', '%' . $search . '%');
 
-                if ($firstName && $lastName) {
-                    // Apply search for first name
-                    $this->applySearch($query, $firstName, ['first_name']);
-                    // Apply search for last name (both must match)
-                    $this->applySearch($query, $lastName, ['last_name']);
+                // Search full name as phrase (both orders)
+                if ($isSqlite) {
+                    $q->orWhereRaw("LOWER(first_name || ' ' || last_name) LIKE ?", ['%' . strtolower($search) . '%'])
+                      ->orWhereRaw("LOWER(last_name || ' ' || first_name) LIKE ?", ['%' . strtolower($search) . '%']);
                 } else {
-                    // If only first part exists, search normally
-                    $this->applySearch($query, $firstName ?: $lastName, ['first_name', 'last_name', 'email']);
+                    $q->orWhereRaw("LOWER(CONCAT(first_name, ' ', last_name)) LIKE ?", ['%' . strtolower($search) . '%'])
+                      ->orWhereRaw("LOWER(CONCAT(last_name, ' ', first_name)) LIKE ?", ['%' . strtolower($search) . '%']);
                 }
-            } else {
-                // Single word search - search in both first_name and last_name separately
-                $this->applySearch($query, $search, ['first_name', 'last_name', 'email']);
-            }
+            });
         }
 
         // Filter by gender

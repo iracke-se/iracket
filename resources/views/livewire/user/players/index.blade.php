@@ -87,20 +87,18 @@
                 <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.rankings') }}</label>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.from') }}</label>
                         <input
                             type="number"
                             wire:model.blur="rankingFrom"
-                            placeholder="1500"
+                            placeholder=""
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
                     </div>
                     <div>
-                        <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.to') }}</label>
                         <input
                             type="number"
                             wire:model.blur="rankingTo"
-                            placeholder="1749"
+                            placeholder=""
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
                     </div>
@@ -112,20 +110,18 @@
                 <label class="block text-sm font-medium text-zinc-600 dark:text-zinc-300 mb-2">{{ __('user-players.age') }}</label>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.from') }}</label>
                         <input
                             type="number"
                             wire:model.blur="ageFrom"
-                            placeholder="18"
+                            placeholder=""
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
                     </div>
                     <div>
-                        <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">{{ __('user-players.to') }}</label>
                         <input
                             type="number"
                             wire:model.blur="ageTo"
-                            placeholder="50"
+                            placeholder=""
                             class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
                     </div>
