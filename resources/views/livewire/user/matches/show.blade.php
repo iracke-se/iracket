@@ -2,6 +2,7 @@
     @php
         $user = auth()->user();
         $isParticipant = $match->player1_id === $user->id || $match->player2_id === $user->id;
+        $isCreator = $match->created_by === $user->id;
         $player1 = $match->player1;
         $player2 = $match->player2;
     @endphp
@@ -174,50 +175,52 @@
 
     @endif
 
-    <!-- Description -->
-    @if($match->description)
+    <!-- Description (creator only) -->
+    @if($isCreator && $match->description)
         <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
             <h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2">{{ __('user-matches.match_notes') }}</h3>
             <p class="text-sm text-zinc-700 dark:text-zinc-200">{{ $match->description }}</p>
         </div>
     @endif
 
-    <!-- Comments / Tags -->
-    @php
-        $p1Comments = $match->player1_comments ?? [];
-        $p2Comments = $match->player2_comments ?? [];
-        $hasComments = !empty($p1Comments) || !empty($p2Comments);
-    @endphp
-    @if($hasComments)
-        <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
-            <h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">{{ __('user-matches.comments_on_opponent') }}</h3>
-            <div class="space-y-3">
-                @if(!empty($p1Comments))
-                    <div>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ $player1->name }}</p>
-                        <div class="flex flex-wrap gap-2">
-                            @foreach($p1Comments as $comment)
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                                    {{ __('user-matches.' . $comment) }}
-                                </span>
-                            @endforeach
+    <!-- Comments / Tags (creator only) -->
+    @if($isCreator)
+        @php
+            $p1Comments = $match->player1_comments ?? [];
+            $p2Comments = $match->player2_comments ?? [];
+            $hasComments = !empty($p1Comments) || !empty($p2Comments);
+        @endphp
+        @if($hasComments)
+            <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
+                <h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">{{ __('user-matches.comments_on_opponent') }}</h3>
+                <div class="space-y-3">
+                    @if(!empty($p1Comments))
+                        <div>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ $player1->name }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($p1Comments as $comment)
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                                        {{ __('user-matches.' . $comment) }}
+                                    </span>
+                                @endforeach
+                            </div>
                         </div>
-                    </div>
-                @endif
-                @if(!empty($p2Comments))
-                    <div>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ $player2->name }}</p>
-                        <div class="flex flex-wrap gap-2">
-                            @foreach($p2Comments as $comment)
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                                    {{ __('user-matches.' . $comment) }}
-                                </span>
-                            @endforeach
+                    @endif
+                    @if(!empty($p2Comments))
+                        <div>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{{ $player2->name }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($p2Comments as $comment)
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                                        {{ __('user-matches.' . $comment) }}
+                                    </span>
+                                @endforeach
+                            </div>
                         </div>
-                    </div>
-                @endif
+                    @endif
+                </div>
             </div>
-        </div>
+        @endif
     @endif
 
     <!-- Match Status -->
@@ -232,7 +235,6 @@
 
     <!-- Actions -->
     @php
-        $isCreator = $match->created_by === $user->id;
         $isOpponent = $isParticipant && !$isCreator;
         $isPending = $match->status === 'pending';
     @endphp
