@@ -364,7 +364,7 @@ class Index extends Component
                 return $range['max'] === null
                     ? $pts >= $range['min']
                     : $pts >= $range['min'] && $pts <= $range['max'];
-            })->values()->take(3);
+            })->sortByDesc('points_change')->values()->take(3);
 
             if ($players->isNotEmpty()) {
                 $grouped[] = ['label' => $range['label'], 'players' => $players];
