@@ -260,8 +260,11 @@ class Index extends Component
         // Build scores
         $scores = [];
         foreach ($byClub as $clubId => $rankings) {
-            $top10            = $rankings->sortByDesc('points_change')->take(10);
-            $positiveClimbers = $top10->where('points_change', '>', 0);
+            $top10 = $rankings->sortByDesc('points_change')->take(10);
+
+            // Exclude new players (points_change == points means they had no prior ranking)
+            $positiveClimbers = $top10->where('points_change', '>', 0)
+                ->filter(fn ($r) => $r->points_change != $r->points);
 
             $totalPointsGained = (int) $positiveClimbers->sum('points_change');
             $bubblerCount      = $positiveClimbers->count();
@@ -360,6 +363,11 @@ class Index extends Component
         foreach ($ranges as $range) {
             $players = $rankings->filter(function ($r) use ($range) {
                 $pts = $r->effective_points;
+
+                // Exclude new players: points_change == points means no prior ranking
+                if ($r->points > 0 && $r->points_change == $r->points) {
+                    return false;
+                }
 
                 return $range['max'] === null
                     ? $pts >= $range['min']
