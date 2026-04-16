@@ -219,9 +219,11 @@ class Form extends Component
             : User::with('club')
                 ->where('id', '!=', auth()->id())
                 ->when($this->opponentSearch, function ($query) {
-                    $query->where(function ($q) {
-                        $q->where('first_name', 'like', '%' . $this->opponentSearch . '%')
-                          ->orWhere('last_name', 'like', '%' . $this->opponentSearch . '%');
+                    $search = $this->opponentSearch;
+                    $query->where(function ($q) use ($search) {
+                        $q->where('first_name', 'like', '%' . $search . '%')
+                          ->orWhere('last_name', 'like', '%' . $search . '%')
+                          ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%' . $search . '%']);
                     });
                 })
                 ->orderBy('first_name')

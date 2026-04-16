@@ -131,8 +131,8 @@
                 @foreach($availableComments as $key => $value)
                     <button
                         type="button"
-                        wire:click="toggleComment('{{ $value }}')"
-                        class="px-3 py-1.5 text-sm rounded-lg transition-colors {{ in_array($value, $opponent_comments) ? 'bg-accent text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600' }}"
+                        wire:click="toggleComment('{{ $key }}')"
+                        class="px-3 py-1.5 text-sm rounded-lg transition-colors {{ in_array($key, $opponent_comments) ? 'bg-accent text-white' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600' }}"
                     >
                         {{ __('user-matches.comment_' . $key) }}
                     </button>
@@ -163,7 +163,7 @@
                     <div class="flex flex-wrap gap-1">
                         @foreach($opponent_comments as $comment)
                             <span class="inline-flex items-center gap-1 px-2 py-1 bg-zinc-200 dark:bg-zinc-600 rounded text-xs text-zinc-700 dark:text-zinc-200">
-                                {{ ($key = array_search($comment, $availableComments)) !== false ? __('user-matches.comment_' . $key) : $comment }}
+                                {{ isset($availableComments[$comment]) ? __('user-matches.comment_' . $comment) : $comment }}
                                 <button type="button" wire:click="toggleComment('{{ $comment }}')" class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>

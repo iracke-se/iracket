@@ -3,6 +3,7 @@
         $user = auth()->user();
         $isParticipant = $match->player1_id === $user->id || $match->player2_id === $user->id;
         $isCreator = $match->created_by === $user->id;
+        $isMePlayer1 = $match->player1_id === $user->id;
         $player1 = $match->player1;
         $player2 = $match->player2;
     @endphp
@@ -36,6 +37,16 @@
                 if ($match->winner_id === null) {
                     if (isset($p1ScrapedResult) && $p1ScrapedResult === 'W') { $player1Won = true; }
                     elseif (isset($p2ScrapedResult) && $p2ScrapedResult === 'W') { $player2Won = true; }
+                    // Fallback: infer from points_change sign (manual matches with missing winner_id)
+                    if (!$player1Won && !$player2Won && $match->player1_points_change !== null) {
+                        if ($match->player1_points_change > 0) { $player1Won = true; }
+                        elseif ($match->player2_points_change > 0) { $player2Won = true; }
+                    }
+                    // Last resort: infer from sets
+                    if (!$player1Won && !$player2Won) {
+                        if ($player1Sets > $player2Sets) { $player1Won = true; }
+                        elseif ($player2Sets > $player1Sets) { $player2Won = true; }
+                    }
                 }
 
                 // Calculate sets from live center data
@@ -60,6 +71,14 @@
                 if ($p2BadgePoints !== null) { $p2BadgePoints = $player2Won ? abs($p2BadgePoints) : -abs($p2BadgePoints); }
                 if ($p1BadgePoints !== null && $p2BadgePoints === null) { $p2BadgePoints = -$p1BadgePoints; }
                 elseif ($p2BadgePoints !== null && $p1BadgePoints === null) { $p1BadgePoints = -$p2BadgePoints; }
+
+                // Swap display order so logged-in user is always on the left
+                if ($isParticipant && !$isMePlayer1) {
+                    [$player1, $player2]             = [$player2, $player1];
+                    [$player1Won, $player2Won]         = [$player2Won, $player1Won];
+                    [$player1Sets, $player2Sets]       = [$player2Sets, $player1Sets];
+                    [$p1BadgePoints, $p2BadgePoints]   = [$p2BadgePoints, $p1BadgePoints];
+                }
             @endphp
 
             @if($player1Sets > 0 || $player2Sets > 0)
@@ -189,6 +208,17 @@
             $p1Comments = $match->player1_comments ?? [];
             $p2Comments = $match->player2_comments ?? [];
             $hasComments = !empty($p1Comments) || !empty($p2Comments);
+            // Map old display values → keys for backwards compat
+            $commentValueToKey = [
+                'Good backhand'       => 'good_backhand',
+                'Good forehand'       => 'good_forehand',
+                'Strong serve'        => 'strong_serve',
+                'Fast footwork'       => 'fast_footwork',
+                'Excellent net play'  => 'excellent_net_play',
+                'Super sensitive'     => 'super_sensitive',
+                'Great sportsmanship' => 'great_sportsmanship',
+                'Consistent player'   => 'consistent_player',
+            ];
         @endphp
         @if($hasComments)
             <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 mb-6">
@@ -200,7 +230,7 @@
                             <div class="flex flex-wrap gap-2">
                                 @foreach($p1Comments as $comment)
                                     <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                                        {{ __('user-matches.' . $comment) }}
+                                        {{ __('user-matches.comment_' . ($commentValueToKey[$comment] ?? $comment)) }}
                                     </span>
                                 @endforeach
                             </div>
@@ -212,7 +242,7 @@
                             <div class="flex flex-wrap gap-2">
                                 @foreach($p2Comments as $comment)
                                     <span class="px-3 py-1 rounded-full text-xs font-medium bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                                        {{ __('user-matches.' . $comment) }}
+                                        {{ __('user-matches.comment_' . ($commentValueToKey[$comment] ?? $comment)) }}
                                     </span>
                                 @endforeach
                             </div>
