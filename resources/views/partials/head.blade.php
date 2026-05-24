@@ -1,6 +1,21 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+{{-- Prevent FOUC: apply theme class to <html> synchronously before any CSS paints. --}}
+{{-- Reads Flux's `flux.appearance` (written by the Appearance settings page) with --}}
+{{-- fallback to the legacy `theme` key. Default is dark. --}}
+<script>
+    (function () {
+        try {
+            var pref = localStorage.getItem('flux.appearance') || localStorage.getItem('theme') || 'dark';
+            var isDark = pref === 'system'
+                ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                : pref !== 'light';
+            document.documentElement.classList.toggle('dark', isDark);
+        } catch (e) {}
+    })();
+</script>
+
 <title>{{ $title ?? config('app.name') }}</title>
 
 <link rel="icon" href="/assets/images/icon.png" type="image/png">
