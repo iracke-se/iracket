@@ -43,8 +43,11 @@
 
     @php($currentLocale = app()->getLocale())
 
-    <x-settings.layout :heading="__('user-settings.language_heading')" :subheading="__('user-settings.language_subheading')">
-        <div class="flex gap-3">
+    <div class="mt-6 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 sm:p-6 overflow-hidden">
+        <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">{{ __('user-settings.language_heading') }}</h2>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{{ __('user-settings.language_subheading') }}</p>
+
+        <div class="mt-6 flex gap-3">
             <a
                 href="{{ route('locale.switch', 'en') }}"
                 @class([
@@ -73,5 +76,5 @@
                 <span class="text-sm font-medium">{{ __('user-settings.swedish') }}</span>
             </a>
         </div>
-    </x-settings.layout>
+    </div>
 </div>
