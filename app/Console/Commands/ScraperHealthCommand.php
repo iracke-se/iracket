@@ -89,6 +89,7 @@ class ScraperHealthCommand extends Command
     protected function checkPython(): void
     {
         $binary = config('scraper.python.binary', env('SCRAPER_PYTHON_BINARY', 'python3'));
+        $hint = "Install Python 3.8+ and set SCRAPER_PYTHON_BINARY in .env to the absolute path";
 
         try {
             $result = Process::timeout(5)->run("{$binary} --version 2>&1");
@@ -96,9 +97,9 @@ class ScraperHealthCommand extends Command
                 $this->checkPass('Python', trim($result->output()), ['binary' => $binary]);
                 return;
             }
-            $this->checkFail('Python', "Not runnable at {$binary}");
+            $this->checkFail('Python', "Not runnable at {$binary}", [], $hint);
         } catch (\Throwable $e) {
-            $this->checkFail('Python', "Error invoking {$binary}: ".$e->getMessage());
+            $this->checkFail('Python', "Error invoking {$binary}: ".$e->getMessage(), [], $hint);
         }
     }
 
@@ -131,12 +132,19 @@ class ScraperHealthCommand extends Command
             ? $venvPython
             : config('scraper.python.binary', env('SCRAPER_PYTHON_BINARY', 'python3'));
 
+        // importlib.metadata is the standard way to read a package version in
+        // Python 3.8+. Older "import playwright; playwright.__version__" no
+        // longer works as of Playwright 1.50+.
+        $script = <<<'PY'
+from importlib.metadata import version
+from playwright.async_api import async_playwright  # ensure the actual API is loadable
+print(version("playwright"))
+PY;
+
+        $hint = "cd /www/wwwroot/iracket.se/scripts/scraper && source venv/bin/activate && pip install playwright && playwright install chromium";
+
         try {
-            $result = Process::timeout(10)->run([
-                $python,
-                '-c',
-                'import playwright; print(playwright.__version__)',
-            ]);
+            $result = Process::timeout(10)->run([$python, '-c', $script]);
 
             if ($result->successful()) {
                 $version = trim($result->output());
@@ -144,10 +152,10 @@ class ScraperHealthCommand extends Command
                 $this->checkPass('Python Playwright', "v{$version} importable ({$source})", ['python' => $python]);
             } else {
                 $err = trim($result->errorOutput() ?: $result->output());
-                $this->checkFail('Python Playwright', 'Cannot import playwright — rankings scraper will fail. '.$err);
+                $this->checkFail('Python Playwright', 'Cannot import — rankings scraper will fail. '.$err, [], $hint);
             }
         } catch (\Throwable $e) {
-            $this->checkFail('Python Playwright', 'Check errored: '.$e->getMessage());
+            $this->checkFail('Python Playwright', 'Check errored: '.$e->getMessage(), [], $hint);
         }
     }
 
@@ -155,6 +163,7 @@ class ScraperHealthCommand extends Command
     {
         $node = config('scraper.browser.node_binary', env('SCRAPER_NODE_BINARY', 'node'));
         $npm = config('scraper.browser.npm_binary', env('SCRAPER_NPM_BINARY', 'npm'));
+        $hint = "Install Node.js >=14 and set SCRAPER_NODE_BINARY + SCRAPER_NPM_BINARY in .env to absolute paths (find them with: which node npm)";
 
         try {
             $nodeResult = Process::timeout(5)->run("{$node} --version 2>&1");
@@ -170,10 +179,10 @@ class ScraperHealthCommand extends Command
                 if (! $npmResult->successful()) {
                     $missing[] = "npm ({$npm})";
                 }
-                $this->checkFail('Node / npm', 'Cannot invoke: '.implode(', ', $missing).'. Browsershot scrapers (transitions, series) will fail.');
+                $this->checkFail('Node / npm', 'Cannot invoke: '.implode(', ', $missing).'. Browsershot scrapers (transitions, series) will fail.', [], $hint);
             }
         } catch (\Throwable $e) {
-            $this->checkFail('Node / npm', 'Check errored: '.$e->getMessage());
+            $this->checkFail('Node / npm', 'Check errored: '.$e->getMessage(), [], $hint);
         }
     }
 
@@ -181,18 +190,24 @@ class ScraperHealthCommand extends Command
     {
         $chrome = config('scraper.browser.chrome_path', env('SCRAPER_CHROME_PATH'));
 
+        // Auto-discover Playwright's bundled Chromium as a fallback suggestion
+        $playwrightChrome = $this->findPlaywrightChromium();
+        $playwrightHint = $playwrightChrome
+            ? "Either install system Chromium (dnf/apt/yum install chromium) OR point SCRAPER_CHROME_PATH at Playwright's bundled binary:\nSCRAPER_CHROME_PATH={$playwrightChrome}"
+            : "Install system Chromium and set SCRAPER_CHROME_PATH in .env (try: which chromium chromium-browser google-chrome)";
+
         if (! $chrome) {
-            $this->checkWarn('Chromium', 'SCRAPER_CHROME_PATH not configured — Browsershot will fall back to its bundled binary');
+            $this->checkWarn('Chromium', 'SCRAPER_CHROME_PATH not configured — Browsershot will fall back to its bundled binary', [], $playwrightHint);
             return;
         }
 
         if (! file_exists($chrome)) {
-            $this->checkFail('Chromium', "Configured path does not exist: {$chrome}");
+            $this->checkFail('Chromium', "Configured path does not exist: {$chrome}", [], $playwrightHint);
             return;
         }
 
         if (! is_executable($chrome)) {
-            $this->checkFail('Chromium', "Path exists but not executable: {$chrome} — run chmod +x");
+            $this->checkFail('Chromium', "Path exists but not executable: {$chrome}", [], "chmod +x {$chrome}");
             return;
         }
 
@@ -209,6 +224,35 @@ class ScraperHealthCommand extends Command
         } catch (\Throwable) {
             $this->checkPass('Chromium', "Found at {$chrome}");
         }
+    }
+
+    /**
+     * Discover Playwright's bundled Chromium binary, if any was installed via
+     * `playwright install chromium`. Returns absolute path or null.
+     */
+    protected function findPlaywrightChromium(): ?string
+    {
+        $candidates = array_filter([
+            $_SERVER['HOME'] ?? null,
+            '/root',
+            '/home/www',
+        ]);
+
+        foreach ($candidates as $home) {
+            $glob = glob($home.'/.cache/ms-playwright/chromium-*/chrome-linux/chrome');
+            if (! empty($glob)) {
+                // Prefer the highest-version directory
+                rsort($glob);
+                return $glob[0];
+            }
+            $glob = glob($home.'/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell');
+            if (! empty($glob)) {
+                rsort($glob);
+                return $glob[0];
+            }
+        }
+
+        return null;
     }
 
     protected function checkScraperTables(): void
@@ -261,6 +305,7 @@ class ScraperHealthCommand extends Command
     protected function checkScraperWorker(): void
     {
         $queueName = config('scraper.queue.queue_name', env('SCRAPER_QUEUE_NAME', 'scraper'));
+        $hint = "Add a supervisor program running 'php artisan queue:work --queue={$queueName} --timeout=0' — see SCRAPER.md / docs/PRODUCTION_QUEUE_SETUP.md";
 
         try {
             $result = Process::timeout(5)->run("ps aux | grep -E 'queue:work.*{$queueName}|queue:listen.*{$queueName}' | grep -v grep");
@@ -270,7 +315,7 @@ class ScraperHealthCommand extends Command
                 $workerCount = count(array_filter(explode("\n", $output)));
                 $this->checkPass('Scraper queue worker', "{$workerCount} worker process(es) on '{$queueName}' queue");
             } else {
-                $this->checkFail('Scraper queue worker', "No worker process found for '{$queueName}' queue");
+                $this->checkFail('Scraper queue worker', "No worker process found for '{$queueName}' queue", [], $hint);
             }
         } catch (\Throwable $e) {
             $this->checkWarn('Scraper queue worker', 'Could not inspect process list: '.$e->getMessage());
@@ -302,7 +347,12 @@ class ScraperHealthCommand extends Command
         $threshold = (int) config('heartbeat.timeout', 5);
 
         if ($minutesAgo > $threshold) {
-            $this->checkFail('Scheduler heartbeat', "Stale — last beat {$minutesAgo}m ago (threshold {$threshold}m)");
+            $this->checkFail(
+                'Scheduler heartbeat',
+                "Stale — last beat {$minutesAgo}m ago (threshold {$threshold}m)",
+                [],
+                "Cron isn't running 'php artisan schedule:run'. Add a supervisor program OR cron entry:\n* * * * * cd /www/wwwroot/iracket.se && php artisan schedule:run >> /dev/null 2>&1"
+            );
         } else {
             $this->checkPass('Scheduler heartbeat', "Fresh — last beat {$minutesAgo}m ago");
         }
@@ -411,7 +461,12 @@ class ScraperHealthCommand extends Command
         $details = $stuck->map(fn ($r) => "#{$r->id} ({$r->type}, step: ".($r->current_step ?: 'n/a').", started {$r->started_at})")
             ->all();
 
-        $this->checkFail('Stuck runs', $stuck->count().' run(s) running longer than '.$threshold.'m', ['stuck' => $details]);
+        $this->checkFail(
+            'Stuck runs',
+            $stuck->count().' run(s) running longer than '.$threshold.'m',
+            ['stuck' => $details],
+            "Mark them failed: php artisan scraper:cleanup --older-than={$threshold}"
+        );
     }
 
     protected function checkLastRunsByDomain(): void
@@ -480,14 +535,16 @@ class ScraperHealthCommand extends Command
 
         $rate = (int) round(($failed / $total) * 100);
 
+        $inspectHint = "Inspect: php artisan tinker --execute=\"\\App\\Models\\Scraper\\ScraperRun::where('status','failed')->where('started_at','>=',now()->subDays({$window}))->get(['id','type','current_step','error_message','started_at'])->each(fn(\\\$r)=>print_r(\\\$r->toArray()));\"";
+
         if ($rate === 0) {
             $this->checkPass('Recent failure rate', "0% ({$failed}/{$total} in last {$window}d)");
         } elseif ($rate < 20) {
             $this->checkPass('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)");
         } elseif ($rate < 50) {
-            $this->checkWarn('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)");
+            $this->checkWarn('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)", [], $inspectHint);
         } else {
-            $this->checkFail('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d) — investigate");
+            $this->checkFail('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d) — investigate", [], $inspectHint);
         }
     }
 
@@ -533,10 +590,12 @@ class ScraperHealthCommand extends Command
             $freeGb = round($free / 1024 / 1024 / 1024, 1);
             $usedPct = (int) round((1 - ($free / $total)) * 100);
 
+            $cleanupHint = "Free space: php artisan scraper:cleanup-logs --days=7 --delete-archived=30  •  or prune old scraped_* runs";
+
             if ($freeGb < 2) {
-                $this->checkFail('Disk space', "{$freeGb}GB free ({$usedPct}% used) — critically low");
+                $this->checkFail('Disk space', "{$freeGb}GB free ({$usedPct}% used) — critically low", [], $cleanupHint);
             } elseif ($freeGb < 10 || $usedPct > 90) {
-                $this->checkWarn('Disk space', "{$freeGb}GB free ({$usedPct}% used)");
+                $this->checkWarn('Disk space', "{$freeGb}GB free ({$usedPct}% used)", [], $cleanupHint);
             } else {
                 $this->checkPass('Disk space', "{$freeGb}GB free ({$usedPct}% used)");
             }
@@ -556,31 +615,42 @@ class ScraperHealthCommand extends Command
         $this->passed++;
     }
 
-    protected function checkFail(string $name, string $message, array $context = []): void
+    protected function checkFail(string $name, string $message, array $context = [], ?string $hint = null): void
     {
-        $this->record('fail', $name, $message, $context);
+        $this->record('fail', $name, $message, $context, $hint);
         if (! $this->json) {
             $this->line("  <fg=red>✗</> <fg=white>{$name}:</> {$message}");
+            if ($hint !== null) {
+                foreach (preg_split('/\r?\n/', $hint) as $line) {
+                    $this->line("     <fg=gray>↳ {$line}</>");
+                }
+            }
         }
         $this->failed++;
     }
 
-    protected function checkWarn(string $name, string $message, array $context = []): void
+    protected function checkWarn(string $name, string $message, array $context = [], ?string $hint = null): void
     {
-        $this->record('warn', $name, $message, $context);
+        $this->record('warn', $name, $message, $context, $hint);
         if (! $this->json) {
             $this->line("  <fg=yellow>⚠</> <fg=white>{$name}:</> {$message}");
+            if ($hint !== null) {
+                foreach (preg_split('/\r?\n/', $hint) as $line) {
+                    $this->line("     <fg=gray>↳ {$line}</>");
+                }
+            }
         }
         $this->warnings++;
     }
 
-    protected function record(string $level, string $name, string $message, array $context): void
+    protected function record(string $level, string $name, string $message, array $context, ?string $hint = null): void
     {
         $this->results[] = [
             'level' => $level,
             'name' => $name,
             'message' => $message,
             'context' => $context,
+            'hint' => $hint,
         ];
     }
 
