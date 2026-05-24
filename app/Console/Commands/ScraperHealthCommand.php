@@ -42,6 +42,9 @@ class ScraperHealthCommand extends Command
         $this->section('Environment');
         $this->checkPython();
         $this->checkPythonScripts();
+        $this->checkPythonPlaywright();
+        $this->checkNodeNpm();
+        $this->checkChromium();
 
         $this->section('Database');
         $this->checkScraperTables();
@@ -117,6 +120,94 @@ class ScraperHealthCommand extends Command
             $this->checkPass('Python scripts', 'All scraper scripts present', ['scripts' => array_keys($scripts)]);
         } else {
             $this->checkFail('Python scripts', 'Missing: '.implode(', ', $missing));
+        }
+    }
+
+    protected function checkPythonPlaywright(): void
+    {
+        // Prefer the project venv if present, otherwise the system python.
+        $venvPython = base_path('scripts/scraper/venv/bin/python3');
+        $python = file_exists($venvPython)
+            ? $venvPython
+            : config('scraper.python.binary', env('SCRAPER_PYTHON_BINARY', 'python3'));
+
+        try {
+            $result = Process::timeout(10)->run([
+                $python,
+                '-c',
+                'import playwright; print(playwright.__version__)',
+            ]);
+
+            if ($result->successful()) {
+                $version = trim($result->output());
+                $source = $python === $venvPython ? 'venv' : 'system';
+                $this->checkPass('Python Playwright', "v{$version} importable ({$source})", ['python' => $python]);
+            } else {
+                $err = trim($result->errorOutput() ?: $result->output());
+                $this->checkFail('Python Playwright', 'Cannot import playwright — rankings scraper will fail. '.$err);
+            }
+        } catch (\Throwable $e) {
+            $this->checkFail('Python Playwright', 'Check errored: '.$e->getMessage());
+        }
+    }
+
+    protected function checkNodeNpm(): void
+    {
+        $node = config('scraper.browser.node_binary', env('SCRAPER_NODE_BINARY', 'node'));
+        $npm = config('scraper.browser.npm_binary', env('SCRAPER_NPM_BINARY', 'npm'));
+
+        try {
+            $nodeResult = Process::timeout(5)->run("{$node} --version 2>&1");
+            $npmResult = Process::timeout(5)->run("{$npm} --version 2>&1");
+
+            if ($nodeResult->successful() && $npmResult->successful()) {
+                $this->checkPass('Node / npm', 'Node '.trim($nodeResult->output()).', npm '.trim($npmResult->output()));
+            } else {
+                $missing = [];
+                if (! $nodeResult->successful()) {
+                    $missing[] = "node ({$node})";
+                }
+                if (! $npmResult->successful()) {
+                    $missing[] = "npm ({$npm})";
+                }
+                $this->checkFail('Node / npm', 'Cannot invoke: '.implode(', ', $missing).'. Browsershot scrapers (transitions, series) will fail.');
+            }
+        } catch (\Throwable $e) {
+            $this->checkFail('Node / npm', 'Check errored: '.$e->getMessage());
+        }
+    }
+
+    protected function checkChromium(): void
+    {
+        $chrome = config('scraper.browser.chrome_path', env('SCRAPER_CHROME_PATH'));
+
+        if (! $chrome) {
+            $this->checkWarn('Chromium', 'SCRAPER_CHROME_PATH not configured — Browsershot will fall back to its bundled binary');
+            return;
+        }
+
+        if (! file_exists($chrome)) {
+            $this->checkFail('Chromium', "Configured path does not exist: {$chrome}");
+            return;
+        }
+
+        if (! is_executable($chrome)) {
+            $this->checkFail('Chromium', "Path exists but not executable: {$chrome} — run chmod +x");
+            return;
+        }
+
+        // Headless environments often can't print --version without an X server,
+        // so missing version output is not a hard failure — file existence is enough.
+        try {
+            $result = Process::timeout(5)->run("\"{$chrome}\" --version 2>&1");
+            $output = trim($result->output());
+            if ($result->successful() && $output !== '') {
+                $this->checkPass('Chromium', $output, ['path' => $chrome]);
+            } else {
+                $this->checkPass('Chromium', "Found at {$chrome} (version check unsupported in this env)");
+            }
+        } catch (\Throwable) {
+            $this->checkPass('Chromium', "Found at {$chrome}");
         }
     }
 
@@ -221,21 +312,40 @@ class ScraperHealthCommand extends Command
     {
         $connection = config('scraper.queue.connection', config('queue.default'));
         $queueName = config('scraper.queue.queue_name', 'scraper');
+        $driver = config("queue.connections.{$connection}.driver");
 
-        if ($connection === 'database' && Schema::hasTable('jobs')) {
+        if ($driver === 'database' && Schema::hasTable('jobs')) {
             $count = DB::table('jobs')->where('queue', $queueName)->count();
             $oldest = DB::table('jobs')->where('queue', $queueName)->min('created_at');
 
-            if ($count === 0) {
-                $this->checkPass('Queued jobs', "0 pending on '{$queueName}' queue");
-            } elseif ($count < 10) {
-                $this->checkPass('Queued jobs', "{$count} pending on '{$queueName}' queue");
-            } else {
-                $this->checkWarn('Queued jobs', "{$count} pending on '{$queueName}' queue — backlog forming"
-                    .($oldest ? " (oldest: {$oldest})" : ''));
+            $this->reportQueueDepth($queueName, $count, $oldest);
+            return;
+        }
+
+        if ($driver === 'redis') {
+            try {
+                $redisConn = config("queue.connections.{$connection}.connection", 'default');
+                $count = (int) Redis::connection($redisConn)->llen("queues:{$queueName}");
+                $this->reportQueueDepth($queueName, $count);
+                return;
+            } catch (\Throwable $e) {
+                $this->checkWarn('Queued jobs', 'Could not query Redis queue depth: '.$e->getMessage());
+                return;
             }
+        }
+
+        $this->checkWarn('Queued jobs', "Cannot inspect — unsupported driver '{$driver}' for connection '{$connection}'");
+    }
+
+    protected function reportQueueDepth(string $queueName, int $count, ?string $oldest = null): void
+    {
+        if ($count === 0) {
+            $this->checkPass('Queued jobs', "0 pending on '{$queueName}' queue");
+        } elseif ($count < 50) {
+            $this->checkPass('Queued jobs', "{$count} pending on '{$queueName}' queue");
         } else {
-            $this->checkWarn('Queued jobs', "Cannot inspect — connection '{$connection}' is not database-backed");
+            $this->checkWarn('Queued jobs', "{$count} pending on '{$queueName}' queue — backlog forming"
+                .($oldest ? " (oldest: {$oldest})" : ''));
         }
     }
 
