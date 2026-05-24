@@ -546,6 +546,7 @@ Should report all green for PHP version, extensions, Node/npm/Chrome paths, Brow
 
 ## Pointers to related docs
 
+- **[docs/SCRAPER_SMOKE_TESTS.md](docs/SCRAPER_SMOKE_TESTS.md)** — end-to-end testing playbook (run after a fresh deploy or any infra change)
 - [docs/PRODUCTION_QUEUE_SETUP.md](docs/PRODUCTION_QUEUE_SETUP.md) — Supervisor + queue workers
 - [docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md) — Server install
 - [docs/CHROMIUM_INSTALLATION.md](docs/CHROMIUM_INSTALLATION.md) — Headless Chrome setup
