@@ -1,6 +1,6 @@
 @props(['title' => null, 'bannerLocation' => 'home', 'selectedBannerId' => null, 'selectedBannerPosition' => null])
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
     <head>
         @include('partials.head')
         @stack('styles')

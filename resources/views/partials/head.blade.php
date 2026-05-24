@@ -4,21 +4,39 @@
 {{-- Prevent FOUC: apply theme class to <html> synchronously before any CSS paints. --}}
 {{-- Reads Flux's `flux.appearance` (written by the Appearance settings page) with --}}
 {{-- fallback to the legacy `theme` key. Default is dark. --}}
-{{-- Re-applies on wire:navigate transitions because Livewire updates <html> --}}
-{{-- attributes from the new page's server response — pages whose <html> tag --}}
-{{-- doesn't have class="dark" would otherwise briefly flash light. --}}
+{{-- A MutationObserver re-asserts the correct class on every <html> class --}}
+{{-- mutation — needed because Livewire's wire:navigate morph briefly strips --}}
+{{-- the dark class from <html> mid-transition, which would otherwise cause a --}}
+{{-- visible white flash on elements that use bg-white dark:bg-zinc-xxx. --}}
 <script>
     (function () {
-        function applyTheme() {
+        var applying = false;
+        function desiredDark() {
             try {
                 var pref = localStorage.getItem('flux.appearance') || localStorage.getItem('theme') || 'dark';
-                var isDark = pref === 'system'
+                return pref === 'system'
                     ? window.matchMedia('(prefers-color-scheme: dark)').matches
                     : pref !== 'light';
-                document.documentElement.classList.toggle('dark', isDark);
-            } catch (e) {}
+            } catch (e) {
+                return true;
+            }
+        }
+        function applyTheme() {
+            applying = true;
+            document.documentElement.classList.toggle('dark', desiredDark());
+            applying = false;
         }
         applyTheme();
+
+        // Catch wire:navigate morph stripping the class
+        new MutationObserver(function () {
+            if (applying) return;
+            var isDark = document.documentElement.classList.contains('dark');
+            if (isDark !== desiredDark()) {
+                applyTheme();
+            }
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
         document.addEventListener('livewire:navigating', applyTheme);
         document.addEventListener('livewire:navigated', applyTheme);
     })();
