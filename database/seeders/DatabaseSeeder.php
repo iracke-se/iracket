@@ -2,27 +2,26 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Seed the application's database with everything required to run
+     * in production. All seeders below are idempotent — safe to re-run.
+     *
+     * Order matters: roles must exist before AdminUserSeeder assigns one.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'first_name' => 'Test',
-            'last_name' => 'User',
-            'email' => 'test@example.com',
-        ]);
-
         $this->call([
+            RoleSeeder::class,
+            AdminUserSeeder::class,
             TermsSeeder::class,
+            AboutTermsSeeder::class,
+            BubblerTermsSeeder::class,
+            MatchesTermsSeeder::class,
+            PlayerDistrictSeeder::class,
         ]);
     }
 }
