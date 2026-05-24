@@ -387,13 +387,20 @@ class ScraperHealthCommand extends Command
 
         try {
             $started = microtime(true);
-            $response = Http::timeout(5)->withHeaders(['User-Agent' => 'iRacket-health-check/1.0'])->head($url);
+            // GET, not HEAD — profixio.com returns 404 for HEAD on some paths.
+            // For a connectivity probe, any HTTP response means the server is up;
+            // only network failures or 5xx mean truly unreachable.
+            $response = Http::timeout(5)
+                ->withHeaders(['User-Agent' => 'iRacket-health-check/1.0'])
+                ->withOptions(['allow_redirects' => false])
+                ->get($url);
             $ms = (int) round((microtime(true) - $started) * 1000);
+            $status = $response->status();
 
-            if ($response->successful() || $response->status() === 302 || $response->status() === 301) {
-                $this->checkPass('Profixio reachability', "HTTP {$response->status()} in {$ms}ms", ['url' => $url]);
+            if ($status >= 500) {
+                $this->checkFail('Profixio reachability', "HTTP {$status} from {$url} (server error)");
             } else {
-                $this->checkWarn('Profixio reachability', "HTTP {$response->status()} from {$url}");
+                $this->checkPass('Profixio reachability', "HTTP {$status} in {$ms}ms", ['url' => $url]);
             }
         } catch (\Throwable $e) {
             $this->checkFail('Profixio reachability', 'Unreachable: '.$e->getMessage());
