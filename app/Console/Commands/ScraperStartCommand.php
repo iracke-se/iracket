@@ -24,12 +24,13 @@ class ScraperStartCommand extends Command
                             {--limit-seasons= : Limit number of seasons to scrape (for testing)}
                             {--limit-players= : Limit number of players to scrape (for testing)}
                             {--skip-live-center : Skip Live Center scraping and syncing}
-                            {--skip-series : Skip Series Standings scraping}';
+                            {--skip-series : Skip Series Standings scraping}
+                            {--skip-transitions : Skip Club Transitions scraping and syncing}';
 
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
     protected array $stats = [];
-    protected int $totalSteps = 12; // Backup, Rankings M, Rankings F, Players, Sync Players, Sync Rankings, Monthly Rankings, Sync Matches, Standings, Live Center, Sync Live Center, Verify
+    protected int $totalSteps = 15; // + Scrape Transitions, Sync Transitions, Sync Standings (added 2026-05-24)
     protected int $currentStep = 0;
     protected ?string $backupFile = null;
     protected array $executionLog = [];
@@ -199,12 +200,38 @@ class ScraperStartCommand extends Command
                 return $this->syncMatches();
             });
 
-            // Step 7: Scrape Series Standings
+            // Step 7: Scrape Club Transitions
+            if (!$this->option('skip-transitions')) {
+                $result = $this->runStep('Scraping Club Transitions', function () use ($month, $scrapeAll) {
+                    return $this->scrapeTransitions($month, $scrapeAll);
+                });
+                $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+            } else {
+                $this->line('  ⏭  Skipping Club Transitions scrape (--skip-transitions)');
+                $this->newLine();
+            }
+
+            // Step 8: Sync Club Transitions
+            if (!$this->option('skip-transitions')) {
+                $this->runStep('Syncing Club Transitions', function () {
+                    return $this->syncTransitions();
+                });
+            } else {
+                $this->line('  ⏭  Skipping Club Transitions sync (--skip-transitions)');
+                $this->newLine();
+            }
+
+            // Step 9: Scrape Series Standings
             if (!$this->option('skip-series')) {
                 $result = $this->runStep('Scraping Series Standings', function () use ($month, $scrapeAll) {
                     return $this->scrapeSeries($month, $scrapeAll);
                 });
                 $this->latestRunId = $result['run_id'] ?? $this->latestRunId;
+
+                // Step 10: Sync Series Standings
+                $this->runStep('Syncing Series Standings', function () {
+                    return $this->syncStandings();
+                });
             } else {
                 $this->info('  ⏭  Skipping Series Standings (--skip-series)');
             }
@@ -918,6 +945,78 @@ class ScraperStartCommand extends Command
         $command .= $this->buildLimitOptions();
 
         return $this->runScraperWithProgress($command, 'Players');
+    }
+
+    protected function scrapeTransitions(string $month, bool $scrapeAll): array
+    {
+        $command = 'php artisan scraper:run transitions';
+        $command .= $this->buildLimitOptions();
+
+        return $this->runScraperWithProgress($command, 'Club Transitions');
+    }
+
+    protected function syncTransitions(): array
+    {
+        $this->line('  🔄 Syncing club transitions...');
+        $this->newLine();
+
+        $run = $this->parentRun;
+        $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
+
+        $service = app(\App\Services\Scraper\TransitionSyncService::class);
+
+        $this->syncWithProgress(function () use ($service, $run) {
+            return $service->syncTransitions(null, $run);
+        }, $run, $lastLogId);
+
+        $stats = $service->getStats();
+
+        $this->newLine();
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Created', number_format($stats['created'])],
+                ['Updated', number_format($stats['updated'])],
+                ['Skipped', number_format($stats['skipped'])],
+                ['Errors', number_format($stats['errors'])],
+            ]
+        );
+
+        $this->stats['transitions'] = $stats;
+
+        return $stats;
+    }
+
+    protected function syncStandings(): array
+    {
+        $this->line('  🔄 Syncing series standings...');
+        $this->newLine();
+
+        $run = $this->parentRun;
+        $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
+
+        $service = app(\App\Services\Scraper\StandingsSyncService::class);
+
+        $this->syncWithProgress(function () use ($service, $run) {
+            return $service->syncStandings(null, $run);
+        }, $run, $lastLogId);
+
+        $stats = $service->getStats();
+
+        $this->newLine();
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Created', number_format($stats['created'])],
+                ['Updated', number_format($stats['updated'])],
+                ['Skipped', number_format($stats['skipped'])],
+                ['Errors', number_format($stats['errors'])],
+            ]
+        );
+
+        $this->stats['standings'] = $stats;
+
+        return $stats;
     }
 
     protected function scrapeSeries(string $month, bool $scrapeAll): array

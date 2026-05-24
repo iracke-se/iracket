@@ -139,7 +139,8 @@ The scraper handles six domains. For each: where it comes from, which service do
 - **Service**: [SeriesScraper](app/Services/Scraper/SeriesScraper.php) — Browsershot
 - **Source URL**: `https://www.profixio.com/fx/serieoppsett.php` (discovers seasons → series → standings table)
 - **Raw table**: `scraped_standings`
-- **Sync**: **NOT IMPLEMENTED** (planned: `StandingsSyncService` → new `club_standings` table)
+- **Sync**: [StandingsSyncService::syncStandings()](app/Services/Scraper/StandingsSyncService.php) — upserts into `club_standings` keyed by `(team_name, series_name, session_name)`
+- **Production**: `club_standings` (new table as of 2026-05-24)
 - **Atom**: one season
 
 ### 5. Club transitions
@@ -148,7 +149,8 @@ The scraper handles six domains. For each: where it comes from, which service do
 - **Service**: [TransitionsScraper](app/Services/Scraper/TransitionsScraper.php) — Browsershot
 - **Source URL**: `https://www.profixio.com/fx/lisens/public_overgang.php`
 - **Raw table**: `scraped_transitions`
-- **Sync**: **NOT IMPLEMENTED** (planned: `TransitionSyncService` → existing `club_transitions` table; model already exists)
+- **Sync**: [TransitionSyncService::syncTransitions()](app/Services/Scraper/TransitionSyncService.php) — matches player by `(first_name, last_name)`, looks up `from_club`/`to_club` by name, upserts into `club_transitions`
+- **Production**: `club_transitions`
 - **Atom**: one period
 
 ### 6. Live center (team match details with set/point data)
@@ -185,6 +187,8 @@ The scraper handles six domains. For each: where it comes from, which service do
 | [SyncService.php](app/Services/Scraper/SyncService.php) | Promote players + rankings | — |
 | [MatchSyncService.php](app/Services/Scraper/MatchSyncService.php) | Promote matches | — |
 | [LiveCenterSyncService.php](app/Services/Scraper/LiveCenterSyncService.php) | Promote live-center games (singles, both players exist) | — |
+| [TransitionSyncService.php](app/Services/Scraper/TransitionSyncService.php) | Promote club transitions | — |
+| [StandingsSyncService.php](app/Services/Scraper/StandingsSyncService.php) | Promote series standings | — |
 | [ScraperExporter.php](app/Services/Scraper/ScraperExporter.php) | JSON archive of all scraped data | — |
 
 ### Queue jobs (`app/Jobs/Scraper/`)
@@ -246,8 +250,8 @@ All raw tables follow the pattern:
 | `matches` | scraped_matches, live_match_games | UUID routing; linked to live games via `live_match_game_id` |
 | `monthly_rankings` | scraped_rankings | One row per (user, division, gender, month) |
 | `club_monthly_rankings` | aggregated | Monthly club ranking snapshot (different from series standings) |
-| `club_transitions` | scraped_transitions | **Sync not yet implemented** |
-| `club_standings` | scraped_standings | **Table not yet created; sync not yet implemented** |
+| `club_transitions` | scraped_transitions | Synced via TransitionSyncService |
+| `club_standings` | scraped_standings | Synced via StandingsSyncService (table created 2026-05-24) |
 
 ---
 
@@ -480,8 +484,6 @@ Should report all green for PHP version, extensions, Node/npm/Chrome paths, Brow
 
 ### Not yet implemented
 
-- **Transition sync**: `scraped_transitions` rows are written but never promoted to `club_transitions`. Planned: new `TransitionSyncService`.
-- **Standings sync**: `scraped_standings` rows are written but never promoted. Planned: new `club_standings` table + `StandingsSyncService`.
 - **Backfill command**: no `scraper:backfill` exists. Planned: command to scrape 2021–2026 across all domains.
 
 ### Data integrity caveats

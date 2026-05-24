@@ -1,12 +1,17 @@
+import 'package:flutter/foundation.dart';
+
 class Environment {
+  static const String _defaultBaseUrl =
+      kReleaseMode ? 'https://iracket.se' : 'https://dev.iracket.se';
+
   static const String laravelBaseUrl = String.fromEnvironment(
     'LARAVEL_URL',
-    defaultValue: 'https://indorsable-prophetically-eugena.ngrok-free.dev',
+    defaultValue: _defaultBaseUrl,
   );
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'https://indorsable-prophetically-eugena.ngrok-free.dev/api',
+    defaultValue: '$_defaultBaseUrl/api',
   );
 
   static const String bearerToken = String.fromEnvironment(
@@ -14,8 +19,5 @@ class Environment {
     defaultValue: '',
   );
 
-  static const bool isProduction = String.fromEnvironment(
-    'ENV',
-    defaultValue: 'development',
-  ) == 'production';
+  static const bool isProduction = kReleaseMode;
 }

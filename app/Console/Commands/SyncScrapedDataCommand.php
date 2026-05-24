@@ -4,7 +4,9 @@ namespace App\Console\Commands;
 
 use App\Services\Scraper\LiveCenterSyncService;
 use App\Services\Scraper\MatchSyncService;
+use App\Services\Scraper\StandingsSyncService;
 use App\Services\Scraper\SyncService;
+use App\Services\Scraper\TransitionSyncService;
 use Illuminate\Console\Command;
 
 class SyncScrapedDataCommand extends Command
@@ -13,7 +15,7 @@ class SyncScrapedDataCommand extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'scraper:sync
-                            {type : The type of data to sync (players, rankings, matches, live_center, all)}
+                            {type : The type of data to sync (players, rankings, matches, transitions, standings, live_center, all)}
                             {--run= : Only sync data from a specific scraper run ID}
                             {--dry-run : Show what would be synced without actually syncing}';
 
@@ -25,13 +27,18 @@ class SyncScrapedDataCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(SyncService $syncService, MatchSyncService $matchSyncService, LiveCenterSyncService $liveCenterSyncService): int
-    {
+    public function handle(
+        SyncService $syncService,
+        MatchSyncService $matchSyncService,
+        LiveCenterSyncService $liveCenterSyncService,
+        TransitionSyncService $transitionSyncService,
+        StandingsSyncService $standingsSyncService,
+    ): int {
         $type = $this->argument('type');
         $runId = $this->option('run') ? (int) $this->option('run') : null;
         $dryRun = $this->option('dry-run');
 
-        $validTypes = ['players', 'rankings', 'matches', 'live_center', 'all'];
+        $validTypes = ['players', 'rankings', 'matches', 'transitions', 'standings', 'live_center', 'all'];
 
         if (!in_array($type, $validTypes)) {
             $this->error("Invalid type. Must be one of: " . implode(', ', $validTypes));
@@ -76,6 +83,20 @@ class SyncScrapedDataCommand extends Command
                 $matchStats = $matchSyncService->syncMatches($runId);
                 $this->displayMatchStats($matchStats);
                 $stats['matches'] = $matchStats;
+            }
+
+            if ($type === 'transitions' || $type === 'all') {
+                $this->info('Syncing club transitions...');
+                $transitionStats = $transitionSyncService->syncTransitions($runId);
+                $this->displayStats('Transitions', $transitionStats);
+                $stats['transitions'] = $transitionStats;
+            }
+
+            if ($type === 'standings' || $type === 'all') {
+                $this->info('Syncing club standings...');
+                $standingStats = $standingsSyncService->syncStandings($runId);
+                $this->displayStats('Standings', $standingStats);
+                $stats['standings'] = $standingStats;
             }
 
             if ($type === 'live_center' || $type === 'all') {
