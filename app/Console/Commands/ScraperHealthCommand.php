@@ -229,26 +229,33 @@ PY;
     /**
      * Discover Playwright's bundled Chromium binary, if any was installed via
      * `playwright install chromium`. Returns absolute path or null.
+     *
+     * Playwright 1.50+ renamed `chrome-linux/` to `chrome-linux64/` — we
+     * check both. We also try a few HOME candidates because the server
+     * may run scrapers as different users than the one running this check.
      */
     protected function findPlaywrightChromium(): ?string
     {
-        $candidates = array_filter([
+        $homes = array_unique(array_filter([
             $_SERVER['HOME'] ?? null,
             '/root',
             '/home/www',
-        ]);
+        ]));
 
-        foreach ($candidates as $home) {
-            $glob = glob($home.'/.cache/ms-playwright/chromium-*/chrome-linux/chrome');
-            if (! empty($glob)) {
-                // Prefer the highest-version directory
-                rsort($glob);
-                return $glob[0];
-            }
-            $glob = glob($home.'/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell');
-            if (! empty($glob)) {
-                rsort($glob);
-                return $glob[0];
+        $patterns = [
+            '/.cache/ms-playwright/chromium-*/chrome-linux64/chrome',
+            '/.cache/ms-playwright/chromium-*/chrome-linux/chrome',
+            '/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux64/headless_shell',
+            '/.cache/ms-playwright/chromium_headless_shell-*/chrome-linux/headless_shell',
+        ];
+
+        foreach ($homes as $home) {
+            foreach ($patterns as $pattern) {
+                $matches = glob($home.$pattern);
+                if (! empty($matches)) {
+                    rsort($matches); // prefer highest-version directory
+                    return $matches[0];
+                }
             }
         }
 
