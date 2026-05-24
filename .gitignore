@@ -26,6 +26,11 @@ yarn-error.log
 /storage/app/apple/*.p8
 /storage/apple/*.p8
 
+# Firebase Admin SDK service account credentials
+*firebase-adminsdk*.json
+/storage/app/*firebase*.json
+/storage/firebase/
+
 # Chrome/Puppeteer data
 /chrome-data
 
