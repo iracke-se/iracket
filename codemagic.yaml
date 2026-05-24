@@ -34,6 +34,68 @@ workflows:
           success: true
           failure: true
 
+  combined-workflow:
+    name: Android + iOS Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      flutter: 3.35.5
+      xcode: latest
+      cocoapods: default
+      groups:
+        - google_play
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.iracket.app
+      vars:
+        PACKAGE_NAME: "com.iracket.app"
+        BUNDLE_ID: "com.iracket.app"
+        APP_STORE_APPLE_ID: 0000000000
+    scripts:
+      - name: Pre-build
+        script: |
+          cd flutter-app
+          flutter pub get
+          flutter pub run flutter_launcher_icons
+          dart run flutter_native_splash:create
+      - name: Install pods
+        script: |
+          cd flutter-app/ios
+          pod install
+      - name: Set iOS build number
+        script: |
+          cd flutter-app/ios
+          agvtool new-version -all $(($BUILD_NUMBER + 1))
+      - name: Build Android AAB
+        script: |
+          cd flutter-app
+          flutter build appbundle --release \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$BUILD_NUMBER
+      - name: Build iOS IPA
+        script: |
+          cd flutter-app
+          flutter build ipa --release \
+            --build-name=1.0.$BUILD_NUMBER \
+            --build-number=$(($BUILD_NUMBER + 1)) \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - flutter-app/build/**/outputs/bundle/**/*.aab
+      - flutter-app/build/**/outputs/apk/**/*.apk
+      - flutter-app/build/**/outputs/**/mapping.txt
+      - flutter-app/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter-app/flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - andrej.gosevski03@gmail.com
+        notify:
+          success: true
+          failure: true
+
   ios-workflow:
     name: iOS Workflow
     max_build_duration: 60
