@@ -21,14 +21,22 @@
                 return true;
             }
         }
+        function syncCookie(isDark) {
+            try {
+                // Server reads this on every request to pick the initial <html class>
+                document.cookie = 'theme=' + (isDark ? 'dark' : 'light') + '; path=/; max-age=31536000; samesite=lax';
+            } catch (e) {}
+        }
         function applyTheme() {
             applying = true;
-            document.documentElement.classList.toggle('dark', desiredDark());
+            var isDark = desiredDark();
+            document.documentElement.classList.toggle('dark', isDark);
+            syncCookie(isDark);
             applying = false;
         }
         applyTheme();
 
-        // Catch wire:navigate morph stripping the class
+        // Catch any external mutation that flips the class away from desired state
         new MutationObserver(function () {
             if (applying) return;
             var isDark = document.documentElement.classList.contains('dark');
