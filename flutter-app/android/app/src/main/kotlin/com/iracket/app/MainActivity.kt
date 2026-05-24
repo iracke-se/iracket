@@ -1,4 +1,4 @@
-package com.iracket.iracket_app
+package com.iracket.app
 
 import io.flutter.embedding.android.FlutterActivity
 
