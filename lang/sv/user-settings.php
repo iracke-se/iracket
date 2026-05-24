@@ -96,6 +96,11 @@ return [
     'dark' => 'Morkt',
     'system' => 'System',
 
+    'language_heading' => 'Språk',
+    'language_subheading' => 'Välj språket som används i hela appen',
+    'english' => 'Engelska',
+    'swedish' => 'Svenska',
+
     /*
     |--------------------------------------------------------------------------
     | Club Page

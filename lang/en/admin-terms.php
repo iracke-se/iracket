@@ -21,6 +21,7 @@ return [
     'actions' => 'Actions',
 
     // Actions
+    'view' => 'View',
     'edit' => 'Edit',
     'delete' => 'Delete',
 

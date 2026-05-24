@@ -40,4 +40,38 @@
             </button>
         </div>
     </x-settings.layout>
+
+    @php($currentLocale = app()->getLocale())
+
+    <x-settings.layout :heading="__('user-settings.language_heading')" :subheading="__('user-settings.language_subheading')">
+        <div class="flex gap-3">
+            <a
+                href="{{ route('locale.switch', 'en') }}"
+                @class([
+                    'flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all',
+                    'bg-accent/10 border-accent text-accent' => $currentLocale === 'en',
+                    'bg-zinc-100 border-zinc-300 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-700 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500' => $currentLocale !== 'en',
+                ])
+            >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+                </svg>
+                <span class="text-sm font-medium">{{ __('user-settings.english') }}</span>
+            </a>
+
+            <a
+                href="{{ route('locale.switch', 'sv') }}"
+                @class([
+                    'flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all',
+                    'bg-accent/10 border-accent text-accent' => $currentLocale === 'sv',
+                    'bg-zinc-100 border-zinc-300 text-zinc-600 hover:border-zinc-400 dark:bg-zinc-700 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500' => $currentLocale !== 'sv',
+                ])
+            >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+                </svg>
+                <span class="text-sm font-medium">{{ __('user-settings.swedish') }}</span>
+            </a>
+        </div>
+    </x-settings.layout>
 </div>

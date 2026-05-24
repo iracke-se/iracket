@@ -21,6 +21,7 @@ return [
     'actions' => 'Åtgärder',
 
     // Actions
+    'view' => 'Visa',
     'edit' => 'Redigera',
     'delete' => 'Ta bort',
 

@@ -96,6 +96,11 @@ return [
     'dark' => 'Dark',
     'system' => 'System',
 
+    'language_heading' => 'Language',
+    'language_subheading' => 'Choose the language used across the app',
+    'english' => 'English',
+    'swedish' => 'Swedish',
+
     /*
     |--------------------------------------------------------------------------
     | Club Page

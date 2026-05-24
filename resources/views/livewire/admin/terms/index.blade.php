@@ -96,6 +96,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{{ $term->created_at->format('M d, Y') }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <a href="{{ route('terms.show', $term->slug) }}" target="_blank" rel="noopener" class="text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white mr-3">{{ __('admin-terms.view') }}</a>
                             <a href="{{ route('admin.terms.edit', $term->id) }}" class="text-accent hover:text-accent/80 mr-3" wire:navigate>{{ __('admin-terms.edit') }}</a>
                             <button wire:click="delete({{ $term->id }})" wire:confirm="{{ __('admin-terms.confirm_delete') }}" class="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300">{{ __('admin-terms.delete') }}</button>
                         </td>
