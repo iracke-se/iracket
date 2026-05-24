@@ -228,7 +228,7 @@ All go on the `scraper` queue. Connection is `redis` in production (configured v
 | LiveMatchPoint | Point within a set |
 | ScraperSetting | DB-backed settings (schedule enable/freq/day/time, URLs) |
 
-`ScraperRun.type` values: `rankings`, `players`, `transitions`, `series`, `series_matches`, `live_center`, `full_scrape`.
+`ScraperRun.type` values: `rankings`, `players`, `transitions`, `series`, `series_matches`, `live_center`, `full_scrape`, `backfill`.
 
 ---
 
@@ -301,6 +301,29 @@ Add `--queue` to dispatch async onto the scraper queue. Default is synchronous.
 ### `scraper:queue {type} [month]`
 
 Dispatch `scraper:start` or `scraper:run` to the background queue. Checks for already-running scrapers first.
+
+### `scraper:backfill [--from=YYYY-MM] [--to=YYYY-MM] [--domains=...] [--genders=m,k] [--dry-run] [--resume] [--sync]`
+
+Historical backfill across all six domains. Default range is the last five years through the previous month, queueing one atom per (year, month, gender) for rankings + one per year for live center + one each for players/transitions/series.
+
+```bash
+# Preview what would run (no dispatching)
+php artisan scraper:backfill --dry-run
+
+# Backfill 2021-01 through last month — default, queue mode
+php artisan scraper:backfill --force
+
+# Backfill only the rankings domain for a specific window
+php artisan scraper:backfill --from=2023-01 --to=2023-12 --domains=rankings
+
+# Resume the latest interrupted backfill
+php artisan scraper:backfill --resume --force
+```
+
+Pre-flight safety:
+- Refuses to start if another `full_scrape` or `backfill` is in `running` state
+- Aborts on duplicate `(first_name, last_name)` pairs in `users` unless `--allow-name-collisions` is passed (because sync would silently merge data)
+- Aborts if free disk space is below 2× the estimated raw-table growth
 
 ### `scraper:sync {type}`
 
@@ -484,7 +507,7 @@ Should report all green for PHP version, extensions, Node/npm/Chrome paths, Brow
 
 ### Not yet implemented
 
-- **Backfill command**: no `scraper:backfill` exists. Planned: command to scrape 2021–2026 across all domains.
+(All planned items have shipped as of 2026-05-24.)
 
 ### Data integrity caveats
 
