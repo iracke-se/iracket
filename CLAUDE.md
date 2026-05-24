@@ -8,6 +8,15 @@ iRacket is a Laravel 12 web application for managing racquetball/badminton tourn
 
 **Stack**: Laravel 12, Livewire/Flux v2, Livewire Volt v1, Tailwind CSS 4, Alpine.js (via Flux), Pest PHP 4, MariaDB (Docker)
 
+## Active work
+
+As of 2026-05-25, the remaining open workstreams are:
+
+1. **Mobile app deployment** — Flutter app in [flutter-app/](flutter-app/) is feature-complete and Codemagic pipelines are defined in [codemagic.yaml](codemagic.yaml). Outstanding manual steps tracked in the signing + deployment checklists in [APP.md § Deployment via Codemagic](APP.md#deployment-via-codemagic): upload Android keystore to Codemagic, register iOS App ID + create App Store Connect listing + API key, create Play Console app + service account, then add `android_signing:` / `app_store_connect:` / `google_play:` publishing blocks to the yaml.
+2. **Scraper finalization** — see [SCRAPER.md](SCRAPER.md) and [SCRAPER_SMOKE_TESTS.md](docs/SCRAPER_SMOKE_TESTS.md) for current state and remaining work on the profixio.com ingest pipeline.
+
+Everything else (web app, auth, rankings, admin, theming) is in maintenance.
+
 ## Commands
 
 ### Development
