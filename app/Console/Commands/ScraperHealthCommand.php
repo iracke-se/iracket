@@ -90,12 +90,12 @@ class ScraperHealthCommand extends Command
         try {
             $result = Process::timeout(5)->run("{$binary} --version 2>&1");
             if ($result->successful()) {
-                $this->pass('Python', trim($result->output()), ['binary' => $binary]);
+                $this->checkPass('Python', trim($result->output()), ['binary' => $binary]);
                 return;
             }
-            $this->fail('Python', "Not runnable at {$binary}");
+            $this->checkFail('Python', "Not runnable at {$binary}");
         } catch (\Throwable $e) {
-            $this->fail('Python', "Error invoking {$binary}: ".$e->getMessage());
+            $this->checkFail('Python', "Error invoking {$binary}: ".$e->getMessage());
         }
     }
 
@@ -114,9 +114,9 @@ class ScraperHealthCommand extends Command
         }
 
         if (empty($missing)) {
-            $this->pass('Python scripts', 'All scraper scripts present', ['scripts' => array_keys($scripts)]);
+            $this->checkPass('Python scripts', 'All scraper scripts present', ['scripts' => array_keys($scripts)]);
         } else {
-            $this->fail('Python scripts', 'Missing: '.implode(', ', $missing));
+            $this->checkFail('Python scripts', 'Missing: '.implode(', ', $missing));
         }
     }
 
@@ -132,24 +132,24 @@ class ScraperHealthCommand extends Command
         $missing = array_values(array_filter($required, fn ($t) => ! Schema::hasTable($t)));
 
         if (empty($missing)) {
-            $this->pass('Scraper tables', count($required).' tables present');
+            $this->checkPass('Scraper tables', count($required).' tables present');
         } else {
-            $this->fail('Scraper tables', 'Missing: '.implode(', ', $missing));
+            $this->checkFail('Scraper tables', 'Missing: '.implode(', ', $missing));
         }
     }
 
     protected function checkScraperSettings(): void
     {
         if (! Schema::hasTable('scraper_settings')) {
-            $this->fail('Scraper settings', 'scraper_settings table missing — schedules will not register');
+            $this->checkFail('Scraper settings', 'scraper_settings table missing — schedules will not register');
             return;
         }
 
         $count = DB::table('scraper_settings')->count();
         if ($count === 0) {
-            $this->warn('Scraper settings', 'Table exists but empty — schedules use defaults from .env');
+            $this->checkWarn('Scraper settings', 'Table exists but empty — schedules use defaults from .env');
         } else {
-            $this->pass('Scraper settings', "{$count} settings rows");
+            $this->checkPass('Scraper settings', "{$count} settings rows");
         }
     }
 
@@ -159,11 +159,11 @@ class ScraperHealthCommand extends Command
         $driver = config("queue.connections.{$connection}.driver");
 
         if ($driver === 'sync') {
-            $this->fail('Queue driver', "'sync' driver — jobs will block scraper runs", ['connection' => $connection]);
+            $this->checkFail('Queue driver', "'sync' driver — jobs will block scraper runs", ['connection' => $connection]);
         } elseif ($driver === null) {
-            $this->fail('Queue driver', "Connection '{$connection}' has no driver configured");
+            $this->checkFail('Queue driver', "Connection '{$connection}' has no driver configured");
         } else {
-            $this->pass('Queue driver', "{$driver} ({$connection})");
+            $this->checkPass('Queue driver', "{$driver} ({$connection})");
         }
     }
 
@@ -177,19 +177,19 @@ class ScraperHealthCommand extends Command
 
             if ($output !== '') {
                 $workerCount = count(array_filter(explode("\n", $output)));
-                $this->pass('Scraper queue worker', "{$workerCount} worker process(es) on '{$queueName}' queue");
+                $this->checkPass('Scraper queue worker', "{$workerCount} worker process(es) on '{$queueName}' queue");
             } else {
-                $this->fail('Scraper queue worker', "No worker process found for '{$queueName}' queue");
+                $this->checkFail('Scraper queue worker', "No worker process found for '{$queueName}' queue");
             }
         } catch (\Throwable $e) {
-            $this->warn('Scraper queue worker', 'Could not inspect process list: '.$e->getMessage());
+            $this->checkWarn('Scraper queue worker', 'Could not inspect process list: '.$e->getMessage());
         }
     }
 
     protected function checkSchedulerHeartbeat(): void
     {
         if (! config('heartbeat.scheduler.enabled')) {
-            $this->warn('Scheduler heartbeat', 'Heartbeat monitoring disabled — cannot verify scheduler is firing');
+            $this->checkWarn('Scheduler heartbeat', 'Heartbeat monitoring disabled — cannot verify scheduler is firing');
             return;
         }
 
@@ -197,13 +197,13 @@ class ScraperHealthCommand extends Command
         $heartbeat = Cache::get($cacheKey);
 
         if (! $heartbeat) {
-            $this->fail('Scheduler heartbeat', 'No heartbeat in cache — scheduler may not be running');
+            $this->checkFail('Scheduler heartbeat', 'No heartbeat in cache — scheduler may not be running');
             return;
         }
 
         $timestamp = $heartbeat['unix_timestamp'] ?? null;
         if (! $timestamp) {
-            $this->warn('Scheduler heartbeat', 'Heartbeat exists but malformed');
+            $this->checkWarn('Scheduler heartbeat', 'Heartbeat exists but malformed');
             return;
         }
 
@@ -211,9 +211,9 @@ class ScraperHealthCommand extends Command
         $threshold = (int) config('heartbeat.timeout', 5);
 
         if ($minutesAgo > $threshold) {
-            $this->fail('Scheduler heartbeat', "Stale — last beat {$minutesAgo}m ago (threshold {$threshold}m)");
+            $this->checkFail('Scheduler heartbeat', "Stale — last beat {$minutesAgo}m ago (threshold {$threshold}m)");
         } else {
-            $this->pass('Scheduler heartbeat', "Fresh — last beat {$minutesAgo}m ago");
+            $this->checkPass('Scheduler heartbeat', "Fresh — last beat {$minutesAgo}m ago");
         }
     }
 
@@ -227,22 +227,22 @@ class ScraperHealthCommand extends Command
             $oldest = DB::table('jobs')->where('queue', $queueName)->min('created_at');
 
             if ($count === 0) {
-                $this->pass('Queued jobs', "0 pending on '{$queueName}' queue");
+                $this->checkPass('Queued jobs', "0 pending on '{$queueName}' queue");
             } elseif ($count < 10) {
-                $this->pass('Queued jobs', "{$count} pending on '{$queueName}' queue");
+                $this->checkPass('Queued jobs', "{$count} pending on '{$queueName}' queue");
             } else {
-                $this->warn('Queued jobs', "{$count} pending on '{$queueName}' queue — backlog forming"
+                $this->checkWarn('Queued jobs', "{$count} pending on '{$queueName}' queue — backlog forming"
                     .($oldest ? " (oldest: {$oldest})" : ''));
             }
         } else {
-            $this->warn('Queued jobs', "Cannot inspect — connection '{$connection}' is not database-backed");
+            $this->checkWarn('Queued jobs', "Cannot inspect — connection '{$connection}' is not database-backed");
         }
     }
 
     protected function checkFailedJobs(): void
     {
         if (! Schema::hasTable('failed_jobs')) {
-            $this->warn('Failed jobs', 'failed_jobs table missing');
+            $this->checkWarn('Failed jobs', 'failed_jobs table missing');
             return;
         }
 
@@ -250,11 +250,11 @@ class ScraperHealthCommand extends Command
         $recent = DB::table('failed_jobs')->where('failed_at', '>=', now()->subDays(7))->count();
 
         if ($recent === 0 && $total === 0) {
-            $this->pass('Failed jobs', '0 ever');
+            $this->checkPass('Failed jobs', '0 ever');
         } elseif ($recent === 0) {
-            $this->pass('Failed jobs', "{$total} total, none in the last 7 days");
+            $this->checkPass('Failed jobs', "{$total} total, none in the last 7 days");
         } else {
-            $this->warn('Failed jobs', "{$recent} in the last 7 days ({$total} all-time)");
+            $this->checkWarn('Failed jobs', "{$recent} in the last 7 days ({$total} all-time)");
         }
     }
 
@@ -271,12 +271,12 @@ class ScraperHealthCommand extends Command
             $redisConn = config("queue.connections.{$connection}.connection", 'default');
             $pong = Redis::connection($redisConn)->command('ping');
             if ($pong === true || $pong === 'PONG') {
-                $this->pass('Redis', "Reachable (connection: {$redisConn})");
+                $this->checkPass('Redis', "Reachable (connection: {$redisConn})");
             } else {
-                $this->warn('Redis', 'PING returned unexpected response: '.json_encode($pong));
+                $this->checkWarn('Redis', 'PING returned unexpected response: '.json_encode($pong));
             }
         } catch (\Throwable $e) {
-            $this->fail('Redis', 'Connection failed: '.$e->getMessage());
+            $this->checkFail('Redis', 'Connection failed: '.$e->getMessage());
         }
     }
 
@@ -294,14 +294,14 @@ class ScraperHealthCommand extends Command
             ->get(['id', 'type', 'current_step', 'started_at']);
 
         if ($stuck->isEmpty()) {
-            $this->pass('Stuck runs', "None running longer than {$threshold}m");
+            $this->checkPass('Stuck runs', "None running longer than {$threshold}m");
             return;
         }
 
         $details = $stuck->map(fn ($r) => "#{$r->id} ({$r->type}, step: ".($r->current_step ?: 'n/a').", started {$r->started_at})")
             ->all();
 
-        $this->fail('Stuck runs', $stuck->count().' run(s) running longer than '.$threshold.'m', ['stuck' => $details]);
+        $this->checkFail('Stuck runs', $stuck->count().' run(s) running longer than '.$threshold.'m', ['stuck' => $details]);
     }
 
     protected function checkLastRunsByDomain(): void
@@ -345,9 +345,9 @@ class ScraperHealthCommand extends Command
         }
 
         if (empty($stale)) {
-            $this->pass('Last successful runs', 'All critical domains scraped within 40d', ['by_domain' => $rows]);
+            $this->checkPass('Last successful runs', 'All critical domains scraped within 40d', ['by_domain' => $rows]);
         } else {
-            $this->warn('Last successful runs', 'Stale: '.implode('; ', $stale), ['by_domain' => $rows]);
+            $this->checkWarn('Last successful runs', 'Stale: '.implode('; ', $stale), ['by_domain' => $rows]);
         }
     }
 
@@ -364,20 +364,20 @@ class ScraperHealthCommand extends Command
         $failed = ScraperRun::where('started_at', '>=', $since)->where('status', 'failed')->count();
 
         if ($total === 0) {
-            $this->warn('Recent run activity', "No runs in the last {$window} days — scheduler may be silent");
+            $this->checkWarn('Recent run activity', "No runs in the last {$window} days — scheduler may be silent");
             return;
         }
 
         $rate = (int) round(($failed / $total) * 100);
 
         if ($rate === 0) {
-            $this->pass('Recent failure rate', "0% ({$failed}/{$total} in last {$window}d)");
+            $this->checkPass('Recent failure rate', "0% ({$failed}/{$total} in last {$window}d)");
         } elseif ($rate < 20) {
-            $this->pass('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)");
+            $this->checkPass('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)");
         } elseif ($rate < 50) {
-            $this->warn('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)");
+            $this->checkWarn('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)");
         } else {
-            $this->fail('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d) — investigate");
+            $this->checkFail('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d) — investigate");
         }
     }
 
@@ -391,12 +391,12 @@ class ScraperHealthCommand extends Command
             $ms = (int) round((microtime(true) - $started) * 1000);
 
             if ($response->successful() || $response->status() === 302 || $response->status() === 301) {
-                $this->pass('Profixio reachability', "HTTP {$response->status()} in {$ms}ms", ['url' => $url]);
+                $this->checkPass('Profixio reachability', "HTTP {$response->status()} in {$ms}ms", ['url' => $url]);
             } else {
-                $this->warn('Profixio reachability', "HTTP {$response->status()} from {$url}");
+                $this->checkWarn('Profixio reachability', "HTTP {$response->status()} from {$url}");
             }
         } catch (\Throwable $e) {
-            $this->fail('Profixio reachability', 'Unreachable: '.$e->getMessage());
+            $this->checkFail('Profixio reachability', 'Unreachable: '.$e->getMessage());
         }
     }
 
@@ -409,7 +409,7 @@ class ScraperHealthCommand extends Command
             $total = @disk_total_space($path);
 
             if ($free === false || $total === false || $total === 0) {
-                $this->warn('Disk space', 'Could not read disk stats for '.$path);
+                $this->checkWarn('Disk space', 'Could not read disk stats for '.$path);
                 return;
             }
 
@@ -417,20 +417,20 @@ class ScraperHealthCommand extends Command
             $usedPct = (int) round((1 - ($free / $total)) * 100);
 
             if ($freeGb < 2) {
-                $this->fail('Disk space', "{$freeGb}GB free ({$usedPct}% used) — critically low");
+                $this->checkFail('Disk space', "{$freeGb}GB free ({$usedPct}% used) — critically low");
             } elseif ($freeGb < 10 || $usedPct > 90) {
-                $this->warn('Disk space', "{$freeGb}GB free ({$usedPct}% used)");
+                $this->checkWarn('Disk space', "{$freeGb}GB free ({$usedPct}% used)");
             } else {
-                $this->pass('Disk space', "{$freeGb}GB free ({$usedPct}% used)");
+                $this->checkPass('Disk space', "{$freeGb}GB free ({$usedPct}% used)");
             }
         } catch (\Throwable $e) {
-            $this->warn('Disk space', 'Error: '.$e->getMessage());
+            $this->checkWarn('Disk space', 'Error: '.$e->getMessage());
         }
     }
 
     // ---- output helpers ----
 
-    protected function pass(string $name, string $message, array $context = []): void
+    protected function checkPass(string $name, string $message, array $context = []): void
     {
         $this->record('pass', $name, $message, $context);
         if (! $this->json) {
@@ -439,7 +439,7 @@ class ScraperHealthCommand extends Command
         $this->passed++;
     }
 
-    protected function fail(string $name, string $message, array $context = []): void
+    protected function checkFail(string $name, string $message, array $context = []): void
     {
         $this->record('fail', $name, $message, $context);
         if (! $this->json) {
@@ -448,7 +448,7 @@ class ScraperHealthCommand extends Command
         $this->failed++;
     }
 
-    protected function warn(string $name, string $message, array $context = []): void
+    protected function checkWarn(string $name, string $message, array $context = []): void
     {
         $this->record('warn', $name, $message, $context);
         if (! $this->json) {
