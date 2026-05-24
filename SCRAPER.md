@@ -314,7 +314,13 @@ Dump all scraped data to JSON archive in `storage/app/scraper-exports/`. Useful 
 
 ### `scraper:check [--fix]`
 
-Validates the environment: PHP version, Node/npm/Chrome paths, Browsershot, DB connectivity, queue config, scraper tables. Run after deploys or environment changes.
+Validates the **environment** — PHP version, Node/npm/Chrome paths, Browsershot, DB connectivity, queue config, scraper tables. Run after deploys or environment changes.
+
+### `scraper:health [--json] [--stuck-threshold=120] [--failure-window=7]`
+
+Validates **operational state** — Python binaries + scripts, queue driver, scraper-queue worker, scheduler heartbeat, queued/failed job counts, Redis ping, stuck runs, last successful run per domain, recent failure rate, profixio.com reachability, disk space.
+
+Exit code: 0 if healthy/degraded, non-zero if any check failed. Use `--json` for monitoring integrations.
 
 ### `scraper:cleanup [--older-than=30]`
 
@@ -471,10 +477,6 @@ Should report all green for PHP version, extensions, Node/npm/Chrome paths, Brow
 ---
 
 ## Known gaps and gotchas
-
-### Currently broken
-
-- **Monthly schedule month-arg bug**: [routes/console.php:135-141](routes/console.php#L135-L141) computes the "previous month" string at boot time, not fire time. Until restarted, the scheduler scrapes the same fixed month every first Tuesday. Fix planned.
 
 ### Not yet implemented
 

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 class ScraperStartCommand extends Command
 {
     protected $signature = 'scraper:start
-                            {month : The month to scrape (e.g., 2025-09, 2025-10)}
+                            {month? : The month to scrape (e.g., 2025-09). Defaults to previous month when omitted.}
                             {--all : Scrape all data without month filter}
                             {--no-backup : Skip automatic backup before starting}
                             {--skip-sync : Skip automatic sync to production tables}
@@ -40,7 +40,7 @@ class ScraperStartCommand extends Command
 
     public function handle(SyncService $syncService): int
     {
-        $month = $this->argument('month');
+        $month = $this->argument('month') ?: now()->subMonth()->format('Y-m');
         $scrapeAll = $this->option('all');
         $skipBackup = $this->option('no-backup');
 
