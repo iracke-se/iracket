@@ -65,6 +65,9 @@ dev_dependencies:
   # App icon generator
   flutter_launcher_icons: ^0.14.2
 
+  # Native splash screen generator
+  flutter_native_splash: ^2.4.3
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -79,6 +82,7 @@ flutter:
   # Assets
   assets:
     - assets/images/icon.png
+    - assets/images/icon_foreground.png
     - assets/images/splash.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
@@ -112,5 +116,23 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/icon.png"
-  adaptive_icon_background: "#0175C2"
-  adaptive_icon_foreground: "assets/images/icon.png"
+  remove_alpha_ios: true
+  background_color_ios: "#FFFFFF"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/icon_foreground.png"
+
+# Native splash screen configuration
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/splash.png
+  color_dark: "#FFFFFF"
+  image_dark: assets/images/splash.png
+  android_12:
+    color: "#FFFFFF"
+    image: assets/images/icon_foreground.png
+    color_dark: "#FFFFFF"
+    image_dark: assets/images/icon_foreground.png
+  android: true
+  ios: true
+  web: false
+  fullscreen: false
