@@ -398,7 +398,7 @@ class ScraperStartCommand extends Command
         // Provide context-specific suggestions
         $this->displayErrorSuggestions();
 
-        if ($this->option('verbose') || $this->confirm("Show full stack trace?", false)) {
+        if ($this->option('verbose') || ($this->input->isInteractive() && $this->confirm("Show full stack trace?", false))) {
             $this->newLine();
             $this->warn("Full Stack Trace:");
             $this->line($this->failureException->getTraceAsString());
@@ -848,8 +848,10 @@ class ScraperStartCommand extends Command
 
         $startId = ScraperRun::max('id') ?? 0;
 
-        $mProcess = new \Symfony\Component\Process\Process($buildArgs('m'));
-        $fProcess = new \Symfony\Component\Process\Process($buildArgs('k'));
+        // Wrap with setsid so child processes get their own session and survive terminal SIGHUP
+        $wrap = fn(array $args) => array_merge(['setsid'], $args);
+        $mProcess = new \Symfony\Component\Process\Process($wrap($buildArgs('m')));
+        $fProcess = new \Symfony\Component\Process\Process($wrap($buildArgs('k')));
         $mProcess->setTimeout(3600);
         $fProcess->setTimeout(3600);
 
@@ -862,7 +864,16 @@ class ScraperStartCommand extends Command
         // Poll both processes, streaming output until both finish
         $mBuffer = '';
         $fBuffer = '';
+        $maxWait = 7200; // 2 hours hard cap
+        $elapsed = 0;
         while (!$mProcess->isTerminated() || !$fProcess->isTerminated()) {
+            try {
+                $mProcess->checkTimeout();
+                $fProcess->checkTimeout();
+            } catch (\Symfony\Component\Process\Exception\ProcessTimedOutException $e) {
+                break;
+            }
+
             // Flush incremental output from male process
             $mNew = $mProcess->getIncrementalOutput() . $mProcess->getIncrementalErrorOutput();
             foreach (explode("\n", $mBuffer . $mNew) as $line) {
@@ -884,6 +895,29 @@ class ScraperStartCommand extends Command
             $fBuffer = '';
 
             usleep(500000); // 0.5s
+            $elapsed++;
+
+            // Fallback: if DB shows both runs completed/failed, don't wait for the process object
+            if ($elapsed % 20 === 0) {
+                $pending = ScraperRun::where('id', '>', $startId)
+                    ->where('type', ScraperRun::TYPE_RANKINGS)
+                    ->where('status', 'running')
+                    ->count();
+                $done = ScraperRun::where('id', '>', $startId)
+                    ->where('type', ScraperRun::TYPE_RANKINGS)
+                    ->whereIn('status', ['completed', 'failed'])
+                    ->count();
+                if ($pending === 0 && $done >= 2) {
+                    $this->line("  <fg=yellow>Both ranking runs finished in DB — continuing.</>");
+                    break;
+                }
+            }
+
+            // Hard cap
+            if ($elapsed * 0.5 >= $maxWait) {
+                $this->warn("  Hard timeout reached — continuing.");
+                break;
+            }
         }
 
         // Check exit codes
