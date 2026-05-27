@@ -164,7 +164,9 @@ class TransitionSyncService
             return null;
         }
         try {
-            return \Carbon\Carbon::parse($value)->toDateString();
+            // profixio uses YYYY.MM.DD — normalize to YYYY-MM-DD before parsing
+            $normalized = str_replace('.', '-', $value);
+            return \Carbon\Carbon::parse($normalized)->toDateString();
         } catch (\Throwable) {
             return null;
         }
