@@ -218,37 +218,41 @@ class RankingsScraper:
         then fans out into per-player popup tasks (bounded by semaphore).
         """
 
+        # Limit concurrent page navigations with same semaphore to avoid rate-limiting
+        page_semaphore = asyncio.Semaphore(self.config.concurrency)
+
         async def process_page(offset: int) -> Tuple[List[Dict], List[Dict]]:
-            tab = await self.context.new_page()
-            try:
-                url = self.config.get_rankings_url(rid, offset)
-                log_info(f"[page from={offset}] Navigating to {url}")
-                await tab.goto(url, wait_until="domcontentloaded", timeout=0)
-
+            async with page_semaphore:
+                tab = await self.context.new_page()
                 try:
-                    await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
-                except Exception:
-                    log_info(f"[page from={offset}] No players on this page — skipping")
-                    return [], []
+                    url = self.config.get_rankings_url(rid, offset)
+                    log_info(f"[page from={offset}] Navigating to {url}")
+                    await tab.goto(url, wait_until="domcontentloaded", timeout=0)
 
-                players = await self._extract_players_from_page(tab)
-                log_info(f"[page from={offset}] Extracted {len(players)} players")
+                    try:
+                        await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
+                    except Exception:
+                        log_info(f"[page from={offset}] No players on this page — skipping")
+                        return [], []
 
-                if not players:
-                    return [], []
+                    players = await self._extract_players_from_page(tab)
+                    log_info(f"[page from={offset}] Extracted {len(players)} players")
 
-                # Respect global player limit — slice before processing
-                if self.config.limit_players:
-                    async with self._processed_lock:
-                        remaining = self.config.limit_players - self._total_processed
-                        if remaining <= 0:
-                            return [], []
-                        players = players[:remaining]
+                    if not players:
+                        return [], []
 
-                return await self._process_players_parallel(players, url, semaphore, offset)
+                    # Respect global player limit — slice before processing
+                    if self.config.limit_players:
+                        async with self._processed_lock:
+                            remaining = self.config.limit_players - self._total_processed
+                            if remaining <= 0:
+                                return [], []
+                            players = players[:remaining]
 
-            finally:
-                await tab.close()
+                    return await self._process_players_parallel(players, url, semaphore, offset)
+
+                finally:
+                    await tab.close()
 
         results = await asyncio.gather(*[process_page(offset) for offset in offsets])
 
