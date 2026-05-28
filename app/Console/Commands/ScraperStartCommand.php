@@ -852,8 +852,9 @@ class ScraperStartCommand extends Command
         $wrap = fn(array $args) => array_merge(['setsid'], $args);
         $mProcess = new \Symfony\Component\Process\Process($wrap($buildArgs('m')));
         $fProcess = new \Symfony\Component\Process\Process($wrap($buildArgs('k')));
-        $mProcess->setTimeout(3600);
-        $fProcess->setTimeout(3600);
+        // No timeout — a large month can run for many hours.
+        $mProcess->setTimeout(null);
+        $fProcess->setTimeout(null);
 
         $this->line("  <fg=cyan>Starting Male rankings process...</>");
         $mProcess->start();
@@ -864,7 +865,6 @@ class ScraperStartCommand extends Command
         // Poll both processes, streaming output until both finish
         $mBuffer = '';
         $fBuffer = '';
-        $maxWait = 7200; // 2 hours hard cap
         $elapsed = 0;
         while (!$mProcess->isTerminated() || !$fProcess->isTerminated()) {
             try {
@@ -911,12 +911,6 @@ class ScraperStartCommand extends Command
                     $this->line("  <fg=yellow>Both ranking runs finished in DB — continuing.</>");
                     break;
                 }
-            }
-
-            // Hard cap
-            if ($elapsed * 0.5 >= $maxWait) {
-                $this->warn("  Hard timeout reached — continuing.");
-                break;
             }
         }
 
