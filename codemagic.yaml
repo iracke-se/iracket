@@ -4,12 +4,19 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
+      android_signing:
+        - iracket_upload
       flutter: 3.35.5
       groups:
-        - google_play
+        - firebase
+        - app_env
       vars:
         PACKAGE_NAME: "com.iracket.app"
     scripts:
+      - name: Restore Firebase config files
+        script: |
+          echo "$ANDROID_FIREBASE_SECRET" | base64 --decode > flutter-app/android/app/google-services.json
+          echo "$IOS_FIREBASE_SECRET" | base64 --decode > flutter-app/ios/Runner/GoogleService-Info.plist
       - name: Pre-build
         script: |
           cd flutter-app
@@ -21,7 +28,11 @@ workflows:
           cd flutter-app
           flutter build appbundle --release \
             --build-name=1.0.$BUILD_NUMBER \
-            --build-number=$BUILD_NUMBER
+            --build-number=$BUILD_NUMBER \
+            --dart-define=LARAVEL_URL=$LARAVEL_URL \
+            --dart-define=API_URL=$API_URL \
+            --dart-define=BEARER_TOKEN=$BEARER_TOKEN \
+            --dart-define=ENV=$ENV
     artifacts:
       - flutter-app/build/**/outputs/bundle/**/*.aab
       - flutter-app/build/**/outputs/apk/**/*.apk
@@ -41,11 +52,14 @@ workflows:
     integrations:
       app_store_connect: codemagic
     environment:
+      android_signing:
+        - iracket_upload
       flutter: 3.35.5
       xcode: latest
       cocoapods: default
       groups:
-        - google_play
+        - firebase
+        - app_env
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.iracket.app
@@ -54,6 +68,10 @@ workflows:
         BUNDLE_ID: "com.iracket.app"
         APP_STORE_APPLE_ID: 6772827377
     scripts:
+      - name: Restore Firebase config files
+        script: |
+          echo "$ANDROID_FIREBASE_SECRET" | base64 --decode > flutter-app/android/app/google-services.json
+          echo "$IOS_FIREBASE_SECRET" | base64 --decode > flutter-app/ios/Runner/GoogleService-Info.plist
       - name: Pre-build
         script: |
           cd flutter-app
@@ -73,14 +91,22 @@ workflows:
           cd flutter-app
           flutter build appbundle --release \
             --build-name=1.0.$BUILD_NUMBER \
-            --build-number=$BUILD_NUMBER
+            --build-number=$BUILD_NUMBER \
+            --dart-define=LARAVEL_URL=$LARAVEL_URL \
+            --dart-define=API_URL=$API_URL \
+            --dart-define=BEARER_TOKEN=$BEARER_TOKEN \
+            --dart-define=ENV=$ENV
       - name: Build iOS IPA
         script: |
           cd flutter-app
           flutter build ipa --release \
             --build-name=1.0.$BUILD_NUMBER \
             --build-number=$(($BUILD_NUMBER + 1)) \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=LARAVEL_URL=$LARAVEL_URL \
+            --dart-define=API_URL=$API_URL \
+            --dart-define=BEARER_TOKEN=$BEARER_TOKEN \
+            --dart-define=ENV=$ENV
     artifacts:
       - flutter-app/build/**/outputs/bundle/**/*.aab
       - flutter-app/build/**/outputs/apk/**/*.apk
@@ -89,6 +115,10 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
       - flutter-app/flutter_drive.log
     publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
       email:
         recipients:
           - andrej.gosevski03@gmail.com
@@ -106,6 +136,9 @@ workflows:
       flutter: 3.35.5
       xcode: latest
       cocoapods: default
+      groups:
+        - firebase
+        - app_env
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.iracket.app
@@ -113,6 +146,10 @@ workflows:
         BUNDLE_ID: "com.iracket.app"
         APP_STORE_APPLE_ID: 6772827377
     scripts:
+      - name: Restore Firebase config files
+        script: |
+          echo "$ANDROID_FIREBASE_SECRET" | base64 --decode > flutter-app/android/app/google-services.json
+          echo "$IOS_FIREBASE_SECRET" | base64 --decode > flutter-app/ios/Runner/GoogleService-Info.plist
       - name: Pre-build
         script: |
           cd flutter-app
@@ -133,12 +170,20 @@ workflows:
           flutter build ipa --release \
             --build-name=1.0.$BUILD_NUMBER \
             --build-number=$(($BUILD_NUMBER + 1)) \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=LARAVEL_URL=$LARAVEL_URL \
+            --dart-define=API_URL=$API_URL \
+            --dart-define=BEARER_TOKEN=$BEARER_TOKEN \
+            --dart-define=ENV=$ENV
     artifacts:
       - flutter-app/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - flutter-app/flutter_drive.log
     publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
       email:
         recipients:
           - andrej.gosevski03@gmail.com
