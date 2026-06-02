@@ -52,7 +52,7 @@ workflows:
       vars:
         PACKAGE_NAME: "com.iracket.app"
         BUNDLE_ID: "com.iracket.app"
-        APP_STORE_APPLE_ID: 0000000000
+        APP_STORE_APPLE_ID: 6772827377
     scripts:
       - name: Pre-build
         script: |
@@ -111,7 +111,7 @@ workflows:
         bundle_identifier: com.iracket.app
       vars:
         BUNDLE_ID: "com.iracket.app"
-        APP_STORE_APPLE_ID: 0000000000
+        APP_STORE_APPLE_ID: 6772827377
     scripts:
       - name: Pre-build
         script: |
