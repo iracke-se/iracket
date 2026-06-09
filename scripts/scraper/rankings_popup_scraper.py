@@ -222,43 +222,67 @@ class RankingsScraper:
         page_semaphore = asyncio.Semaphore(self.config.concurrency)
 
         async def process_page(offset: int) -> Tuple[List[Dict], List[Dict]]:
-            async with page_semaphore:
-                tab = await self.context.new_page()
-                try:
-                    url = self.config.get_rankings_url(rid, offset)
-                    log_info(f"[page from={offset}] Navigating to {url}")
-                    await tab.goto(url, wait_until="domcontentloaded", timeout=0)
+            url = self.config.get_rankings_url(rid, offset)
+            max_attempts = 3
 
+            for attempt in range(1, max_attempts + 1):
+                async with page_semaphore:
+                    tab = await self.context.new_page()
                     try:
-                        await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
-                    except Exception:
-                        log_info(f"[page from={offset}] No players on this page — skipping")
-                        return [], []
+                        if attempt > 1:
+                            wait = 5 * attempt
+                            log_info(f"[page from={offset}] Retry {attempt}/{max_attempts} — waiting {wait}s")
+                            await asyncio.sleep(wait)
 
-                    players = await self._extract_players_from_page(tab)
-                    log_info(f"[page from={offset}] Extracted {len(players)} players")
+                        log_info(f"[page from={offset}] Navigating to {url} (attempt {attempt})")
+                        await tab.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-                    if not players:
-                        return [], []
+                        try:
+                            await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
+                        except Exception:
+                            log_info(f"[page from={offset}] No players on this page — skipping")
+                            return [], []
 
-                    # Respect global player limit — slice before processing
-                    if self.config.limit_players:
-                        async with self._processed_lock:
-                            remaining = self.config.limit_players - self._total_processed
-                            if remaining <= 0:
-                                return [], []
-                            players = players[:remaining]
+                        players = await self._extract_players_from_page(tab)
+                        log_info(f"[page from={offset}] Extracted {len(players)} players")
 
-                    return await self._process_players_parallel(players, url, semaphore, offset)
+                        if not players:
+                            return [], []
 
-                finally:
-                    await tab.close()
+                        # Respect global player limit — slice before processing
+                        if self.config.limit_players:
+                            async with self._processed_lock:
+                                remaining = self.config.limit_players - self._total_processed
+                                if remaining <= 0:
+                                    return [], []
+                                players = players[:remaining]
 
-        results = await asyncio.gather(*[process_page(offset) for offset in offsets])
+                        return await self._process_players_parallel(players, url, semaphore, offset)
+
+                    except Exception as e:
+                        log_error(f"[page from={offset}] Attempt {attempt}/{max_attempts} failed: {e}")
+                        if attempt == max_attempts:
+                            log_error(f"[page from={offset}] All {max_attempts} attempts failed — skipping page")
+                            async with self._errors_lock:
+                                self.errors.append({"page_offset": offset, "error": str(e)})
+                            return [], []
+                    finally:
+                        try:
+                            await tab.close()
+                        except Exception:
+                            pass
+
+            return [], []
+
+        results = await asyncio.gather(*[process_page(offset) for offset in offsets], return_exceptions=True)
 
         all_rankings: List[Dict] = []
         all_matches: List[Dict] = []
-        for rankings, matches in results:
+        for result in results:
+            if isinstance(result, Exception):
+                log_error(f"Page task raised unhandled exception: {result}")
+                continue
+            rankings, matches = result
             all_rankings.extend(rankings)
             all_matches.extend(matches)
 
@@ -308,32 +332,42 @@ class RankingsScraper:
             return rankings, matches
 
         async def process_one(player: Dict) -> Tuple[List[Dict], List[Dict]]:
-            async with semaphore:
-                tab = await self.context.new_page()
-                try:
-                    return await asyncio.wait_for(
-                        process_one_inner(player, tab),
-                        timeout=60,  # 1 min max per player
-                    )
-                except asyncio.TimeoutError:
-                    async with self._errors_lock:
-                        self.errors.append({"player": player['name'], "error": "Timed out after 1 minute"})
-                    log_error(f"Timed out (1 min): {player['name']} — skipping")
-                    return [], []
-                except Exception as e:
-                    async with self._errors_lock:
-                        self.errors.append({"player": player['name'], "error": str(e)})
-                    log_error(f"Error for {player['name']}: {e}")
+            max_attempts = 2
+            for attempt in range(1, max_attempts + 1):
+                async with semaphore:
+                    tab = await self.context.new_page()
                     try:
-                        await self._close_popup(tab)
-                    except Exception:
-                        pass
-                    return [], []
-                finally:
-                    try:
-                        await tab.close()
-                    except Exception:
-                        pass
+                        if attempt > 1:
+                            await asyncio.sleep(3 * attempt)
+                            log_info(f"Retry {attempt}/{max_attempts} for {player['name']}")
+                        return await asyncio.wait_for(
+                            process_one_inner(player, tab),
+                            timeout=90,  # 90s max per player
+                        )
+                    except asyncio.TimeoutError:
+                        if attempt == max_attempts:
+                            async with self._errors_lock:
+                                self.errors.append({"player": player['name'], "error": "Timed out after 90s (all retries exhausted)"})
+                            log_error(f"Timed out: {player['name']} — skipping after {max_attempts} attempts")
+                            return [], []
+                        log_error(f"Timed out: {player['name']} — will retry")
+                    except Exception as e:
+                        if attempt == max_attempts:
+                            async with self._errors_lock:
+                                self.errors.append({"player": player['name'], "error": str(e)})
+                            log_error(f"Error for {player['name']}: {e} — skipping after {max_attempts} attempts")
+                            return [], []
+                        log_error(f"Error for {player['name']}: {e} — will retry")
+                    finally:
+                        try:
+                            await self._close_popup(tab)
+                        except Exception:
+                            pass
+                        try:
+                            await tab.close()
+                        except Exception:
+                            pass
+            return [], []
 
         results = await asyncio.gather(*[process_one(p) for p in players])
 
