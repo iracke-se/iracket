@@ -61,8 +61,8 @@ class MatchSyncService
         $processed = 0;
         $batchSize = 100;
 
-        // Process in batches for better performance and progress tracking
-        $query->chunk($batchSize, function ($scrapedMatches) use (&$processed, $totalCount, $run) {
+        // Use chunkById (not chunk) to avoid offset-shift skipping when is_synced is updated mid-iteration
+        $query->chunkById($batchSize, function ($scrapedMatches) use (&$processed, $totalCount, $run) {
             foreach ($scrapedMatches as $scrapedMatch) {
                 try {
                     $this->syncMatch($scrapedMatch);

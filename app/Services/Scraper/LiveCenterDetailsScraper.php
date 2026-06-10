@@ -220,7 +220,9 @@ class LiveCenterDetailsScraper extends BaseScraperService
         $process = new Process($arguments, null, $env);
         $process->setTimeout(null); // No timeout - allow unlimited execution time
 
-        $this->info("Executing Python script: " . $process->getCommandLine());
+        $scriptPath = $arguments[0] ?? 'python3';
+        $scriptFile = basename($arguments[1] ?? '');
+        $this->info("Executing Python script: {$scriptPath} {$scriptFile} (with " . count($playerNames) . " player name filters)");
 
         try {
             $process->mustRun(function ($type, $buffer) {

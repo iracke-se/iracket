@@ -86,6 +86,8 @@ class RankingsScraper:
                     '--disable-dev-shm-usage',
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
+                    '--disable-features=NetworkServiceInProcess',
+                    '--no-zygote',
                 ]
             }
             if chrome_path:
@@ -224,6 +226,7 @@ class RankingsScraper:
         async def process_page(offset: int) -> Tuple[List[Dict], List[Dict]]:
             url = self.config.get_rankings_url(rid, offset)
             max_attempts = 3
+            players_to_process = None
 
             for attempt in range(1, max_attempts + 1):
                 async with page_semaphore:
@@ -257,7 +260,8 @@ class RankingsScraper:
                                     return [], []
                                 players = players[:remaining]
 
-                        return await self._process_players_parallel(players, url, semaphore, offset)
+                        players_to_process = players
+                        break
 
                     except Exception as e:
                         log_error(f"[page from={offset}] Attempt {attempt}/{max_attempts} failed: {e}")
@@ -272,7 +276,13 @@ class RankingsScraper:
                         except Exception:
                             pass
 
-            return [], []
+            if not players_to_process:
+                return [], []
+
+            # Each page gets its own semaphore so all active pages process players
+            # concurrently rather than sharing a single global slot pool.
+            per_page_semaphore = asyncio.Semaphore(self.config.concurrency)
+            return await self._process_players_parallel(players_to_process, url, per_page_semaphore, offset)
 
         results = await asyncio.gather(*[process_page(offset) for offset in offsets], return_exceptions=True)
 
@@ -300,76 +310,73 @@ class RankingsScraper:
         offset: int,
     ) -> Tuple[List[Dict], List[Dict]]:
         """
-        Process every player in the list concurrently.
-        Each player gets its own browser tab that:
-          1. Navigates to page_url (the pagination page the player lives on)
-          2. Finds and clicks the player's span to open the popup
-          3. Scrapes ranking + matches from the popup
-          4. Closes the tab
+        Process all players using a pool of worker tabs.
+        Each worker loads the page ONCE and processes its assigned players
+        sequentially — no per-player page reloads.
+        1 worker × 10 active pages = 10 concurrent tabs total.
         """
+        NUM_WORKERS = 1
+        actual_workers = min(NUM_WORKERS, len(players))
 
-        async def process_one_inner(player: Dict, tab: Page) -> Tuple[List[Dict], List[Dict]]:
-            await tab.goto(page_url, wait_until="domcontentloaded", timeout=0)
-            await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
+        # Distribute players round-robin across workers
+        worker_assignments: List[List[Dict]] = [[] for _ in range(actual_workers)]
+        for i, player in enumerate(players):
+            worker_assignments[i % actual_workers].append(player)
 
-            await self._click_player(tab, player['profixio_id'])
-            rankings = await self._scrape_ranking_history(tab, player)
-            matches = await self._scrape_matches(tab, player)
-            await self._close_popup(tab)
+        async def run_worker(assigned_players: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+            tab = await self.context.new_page()
+            worker_rankings: List[Dict] = []
+            worker_matches: List[Dict] = []
 
-            async with self._processed_lock:
-                self._total_processed += 1
-                current = self._total_processed
+            try:
+                await tab.goto(page_url, wait_until="domcontentloaded", timeout=60000)
+                await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
 
-            log_info(
-                f"[{current}] Done: {player['name']} (page from={offset}) — "
-                f"{len(rankings)} rankings, {len(matches)} matches"
-            )
-
-            # Emit player data immediately so PHP can save it without waiting for full completion
-            await self._emit_player(rankings, matches)
-
-            return rankings, matches
-
-        async def process_one(player: Dict) -> Tuple[List[Dict], List[Dict]]:
-            max_attempts = 2
-            for attempt in range(1, max_attempts + 1):
-                async with semaphore:
-                    tab = await self.context.new_page()
-                    try:
-                        if attempt > 1:
-                            await asyncio.sleep(3 * attempt)
-                            log_info(f"Retry {attempt}/{max_attempts} for {player['name']}")
-                        return await asyncio.wait_for(
-                            process_one_inner(player, tab),
-                            timeout=90,  # 90s max per player
-                        )
-                    except asyncio.TimeoutError:
-                        if attempt == max_attempts:
-                            async with self._errors_lock:
-                                self.errors.append({"player": player['name'], "error": "Timed out after 90s (all retries exhausted)"})
-                            log_error(f"Timed out: {player['name']} — skipping after {max_attempts} attempts")
-                            return [], []
-                        log_error(f"Timed out: {player['name']} — will retry")
-                    except Exception as e:
-                        if attempt == max_attempts:
-                            async with self._errors_lock:
-                                self.errors.append({"player": player['name'], "error": str(e)})
-                            log_error(f"Error for {player['name']}: {e} — skipping after {max_attempts} attempts")
-                            return [], []
-                        log_error(f"Error for {player['name']}: {e} — will retry")
-                    finally:
+                for player in assigned_players:
+                    for attempt in range(1, 3):
                         try:
-                            await self._close_popup(tab)
-                        except Exception:
-                            pass
-                        try:
-                            await tab.close()
-                        except Exception:
-                            pass
-            return [], []
+                            rankings, matches = await asyncio.wait_for(
+                                self._scrape_player_on_tab(tab, player, offset),
+                                timeout=60,
+                            )
+                            worker_rankings.extend(rankings)
+                            worker_matches.extend(matches)
+                            break
 
-        results = await asyncio.gather(*[process_one(p) for p in players])
+                        except (asyncio.TimeoutError, Exception) as e:
+                            is_timeout = isinstance(e, asyncio.TimeoutError)
+                            label = "Timed out" if is_timeout else "Error"
+
+                            try:
+                                await self._close_popup(tab)
+                            except Exception:
+                                pass
+
+                            if attempt < 2:
+                                log_error(f"{label}: {player['name']} — will retry")
+                                try:
+                                    await tab.reload(wait_until="domcontentloaded", timeout=30000)
+                                    await tab.wait_for_selector('table tr span.rml_poeng', timeout=15000)
+                                except Exception as reload_err:
+                                    log_error(f"Tab reload failed: {reload_err} — stopping worker")
+                                    return worker_rankings, worker_matches
+                            else:
+                                err_msg = "Timed out after 60s" if is_timeout else str(e)
+                                async with self._errors_lock:
+                                    self.errors.append({"player": player['name'], "error": err_msg})
+                                log_error(f"{label}: {player['name']} — skipping after 2 attempts")
+
+            except Exception as e:
+                log_error(f"Worker failed for page from={offset}: {e}")
+            finally:
+                try:
+                    await tab.close()
+                except Exception:
+                    pass
+
+            return worker_rankings, worker_matches
+
+        results = await asyncio.gather(*[run_worker(assigned) for assigned in worker_assignments])
 
         all_rankings: List[Dict] = []
         all_matches: List[Dict] = []
@@ -378,6 +385,25 @@ class RankingsScraper:
             all_matches.extend(matches)
 
         return all_rankings, all_matches
+
+    async def _scrape_player_on_tab(self, tab: Page, player: Dict, offset: int) -> Tuple[List[Dict], List[Dict]]:
+        """Scrape one player's popup. The page must already be loaded on tab."""
+        await self._click_player(tab, player['profixio_id'])
+        rankings = await self._scrape_ranking_history(tab, player)
+        matches = await self._scrape_matches(tab, player)
+        await self._close_popup(tab)
+
+        async with self._processed_lock:
+            self._total_processed += 1
+            current = self._total_processed
+
+        log_info(
+            f"[{current}] Done: {player['name']} (page from={offset}) — "
+            f"{len(rankings)} rankings, {len(matches)} matches"
+        )
+        # Emit immediately so PHP can save without waiting for full page completion
+        await self._emit_player(rankings, matches)
+        return rankings, matches
 
     async def _emit_player(self, rankings: List[Dict], matches: List[Dict]) -> None:
         """Write one NDJSON line to stdout immediately when a player is done.
@@ -392,47 +418,53 @@ class RankingsScraper:
     # -------------------------------------------------------------------------
 
     async def _extract_players_from_page(self, page: Page) -> List[Dict]:
-        """Extract all player records from the given page tab"""
-        players = []
-        rows = await page.query_selector_all("table tr")
+        """Extract all player records from the given page in a single JS evaluation.
 
-        for row in rows:
-            cells = await row.query_selector_all("td")
-            if len(cells) != 7:
-                continue
+        Parsing runs inside the browser via page.evaluate() and returns plain
+        data, so NO Playwright ElementHandles are held. This avoids the
+        "object has been collected to prevent unbounded heap growth" error that
+        the old handle-by-handle approach hit under high concurrency (each page
+        held ~4,500 handles; with 7 concurrent pages that overflowed Playwright's
+        handle ceiling). It is also far faster — one round-trip instead of thousands.
+        """
+        players = await page.evaluate(
+            """
+            () => {
+                const out = [];
+                const rows = document.querySelectorAll("table tr");
+                for (const row of rows) {
+                    const cells = row.querySelectorAll("td");
+                    if (cells.length !== 7) continue;
 
-            name_span = await cells[2].query_selector("span.rml_poeng")
-            if not name_span:
-                continue
+                    const nameSpan = cells[2].querySelector("span.rml_poeng");
+                    if (!nameSpan) continue;
 
-            player_name = await name_span.text_content()
-            span_id = await name_span.get_attribute('id')
+                    const spanId = nameSpan.getAttribute("id") || "";
+                    const m = spanId.match(/rml:(\\d+):/);
+                    if (!m) continue;
 
-            m = re.search(r'rml:(\d+):', span_id)
-            if not m:
-                continue
+                    const positionText = (cells[0].textContent || "").trim();
+                    const posMatch = positionText.match(/\\d+$/);
+                    const position = posMatch ? (parseInt(posMatch[0], 10) || 0) : 0;
 
-            position_text = await cells[0].text_content()
-            born_text = await cells[3].text_content()
-            club_text = await cells[4].text_content()
-            points_text = await cells[5].text_content()
+                    const cleanedPoints = (cells[5].textContent || "").trim()
+                        .replace(/ /g, "").replace(/\\./g, "").replace(/,/g, "");
+                    const points = cleanedPoints ? (parseInt(cleanedPoints, 10) || 0) : 0;
 
-            pos_match = re.search(r'\d+$', position_text.strip())
-            position = int(pos_match.group(0)) if pos_match else 0
-
-            cleaned_points = points_text.strip().replace(' ', '').replace('.', '').replace(',', '')
-            points = int(cleaned_points) if cleaned_points else 0
-
-            players.append({
-                "profixio_id": m.group(1),
-                "name": player_name.strip(),
-                "born": born_text.strip(),
-                "club": club_text.strip(),
-                "position": position,
-                "points": points,
-                "span_id": span_id,
-            })
-
+                    out.push({
+                        profixio_id: m[1],
+                        name: (nameSpan.textContent || "").trim(),
+                        born: (cells[3].textContent || "").trim(),
+                        club: (cells[4].textContent || "").trim(),
+                        position: position,
+                        points: points,
+                        span_id: spanId,
+                    });
+                }
+                return out;
+            }
+            """
+        )
         return players
 
     async def _click_player(self, page: Page, player_id: str):
@@ -447,9 +479,9 @@ class RankingsScraper:
                 }}
             }}
         """)
-        await page.wait_for_selector("#multipurpose", state="visible", timeout=0)
-        # Allow AJAX content inside popup to finish rendering
-        await page.wait_for_timeout(500)
+        await page.wait_for_selector("#multipurpose", state="visible", timeout=15000)
+        # Wait for actual table content inside popup, not just the container appearing
+        await page.wait_for_selector("#multipurpose table tr", timeout=10000)
 
     async def _scrape_ranking_history(self, page: Page, player: Dict) -> List[Dict]:
         """Read ranking data for the target month from the popup"""
@@ -520,7 +552,17 @@ class RankingsScraper:
                             if (span) span.click();
                         }}
                     """)
-                    await page.wait_for_timeout(700)
+                    # Wait for match rows (W/L) to appear, fall back to fixed wait if none
+                    try:
+                        await page.wait_for_function(
+                            """() => {
+                                const rows = document.querySelectorAll('#multipurpose table tr td:first-child');
+                                return Array.from(rows).some(td => td.textContent.trim() === 'W' || td.textContent.trim() === 'L');
+                            }""",
+                            timeout=5000,
+                        )
+                    except Exception:
+                        await page.wait_for_timeout(700)
                     break
 
         if not points_span:
@@ -577,7 +619,11 @@ class RankingsScraper:
                 if (btn) btn.click();
             }
         """)
-        await page.wait_for_timeout(500)
+        # Wait for ranking history rows to be restored
+        try:
+            await page.wait_for_selector("#multipurpose table tr td span.rmld_poeng", timeout=5000)
+        except Exception:
+            await page.wait_for_timeout(500)
 
     async def _close_popup(self, page: Page):
         """Close the popup by clicking the Stäng (close) button"""
@@ -588,7 +634,11 @@ class RankingsScraper:
                 if (btn) btn.click();
             }
         """)
-        await page.wait_for_timeout(500)
+        # Confirm popup actually closed before moving to next player
+        try:
+            await page.wait_for_selector("#multipurpose", state="hidden", timeout=5000)
+        except Exception:
+            await page.wait_for_timeout(500)
 
 
 # ---------------------------------------------------------------------------

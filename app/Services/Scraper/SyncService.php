@@ -294,8 +294,9 @@ class SyncService
 
             $this->stats['updated']++;
         } else {
-            // Don't create new users - skip if not found
+            // No matching user found — mark as synced so it doesn't re-queue on every run
             Log::info("Skipping player sync - user not found: {$player->first_name} {$player->surname}");
+            $player->update(['is_synced' => true]);
             $this->stats['skipped']++;
         }
     }
