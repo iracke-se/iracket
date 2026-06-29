@@ -729,12 +729,24 @@ def main():
     parser.add_argument("--player-names",  default=None,
                         help="Pipe-separated player names to filter set-detail scraping, "
                              "e.g. 'Andersson, Erik|Johansson, Anna' (case-insensitive)")
+    parser.add_argument("--player-names-file", default=None,
+                        help="Path to a file with one player name per line (alternative to "
+                             "--player-names for large lists that exceed OS arg limits)")
 
     args = parser.parse_args()
+
+    if args.player_names_file:
+        with open(args.player_names_file, "r", encoding="utf-8") as f:
+            player_names = [line.rstrip("\n") for line in f if line.strip()]
+    elif args.player_names:
+        player_names = args.player_names.split("|")
+    else:
+        player_names = None
+
     config  = LiveCenterConfig(
         date=args.date, year=args.year, month=args.month,
         limit_matches=args.limit_matches, skip_points=args.skip_points,
-        player_names=args.player_names.split("|") if args.player_names else None,
+        player_names=player_names,
     )
     scraper = LiveCenterScraper(config)
     result  = scraper.run()

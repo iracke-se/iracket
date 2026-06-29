@@ -209,9 +209,12 @@ class LiveCenterDetailsScraper extends BaseScraperService
             $arguments[] = '--skip-points';
         }
 
+        $namesFile = null;
         if (!empty($playerNames)) {
-            $arguments[] = '--player-names';
-            $arguments[] = implode('|', $playerNames);
+            $namesFile = tempnam(sys_get_temp_dir(), 'lc_players_');
+            file_put_contents($namesFile, implode("\n", $playerNames));
+            $arguments[] = '--player-names-file';
+            $arguments[] = $namesFile;
         }
 
         $env = array_merge(getenv(), [
@@ -261,6 +264,10 @@ class LiveCenterDetailsScraper extends BaseScraperService
                 "Error Output: {$errorOutput}\n" .
                 "Standard Output: " . substr($standardOutput, 0, 1000)
             );
+        } finally {
+            if ($namesFile && file_exists($namesFile)) {
+                unlink($namesFile);
+            }
         }
     }
 
