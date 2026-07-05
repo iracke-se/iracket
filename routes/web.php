@@ -41,6 +41,8 @@ use App\Livewire\Admin\Dashboard\Index as AdminDashboard;
 use App\Livewire\Admin\Localization\Index as AdminLocalization;
 use App\Livewire\Admin\Scraper\Index as AdminScraperIndex;
 use App\Livewire\Admin\Scraper\Show as AdminScraperShow;
+use App\Livewire\Admin\Credentials\Index as AdminCredentialsIndex;
+use App\Livewire\Admin\Credentials\Form as AdminCredentialsForm;
 use App\Livewire\Admin\Notifications\Send as AdminNotificationsSend;
 use App\Livewire\Admin\Contacts\Index as AdminContactsIndex;
 use App\Livewire\Admin\Contacts\Respond as AdminContactsRespond;
@@ -189,6 +191,11 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
         // Scraper
         Route::get('scraper', AdminScraperIndex::class)->name('scraper.index');
         Route::get('scraper/{run}', AdminScraperShow::class)->name('scraper.show');
+
+        // Credentials vault
+        Route::get('credentials', AdminCredentialsIndex::class)->name('credentials.index');
+        Route::get('credentials/create', AdminCredentialsForm::class)->name('credentials.create');
+        Route::get('credentials/{id}/edit', AdminCredentialsForm::class)->name('credentials.edit');
     });
 
     // Notifications
