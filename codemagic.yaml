@@ -60,9 +60,6 @@ workflows:
       groups:
         - firebase
         - app_env
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.iracket.app
       vars:
         PACKAGE_NAME: "com.iracket.app"
         BUNDLE_ID: "com.iracket.app"
@@ -78,6 +75,14 @@ workflows:
           flutter pub get
           flutter pub run flutter_launcher_icons
           dart run flutter_native_splash:create
+      - name: Set up iOS code signing
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Install pods
         script: |
           cd flutter-app/ios
@@ -139,9 +144,6 @@ workflows:
       groups:
         - firebase
         - app_env
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.iracket.app
       vars:
         BUNDLE_ID: "com.iracket.app"
         APP_STORE_APPLE_ID: 6772827377
@@ -156,6 +158,14 @@ workflows:
           flutter pub get
           flutter pub run flutter_launcher_icons
           dart run flutter_native_splash:create
+      - name: Set up iOS code signing
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Install pods
         script: |
           cd flutter-app/ios
