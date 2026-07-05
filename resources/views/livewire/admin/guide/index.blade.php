@@ -1,0 +1,70 @@
+<div class="max-w-6xl mx-auto py-6 px-4">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ __('admin-guide.user_guide') }}</h1>
+        <a href="{{ route('admin.guide.create') }}" class="px-4 py-2 bg-accent text-white font-medium rounded-lg hover:bg-accent/90 transition-colors" wire:navigate>
+            {{ __('admin-guide.create_new') }}
+        </a>
+    </div>
+
+    <p class="mb-6 text-sm text-zinc-500 dark:text-zinc-400">{{ __('admin-guide.intro') }}</p>
+
+    @if (session()->has('message'))
+        <div class="mb-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-green-600 dark:text-green-400">
+            {{ session('message') }}
+        </div>
+    @endif
+
+    <!-- Search -->
+    <div class="mb-6">
+        <input
+            type="text"
+            wire:model.live.debounce.300ms="search"
+            placeholder="{{ __('admin-guide.search') }}"
+            class="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        >
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white dark:bg-zinc-800 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 overflow-x-auto">
+        <table class="w-full min-w-[700px]">
+            <thead class="bg-zinc-100 dark:bg-zinc-700/50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">#</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-guide.title') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-guide.slug') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-guide.visible') }}</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{{ __('admin-guide.actions') }}</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                @forelse($sections as $section)
+                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-700/30">
+                        <td class="px-6 py-4 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{{ $section->order }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-zinc-900 dark:text-white font-medium">{{ $section->getTranslation('title', 'en', false) ?: $section->slug }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-zinc-500 dark:text-zinc-400 font-mono text-sm">{{ $section->slug }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button
+                                wire:click="toggleActive({{ $section->id }})"
+                                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {{ $section->is_active ? 'bg-accent' : 'bg-zinc-300 dark:bg-zinc-600' }}"
+                            >
+                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $section->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                            </button>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <a href="{{ route('admin.guide.edit', $section->id) }}" class="text-accent hover:text-accent/80 mr-3" wire:navigate>{{ __('admin-guide.edit') }}</a>
+                            <button wire:click="delete({{ $section->id }})" wire:confirm="{{ __('admin-guide.confirm_delete') }}" class="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300">{{ __('admin-guide.delete') }}</button>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-zinc-500 dark:text-zinc-400">{{ __('admin-guide.none_found') }}</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-6">
+        {{ $sections->links() }}
+    </div>
+</div>
