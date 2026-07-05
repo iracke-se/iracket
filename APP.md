@@ -303,18 +303,22 @@ iOS signing uses Codemagic's App Store Connect API integration — Codemagic aut
 
 **Google Play Console**: account is active and paid.
 
+**Full step-by-step: [docs/GOOGLE_PLAY_SETUP.md](docs/GOOGLE_PLAY_SETUP.md).**
+
 **Setup checklist:**
 
 - [x] Google Play Console developer registration (paid)
-- [ ] Create the app in Play Console: name `iRacket`, default language English, free, declarations accepted
-- [ ] Create Internal testing track, manually upload first AAB (required before service-account uploads work)
-- [ ] Enable Play App Signing — upload the first AAB, Google generates the app signing key
+- [x] Create the app in Play Console: name `iRacket`, default language English, free, declarations accepted
+- [x] Create Internal testing track, manually upload first AAB (required before service-account uploads work)
+- [x] Enable Play App Signing — upload the first AAB, Google generates the app signing key
+- [x] Add `google_play:` publishing block to Android + combined workflows in [codemagic.yaml](codemagic.yaml) — **done, set to `production` track**
 - [ ] Google Cloud Console → enable Google Play Android Developer API
 - [ ] Google Cloud → IAM → Service accounts → create `codemagic-uploader`, generate JSON key
 - [ ] Save JSON to `~/Documents/iracket-keystore/iracket-play-service-account.json`
 - [ ] Play Console → Setup → API access → link Cloud project → invite the service account → grant Release Manager role for iRacket
-- [ ] Codemagic → environment variables → group `google_play` (already referenced in yaml) → add `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` as a Secure variable containing the JSON contents
-- [ ] Add `google_play:` publishing block to Android + combined workflows in [codemagic.yaml](codemagic.yaml), targeting `internal` track for the first runs
+- [ ] Codemagic → environment variables → add `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` (Secure) containing the JSON contents, in a group both Android workflows import (e.g. `app_env`)
+
+> **Production track note:** the yaml targets `production`. Play will reject a production release until the store listing is complete and — for new *personal* developer accounts — a closed test of ≥12 testers for 14 days has been met. If that gate isn't met yet, temporarily set `track: internal` in [codemagic.yaml](codemagic.yaml). See the doc for details.
 
 ### Deployment — App Store / TestFlight
 

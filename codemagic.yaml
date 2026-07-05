@@ -46,6 +46,13 @@ workflows:
       - flutter-app/build/**/outputs/apk/**/*.apk
       - flutter-app/build/**/outputs/**/mapping.txt
     publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # Publishes to the production track. Requires a complete store listing
+        # and (for new personal accounts) a met closed-testing period, or Play
+        # will reject the release. See docs/GOOGLE_PLAY_SETUP.md.
+        track: production
+        submit_as_draft: false
       email:
         recipients:
           - andrej.gosevski03@gmail.com
@@ -146,6 +153,13 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # Publishes to the production track. Requires a complete store listing
+        # and (for new personal accounts) a met closed-testing period, or Play
+        # will reject the release. See docs/GOOGLE_PLAY_SETUP.md.
+        track: production
+        submit_as_draft: false
       email:
         recipients:
           - andrej.gosevski03@gmail.com
