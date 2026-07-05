@@ -6,6 +6,7 @@ use App\Livewire\Auth\ConnectAccount;
 use App\Livewire\Auth\VerifyEmail;
 use App\Livewire\Public\Home\Index as PublicHome;
 use App\Livewire\Public\Terms\Show as TermsShow;
+use App\Livewire\Public\Contact\Index as ContactPage;
 use App\Livewire\Settings\Appearance;
 use App\Livewire\Settings\Club as SettingsClub;
 use App\Livewire\Settings\Password;
@@ -43,6 +44,10 @@ use App\Livewire\Admin\Scraper\Index as AdminScraperIndex;
 use App\Livewire\Admin\Scraper\Show as AdminScraperShow;
 use App\Livewire\Admin\Credentials\Index as AdminCredentialsIndex;
 use App\Livewire\Admin\Credentials\Form as AdminCredentialsForm;
+use App\Livewire\Admin\Guide\Index as AdminGuideIndex;
+use App\Livewire\Admin\Guide\Form as AdminGuideForm;
+use App\Livewire\User\Guide\Index as GuideIndex;
+use App\Livewire\User\Guide\Show as GuideShow;
 use App\Livewire\Admin\Notifications\Send as AdminNotificationsSend;
 use App\Livewire\Admin\Contacts\Index as AdminContactsIndex;
 use App\Livewire\Admin\Contacts\Respond as AdminContactsRespond;
@@ -77,6 +82,9 @@ Route::post('auth/apple/callback', [AppleController::class, 'callback']);
 // Terms and Privacy Policy
 Route::get('terms/{slug}', TermsShow::class)->name('terms.show');
 
+// Contact / support (open to anyone)
+Route::get('contact', ContactPage::class)->name('contact');
+
 // Districts (public)
 Route::get('districts', Districts::class)->name('districts.index');
 Route::get('districts/{district}', DistrictShow::class)->name('districts.show');
@@ -101,6 +109,10 @@ Route::middleware(['auth'])->group(function () {
 
     // Information page
     Route::get('information', Information::class)->name('information');
+
+    // User Guide (in-app documentation)
+    Route::get('guide', GuideIndex::class)->name('guide.index');
+    Route::get('guide/{slug}', GuideShow::class)->name('guide.show');
 
     // Notifications page
     Route::get('notifications', Notifications::class)->name('notifications');
@@ -162,6 +174,11 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
     Route::get('terms', AdminTermsIndex::class)->name('terms.index');
     Route::get('terms/create', AdminTermsForm::class)->name('terms.create');
     Route::get('terms/{id}/edit', AdminTermsForm::class)->name('terms.edit');
+
+    // User Guide (documentation editable by Admin + Manager)
+    Route::get('guide', AdminGuideIndex::class)->name('guide.index');
+    Route::get('guide/create', AdminGuideForm::class)->name('guide.create');
+    Route::get('guide/{id}/edit', AdminGuideForm::class)->name('guide.edit');
 
     // Users
     Route::get('users', AdminUsersIndex::class)->name('users.index');
