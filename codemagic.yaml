@@ -77,10 +77,10 @@ workflows:
           dart run flutter_native_splash:create
       - name: Set up iOS code signing
         script: |
+          keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-          keychain initialize
           keychain add-certificates
           xcode-project use-profiles
       - name: Install pods
@@ -160,10 +160,10 @@ workflows:
           dart run flutter_native_splash:create
       - name: Set up iOS code signing
         script: |
+          keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-          keychain initialize
           keychain add-certificates
           xcode-project use-profiles
       - name: Install pods
