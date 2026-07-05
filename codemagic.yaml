@@ -23,6 +23,14 @@ workflows:
           flutter pub get
           flutter pub run flutter_launcher_icons
           dart run flutter_native_splash:create
+      - name: Set up Android key.properties
+        script: |
+          cat > "$CM_BUILD_DIR/flutter-app/android/key.properties" <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
       - name: Build AAB
         script: |
           cd flutter-app
@@ -97,6 +105,14 @@ workflows:
         script: |
           cd flutter-app/ios
           agvtool new-version -all $(($BUILD_NUMBER + 1))
+      - name: Set up Android key.properties
+        script: |
+          cat > "$CM_BUILD_DIR/flutter-app/android/key.properties" <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
       - name: Build Android AAB
         script: |
           cd flutter-app
