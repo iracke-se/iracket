@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             BubblerTermsSeeder::class,
             MatchesTermsSeeder::class,
             PlayerDistrictSeeder::class,
+            GuideSectionSeeder::class,
         ]);
     }
 }

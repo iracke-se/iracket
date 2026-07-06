@@ -47,5 +47,10 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Export compliance: app only uses standard exempt encryption (HTTPS/TLS),
+		     no custom or proprietary crypto. Declaring this stops App Store Connect
+		     from asking about export compliance on every build. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 	</dict>
 </plist>

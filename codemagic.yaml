@@ -23,6 +23,14 @@ workflows:
           flutter pub get
           flutter pub run flutter_launcher_icons
           dart run flutter_native_splash:create
+      - name: Set up Android key.properties
+        script: |
+          cat > "$CM_BUILD_DIR/flutter-app/android/key.properties" <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
       - name: Build AAB
         script: |
           cd flutter-app
@@ -38,6 +46,13 @@ workflows:
       - flutter-app/build/**/outputs/apk/**/*.apk
       - flutter-app/build/**/outputs/**/mapping.txt
     publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # Publishes to the production track. Requires a complete store listing
+        # and (for new personal accounts) a met closed-testing period, or Play
+        # will reject the release. See docs/GOOGLE_PLAY_SETUP.md.
+        track: production
+        submit_as_draft: false
       email:
         recipients:
           - andrej.gosevski03@gmail.com
@@ -50,7 +65,7 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: codemagic
+      app_store_connect: "i-racket AB"
     environment:
       android_signing:
         - iracket_upload
@@ -60,9 +75,6 @@ workflows:
       groups:
         - firebase
         - app_env
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.iracket.app
       vars:
         PACKAGE_NAME: "com.iracket.app"
         BUNDLE_ID: "com.iracket.app"
@@ -78,6 +90,20 @@ workflows:
           flutter pub get
           flutter pub run flutter_launcher_icons
           dart run flutter_native_splash:create
+      - name: Set up iOS code signing
+        script: |
+          set -e
+          keychain initialize
+          echo "===== fetch-signing-files (verbose) ====="
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create \
+            --verbose
+          keychain add-certificates
+          echo "===== signing identities in keychain after add-certificates ====="
+          security find-identity -v -p codesigning || true
+          xcode-project use-profiles
       - name: Install pods
         script: |
           cd flutter-app/ios
@@ -86,6 +112,14 @@ workflows:
         script: |
           cd flutter-app/ios
           agvtool new-version -all $(($BUILD_NUMBER + 1))
+      - name: Set up Android key.properties
+        script: |
+          cat > "$CM_BUILD_DIR/flutter-app/android/key.properties" <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
       - name: Build Android AAB
         script: |
           cd flutter-app
@@ -119,6 +153,13 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # Publishes to the production track. Requires a complete store listing
+        # and (for new personal accounts) a met closed-testing period, or Play
+        # will reject the release. See docs/GOOGLE_PLAY_SETUP.md.
+        track: production
+        submit_as_draft: false
       email:
         recipients:
           - andrej.gosevski03@gmail.com
@@ -131,7 +172,7 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: codemagic
+      app_store_connect: "i-racket AB"
     environment:
       flutter: 3.35.5
       xcode: latest
@@ -139,9 +180,6 @@ workflows:
       groups:
         - firebase
         - app_env
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.iracket.app
       vars:
         BUNDLE_ID: "com.iracket.app"
         APP_STORE_APPLE_ID: 6772827377
@@ -156,6 +194,20 @@ workflows:
           flutter pub get
           flutter pub run flutter_launcher_icons
           dart run flutter_native_splash:create
+      - name: Set up iOS code signing
+        script: |
+          set -e
+          keychain initialize
+          echo "===== fetch-signing-files (verbose) ====="
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create \
+            --verbose
+          keychain add-certificates
+          echo "===== signing identities in keychain after add-certificates ====="
+          security find-identity -v -p codesigning || true
+          xcode-project use-profiles
       - name: Install pods
         script: |
           cd flutter-app/ios

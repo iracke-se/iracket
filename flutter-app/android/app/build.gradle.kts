@@ -21,6 +21,8 @@ android {
     ndkVersion = "27.0.12077973"
 
     compileOptions {
+        // Required by flutter_local_notifications
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -40,18 +42,10 @@ android {
         versionName = flutter.versionName
 
         ndk {
-            // Support for 16KB page sizes (Android 15+)
+            // Support for 16KB page sizes (Android 15+). The AAB format already
+            // delivers per-ABI splits at install time, so no `splits { abi }`
+            // block is needed (and combining the two is a Gradle config error).
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
-        }
-    }
-
-    // Support for 16KB page sizes - generate separate APKs/AABs per ABI
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = false
         }
     }
 
@@ -81,4 +75,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
