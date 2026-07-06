@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\MobileAppController;
+use App\Services\DbSync\DbSyncReceiver;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 
@@ -58,4 +60,35 @@ Route::middleware(['auth:sanctum', 'role:Admin'])->get('/heartbeat', function ()
             'queue' => $queue,
         ],
     ], $overallHealthy ? 200 : 503);
+});
+
+/*
+| Database sync (receiver side). Guarded by the shared secret header.
+| The SENDER (your DDEV machine) POSTs table batches here; production writes
+| them verbatim, preserving IDs and ownership.
+*/
+Route::middleware('db_sync_secret')->prefix('db-sync')->group(function () {
+    // Non-destructive connectivity check.
+    Route::get('/ping', function (DbSyncReceiver $receiver) {
+        return response()->json([
+            'ok' => true,
+            'app' => config('app.name'),
+            'env' => config('app.env'),
+            'tables' => count($receiver->realTables()),
+        ]);
+    });
+
+    // Apply one batch of rows to a table.
+    Route::post('/push', function (Request $request, DbSyncReceiver $receiver) {
+        $data = $request->validate([
+            'table' => ['required', 'string'],
+            'mode' => ['required', 'string', 'in:replace,merge,insert'],
+            'truncate' => ['required', 'boolean'],
+            'rows' => ['present', 'array'],
+        ]);
+
+        return response()->json(
+            $receiver->apply($data['table'], $data['mode'], $data['truncate'], $data['rows'])
+        );
+    });
 });

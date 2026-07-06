@@ -44,6 +44,7 @@ use App\Livewire\Admin\Scraper\Index as AdminScraperIndex;
 use App\Livewire\Admin\Scraper\Show as AdminScraperShow;
 use App\Livewire\Admin\Credentials\Index as AdminCredentialsIndex;
 use App\Livewire\Admin\Credentials\Form as AdminCredentialsForm;
+use App\Livewire\Admin\DbSync\Index as AdminDbSyncIndex;
 use App\Livewire\Admin\Guide\Index as AdminGuideIndex;
 use App\Livewire\Admin\Guide\Form as AdminGuideForm;
 use App\Livewire\User\Guide\Index as GuideIndex;
@@ -213,6 +214,9 @@ Route::middleware(['auth', 'role:Admin|Manager'])->prefix('admin')->name('admin.
         Route::get('credentials', AdminCredentialsIndex::class)->name('credentials.index');
         Route::get('credentials/create', AdminCredentialsForm::class)->name('credentials.create');
         Route::get('credentials/{id}/edit', AdminCredentialsForm::class)->name('credentials.edit');
+
+        // Database sync (DDEV → production)
+        Route::get('db-sync', AdminDbSyncIndex::class)->name('db-sync.index');
     });
 
     // Notifications

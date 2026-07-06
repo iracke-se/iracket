@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'mobile_app' => \App\Http\Middleware\MobileAppAuth::class,
             'connected' => \App\Http\Middleware\EnsureAccountConnected::class,
+            'db_sync_secret' => \App\Http\Middleware\VerifyDbSyncSecret::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
