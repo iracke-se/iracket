@@ -16,6 +16,25 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _isLoading = true;
   double _progress = 0;
 
+  /// User-agent marker appended so the Laravel site can reliably identify the
+  /// in-app WebView on EVERY request (initial load and all subsequent
+  /// navigations). This is required because the default iPad WKWebView
+  /// user-agent reports as desktop "Macintosh … Safari" — it contains neither
+  /// "iPhone"/"iPad" nor lacks "Safari" — so heuristic UA sniffing fails there.
+  /// The server redirects any request carrying this marker away from the public
+  /// marketing home page (which shows a Google Play badge) — App Store 2.3.10.
+  /// The site is responsive by viewport width, so the UA string does not affect
+  /// layout.
+  String get _appUserAgent {
+    const marker = 'iRacketApp/1.0';
+    if (Platform.isAndroid) {
+      return 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 $marker';
+    }
+    return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+        'AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 $marker';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -28,17 +47,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final isDarkMode = brightness == Brightness.dark;
     final themeMode = isDarkMode ? 'dark' : 'light';
 
-    // Build URL with theme parameter
+    // Build URL with theme + app-source parameters. `source=app` guarantees the
+    // Laravel home page redirects the app to /login on the very first load,
+    // independent of any user-agent heuristics.
     final uri = Uri.parse(Environment.laravelBaseUrl);
     final urlWithTheme = uri.replace(
       queryParameters: {
         ...uri.queryParameters,
         'app_theme': themeMode,
+        'source': 'app',
       },
     ).toString();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(_appUserAgent)
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {

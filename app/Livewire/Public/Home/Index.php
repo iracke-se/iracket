@@ -50,6 +50,7 @@ class Index extends Component
 
         // Common webview indicators
         $webviewIndicators = [
+            'iRacketApp',   // iRacket Flutter app marker (reliable, sent on every request)
             'wv',           // Android WebView
             'WebView',      // Generic WebView
             'Flutter',      // Flutter specific

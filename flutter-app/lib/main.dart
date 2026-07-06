@@ -50,95 +50,47 @@ class AppInitializer extends StatefulWidget {
 }
 
 class _AppInitializerState extends State<AppInitializer> {
-  bool _isInitialized = false;
-  String? _error;
+  bool _isReady = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    // Reveal the UI immediately and initialize Firebase/notifications in the
+    // background. The web experience does not depend on push notifications, so
+    // a slow, hung, or failed Firebase/APNS setup must never leave the app
+    // stuck on the splash screen (App Store rejection 2.1a — "unresponsive on
+    // launch"). Notably, on iOS `FirebaseMessaging.getToken()` can block
+    // indefinitely when APNS is not fully configured.
+    _initializeFirebaseInBackground();
+    _isReady = true;
   }
 
-  Future<void> _initializeApp() async {
+  Future<void> _initializeFirebaseInBackground() async {
     try {
-      // Initialize Firebase with platform-specific options
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
-      );
+      ).timeout(const Duration(seconds: 10));
 
-      // Try to initialize FCM and notifications (optional for development)
-      try {
-        // Set up background message handler
-        FirebaseMessaging.onBackgroundMessage(
-            _firebaseMessagingBackgroundHandler);
+      // Set up background message handler
+      FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler);
 
-        // Initialize FCM
-        await FcmService.initialize();
+      // Initialize FCM + notifications, each guarded by a timeout so a hung
+      // native call can never propagate into a frozen UI.
+      await FcmService.initialize().timeout(const Duration(seconds: 10));
+      await NotificationService.initialize()
+          .timeout(const Duration(seconds: 10));
 
-        // Initialize notifications
-        await NotificationService.initialize();
-
-        print('FCM initialized successfully');
-      } catch (fcmError) {
-        // FCM failed (likely APNS not configured), but continue anyway
-        print('FCM initialization failed (continuing without notifications): $fcmError');
-      }
-
-      setState(() {
-        _isInitialized = true;
-      });
+      print('Firebase/FCM initialized successfully');
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
-      print('Initialization error: $e');
+      // Push setup is optional — continue without notifications.
+      print('Firebase/FCM initialization skipped: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Initialization Error',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _error = null;
-                    });
-                    _initializeApp();
-                  },
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (!_isInitialized) {
+    if (!_isReady) {
       return const SplashScreen();
     }
 
