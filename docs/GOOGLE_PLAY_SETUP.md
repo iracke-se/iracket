@@ -5,20 +5,32 @@ upload each new AAB to Google Play automatically.
 
 The build pipeline is already wired up: both the **Android Workflow** and the
 **Android + iOS Workflow** in [`codemagic.yaml`](../codemagic.yaml) contain a
-`google_play:` publishing block that targets the **`production`** track and reads
-credentials from the `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` environment variable.
+`publishing` **script** that uploads the built AAB to the **`production`** track
+with `fastlane supply`, reading credentials from the
+`GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` environment variable.
 
 ```yaml
     publishing:
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        track: production
-        submit_as_draft: false
+      scripts:
+        - name: Publish to Google Play (only if a service account is configured)
+          ignore_failure: true
+          script: |
+            if [ -z "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" ]; then
+              echo "GCLOUD_SERVICE_ACCOUNT_CREDENTIALS not set — skipping Google Play publish."
+              exit 0
+            fi
+            AAB=$(find "$CM_BUILD_DIR/flutter-app/build" -name "*.aab" | head -1)
+            echo "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" > "$CM_BUILD_DIR/gcloud_sa.json"
+            fastlane supply --package_name "$PACKAGE_NAME" --aab "$AAB" \
+              --track production --json_key "$CM_BUILD_DIR/gcloud_sa.json" \
+              --skip_upload_metadata true --skip_upload_images true --skip_upload_screenshots true
 ```
 
-Once the steps below are complete and that variable exists in Codemagic, the
-next successful Android build publishes itself. **No further yaml changes are
-needed.**
+This is a script (not the declarative `google_play:` integration) on purpose, so
+that a missing/unconfigured service account **does not fail the build** — it just
+skips the upload. Once the steps below are complete and that variable exists in
+Codemagic, the next successful Android build publishes itself. **No further yaml
+changes are needed.**
 
 ---
 
@@ -28,7 +40,7 @@ needed.**
 - [ ] **Play App Signing is enabled** (Google prompts for this on the first upload — accept it).
 - [ ] The **store listing is complete**: app name, description, graphics, content rating, data safety form, target audience, privacy policy — all filled in and passing review. Production is gated until these are done.
 - [ ] **Closed-testing requirement met (new personal accounts only):** Google requires a closed test with **≥12 testers for 14 continuous days** before a *personal* developer account can publish to production. Organization accounts are exempt. If your account is personal and hasn't met this, change `track: production` to `track: internal` (or `closed`) in [`codemagic.yaml`](../codemagic.yaml) until the period is complete.
-- [ ] Each new build's **`versionCode` is higher** than anything already uploaded. Codemagic uses `$BUILD_NUMBER` as the version code, so this is automatic as long as you don't manually upload a higher code in between.
+- [ ] Each new build's **`versionCode` is higher** than anything already uploaded. Codemagic uses `$PROJECT_BUILD_NUMBER` (a project-wide counter shared across all workflows) as the version code, so this is automatic as long as you don't manually upload a higher code in between.
 
 ---
 
@@ -78,7 +90,8 @@ needed.**
 
 ## Choosing a track
 
-Change `track:` in both `google_play:` blocks in [`codemagic.yaml`](../codemagic.yaml):
+Change the `--track` value in the publishing script in both Android workflows in
+[`codemagic.yaml`](../codemagic.yaml):
 
 | Value | Effect |
 |---|---|
@@ -89,21 +102,19 @@ Change `track:` in both `google_play:` blocks in [`codemagic.yaml`](../codemagic
 
 ### Optional: staged rollout to production
 
-To release to a fraction of users first, add `rollout_fraction` under the block:
+Add `--rollout` to the `fastlane supply` command to release to a fraction of
+users first:
 
-```yaml
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        track: production
-        submit_as_draft: false
-        rollout_fraction: 0.2   # 20% of users; raise later in Play Console
+```bash
+fastlane supply ... --track production --rollout 0.2   # 20% of users
 ```
 
 ### Optional: upload without releasing
 
-Set `submit_as_draft: true` to upload the AAB but leave it as a draft you
-publish manually from the Play Console. Useful while you're still confirming the
-pipeline.
+Add `--release_status draft` to `fastlane supply` to upload the AAB but leave it
+as a draft you publish manually from the Play Console. Useful while you're still
+confirming the pipeline (and required for the very first production release —
+see the prerequisites).
 
 ---
 
@@ -113,6 +124,6 @@ pipeline.
 |---|---|
 | `The caller does not have permission` | Service account not granted access in Play Console (Step 3), or propagation delay — wait a few minutes. |
 | `APK/AAB signed in debug mode` | The release keystore wasn't applied — see the `Set up Android key.properties` step in the yaml; not a Play-API issue. |
-| `Version code N has already been used` | `$BUILD_NUMBER` isn't higher than an existing upload — bump it or run a fresh Codemagic build. |
+| `Version code N has already been used` | `$PROJECT_BUILD_NUMBER` isn't higher than an existing upload — bump it or run a fresh Codemagic build. |
 | `Track 'production' ... not allowed` / release blocked | Store listing incomplete or closed-testing period not met — finish listing tasks or drop to `internal`/`closed` temporarily. |
-| `Only releases with status draft may be created on ... first release` | The very first production release must be started manually in the Play Console, or set `submit_as_draft: true` for the first run. |
+| `Only releases with status draft may be created on ... first release` | The very first production release must be started manually in the Play Console, or add `--release_status draft` to `fastlane supply` for the first run. |
