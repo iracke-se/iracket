@@ -59,12 +59,28 @@ changes are needed.**
 
 ## Step 3 — Link the project and grant access in Play Console
 
+**a) Link the Google Cloud project (required, once):**
+
 1. **Play Console → Setup → API access**.
-2. **Link** the Google Cloud project from Step 1 (if not already linked).
-3. Find the `codemagic-uploader` service account in the list → **Manage Play Console permissions** (or **Grant access**).
-4. Grant it, at minimum:
-   - **Release** → **Release to production, exclude devices, and use Play App Signing** (a.k.a. **Release Manager**), OR **Admin (all permissions)** for simplicity.
-5. Apply the invitation. It can take a few minutes to propagate.
+2. **Link** the Google Cloud project from Step 1 (if not already linked). Without
+   this link Play will reject the service account even if you invite it below.
+
+**b) Grant the service account permissions** (invite it by email, like a user):
+
+3. **Play Console → Users & permissions → Invite new users**.
+4. Paste the service account's **email** — `codemagic-uploader@<project>.iam.gserviceaccount.com`
+   (find it on the service account in Google Cloud). Play auto-detects that it's
+   a service account.
+5. Scope it to the **iRacket app only** (App permissions), not account-wide, so
+   the key can't touch other apps.
+6. Grant, at minimum, the **Release** permissions:
+   **"Release to production, exclude devices, and use Play App Signing"** plus
+   **"Manage testing tracks"** — or **Admin (all permissions)** for simplicity.
+7. Send the invitation. It can take a few minutes to propagate.
+
+> The **API access** page also has a "Manage Play Console permissions" shortcut
+> next to each linked service account — it just opens the same Users &
+> permissions flow, so either entry point works.
 
 ## Step 4 — Add the credentials to Codemagic
 
