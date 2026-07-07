@@ -55,8 +55,15 @@ class DbSyncReceiver
                     'merge' => $pk
                         ? DB::table($table)->upsert($group, $pk)
                         : DB::table($table)->insertOrIgnore($group),
-                    // replace: table was cleared above, straight insert verbatim.
-                    default => DB::table($table)->insert($group),
+                    // replace: table was cleared on its first batch. Upsert (not a
+                    // plain insert) so that if the HTTP client re-sends a batch the
+                    // server already committed (see DbSyncPusher::send's retry), the
+                    // resend overwrites those ids with the exact same local rows
+                    // instead of throwing a duplicate-key error. Still an exact
+                    // mirror — just idempotent under retries.
+                    default => $pk
+                        ? DB::table($table)->upsert($group, $pk)
+                        : DB::table($table)->insert($group),
                 };
 
                 $affected += count($group);
