@@ -320,8 +320,14 @@ class Index extends Component
             $rankingPositions[$userId] = ['position' => $index + 1, 'category' => 'women'];
         }
 
+        // Distinct list of available ranking months for the picker. The DISTINCT
+        // must happen in SQL: this table can hold hundreds of thousands of rows
+        // (489K+ on production), and hydrating every one just to dedupe by
+        // ranking_date exhausts PHP's memory_limit and 500s the page. With
+        // DISTINCT the DB returns only the ~dozens of unique months.
         $availableMonths = MonthlyRanking::whereNotNull('ranking_date')
-            ->selectRaw('ranking_date, year, month')
+            ->select('ranking_date', 'year', 'month')
+            ->distinct()
             ->orderByDesc('ranking_date')
             ->get()
             ->unique('ranking_date')
