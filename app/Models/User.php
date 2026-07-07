@@ -244,14 +244,19 @@ class User extends Authenticatable implements HasLocalePreference
     }
 
     /**
-     * Get current month ranking
+     * Get current month ranking, falling back to the latest available ranking
+     * when this calendar month hasn't been published/scraped yet.
      */
     public function currentMonthRanking()
     {
         return $this->monthlyRankings()
             ->where('year', now()->year)
             ->where('month', now()->month)
-            ->first();
+            ->first()
+            ?? $this->monthlyRankings()
+                ->orderBy('year', 'desc')
+                ->orderBy('month', 'desc')
+                ->first();
     }
 
     /**
@@ -313,9 +318,10 @@ class User extends Authenticatable implements HasLocalePreference
             return null;
         }
 
-        // Get position by counting users with more points in the same gender
-        $position = MonthlyRanking::where('year', now()->year)
-            ->where('month', now()->month)
+        // Compare against the same period as the fallback ranking above,
+        // not necessarily the literal current calendar month.
+        $position = MonthlyRanking::where('year', $currentRanking->year)
+            ->where('month', $currentRanking->month)
             ->whereHas('user', function ($query) {
                 $query->where('gender', $this->gender)
                     ->where('is_active_player', true);
