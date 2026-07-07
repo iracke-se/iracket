@@ -59,7 +59,7 @@ workflows:
               echo "GCLOUD_SERVICE_ACCOUNT_CREDENTIALS not set — skipping Google Play publish."
               exit 0
             fi
-            AAB=$(find "$CM_BUILD_DIR/flutter-app/build" -name "*.aab" | head -1)
+            AAB=$(find "$CM_BUILD_DIR/flutter-app/build" -path "*/outputs/bundle/*" -name "*.aab" | head -1)
             if [ -z "$AAB" ]; then
               echo "No .aab artifact found — skipping Google Play publish."
               exit 0
@@ -187,7 +187,7 @@ workflows:
               echo "GCLOUD_SERVICE_ACCOUNT_CREDENTIALS not set — skipping Google Play publish."
               exit 0
             fi
-            AAB=$(find "$CM_BUILD_DIR/flutter-app/build" -name "*.aab" | head -1)
+            AAB=$(find "$CM_BUILD_DIR/flutter-app/build" -path "*/outputs/bundle/*" -name "*.aab" | head -1)
             if [ -z "$AAB" ]; then
               echo "No .aab artifact found — skipping Google Play publish."
               exit 0
