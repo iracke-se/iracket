@@ -18,6 +18,19 @@ return Application::configure(basePath: dirname(__DIR__))
             | Request::HEADER_X_FORWARDED_PORT
             | Request::HEADER_X_FORWARDED_PROTO);
 
+        // The db-sync receiver must write rows byte-for-byte as sent. Laravel's
+        // global TrimStrings + ConvertEmptyStringsToNull would otherwise rewrite
+        // every "" in the payload to NULL (and trim whitespace) before the
+        // receiver sees it — breaking the exact mirror and throwing NOT-NULL
+        // violations (e.g. scraped_matches.player2_name = '' → NULL). Skip both
+        // for the sync endpoints so the body arrives verbatim.
+        $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request) => $request->is('api/db-sync/*'),
+        ]);
+        $middleware->trimStrings(except: [
+            fn (Request $request) => $request->is('api/db-sync/*'),
+        ]);
+
         $middleware->web(prepend: [
             \App\Http\Middleware\DeveloperMaintenance::class,
         ], append: [
