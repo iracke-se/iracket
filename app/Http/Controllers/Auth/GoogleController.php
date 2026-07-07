@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Auth\AppLoginToken;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -11,13 +13,21 @@ use Laravel\Socialite\Facades\Socialite;
 
 class GoogleController extends Controller
 {
-    public function redirect()
+    public function redirect(Request $request)
     {
+        // Remember when the flow was launched from the Flutter app's secure
+        // browser so the callback hands the session back via a custom scheme.
+        if ($request->query('flow') === 'app') {
+            $request->session()->put('oauth_app_flow', true);
+        }
+
         return Socialite::driver('google')->redirect();
     }
 
-    public function callback()
+    public function callback(Request $request)
     {
+        $isAppFlow = (bool) $request->session()->get('oauth_app_flow', false);
+
         try {
             $googleUser = Socialite::driver('google')->user();
 
@@ -52,6 +62,16 @@ class GoogleController extends Controller
                 $isNewUser = true;
             }
 
+            // App flow: hand the identity back to the WebView via a one-time
+            // token instead of logging into this (secure-browser) session.
+            if ($isAppFlow) {
+                $request->session()->forget('oauth_app_flow');
+                $next = $user->is_connected ? config('fortify.home') : '/connect-account';
+                $token = AppLoginToken::issue($user->id, $next);
+
+                return redirect()->away('iracket://auth-callback?token='.urlencode($token));
+            }
+
             Auth::login($user);
 
             // Redirect to verification if email not verified
@@ -66,6 +86,14 @@ class GoogleController extends Controller
 
             return redirect()->intended('/players');
         } catch (\Exception $e) {
+            // In the app flow we must return to the custom scheme so the secure
+            // browser sheet closes; a normal redirect would leave it hanging.
+            if ($isAppFlow) {
+                $request->session()->forget('oauth_app_flow');
+
+                return redirect()->away('iracket://auth-callback?error=auth_failed');
+            }
+
             return redirect()->route('login')->with('error', 'Google authentication failed. Please try again.');
         }
     }

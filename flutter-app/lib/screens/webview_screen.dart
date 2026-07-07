@@ -1,5 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../config/environment.dart';
@@ -87,9 +90,23 @@ class _WebViewScreenState extends State<WebViewScreen> {
             await _injectThemeMode(themeMode);
           },
           onNavigationRequest: (NavigationRequest request) {
-            // Handle external links
+            final path = Uri.tryParse(request.url)?.path ?? '';
+
+            // Intercept social sign-in. Google (and increasingly Apple) block
+            // OAuth inside embedded WebViews, so we hand the flow off to the
+            // system's secure browser (ASWebAuthenticationSession) and return
+            // to the app via the iracket:// custom scheme.
+            if (path == '/auth/google' || path == '/auth/apple') {
+              final provider = path == '/auth/google' ? 'google' : 'apple';
+              _handleOAuth(provider);
+              return NavigationDecision.prevent;
+            }
+
+            // Keep our own pages inside the WebView; send everything else
+            // (external sites, mailto:, tel:) to the system so links never
+            // dead-end with an unresponsive tap.
             if (!request.url.startsWith(Environment.laravelBaseUrl)) {
-              // Could open in external browser
+              _openExternal(request.url);
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
@@ -169,6 +186,50 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void _handleJavaScriptMessage(String message) {
     // Handle messages from Laravel
     print('Message from Laravel: $message');
+  }
+
+  /// Runs the Google/Apple OAuth flow in the system's secure browser and, on
+  /// success, loads the server's one-time app-login URL back into the WebView
+  /// so the authenticated session lives in the WebView's cookie store.
+  ///
+  /// Flow: open `/auth/{provider}?flow=app` in the secure browser → provider
+  /// login → our server redirects to `iracket://auth-callback?token=…` → we
+  /// exchange that token at `/auth/app-login`, which logs the WebView session
+  /// in and redirects to the right destination.
+  Future<void> _handleOAuth(String provider) async {
+    try {
+      final authUrl = '${Environment.laravelBaseUrl}/auth/$provider?flow=app';
+      final result = await FlutterWebAuth2.authenticate(
+        url: authUrl,
+        callbackUrlScheme: 'iracket',
+      );
+
+      final token = Uri.parse(result).queryParameters['token'];
+      if (token != null && token.isNotEmpty) {
+        final loginUrl = Uri.parse('${Environment.laravelBaseUrl}/auth/app-login')
+            .replace(queryParameters: {'token': token})
+            .toString();
+        await _controller.loadRequest(Uri.parse(loginUrl));
+      }
+    } on PlatformException {
+      // User cancelled or the flow was dismissed — stay on the login page.
+    } catch (e) {
+      print('OAuth error: $e');
+    }
+  }
+
+  /// Open a non-app URL in the system browser (or the relevant app for
+  /// mailto:/tel:) instead of leaving it as a dead tap inside the WebView.
+  Future<void> _openExternal(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      print('Failed to open external URL: $e');
+    }
   }
 
   @override

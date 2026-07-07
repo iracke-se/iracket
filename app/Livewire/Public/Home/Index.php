@@ -22,59 +22,12 @@ class Index extends Component
 
     public function mount()
     {
-        // Check if request is from Flutter app webview
-        if ($this->isFromFlutterApp()) {
+        // The Flutter app never shows the public landing page — redirect it to
+        // the login screen. Detection lives in the Request::isWebviewApp() macro
+        // (see AppServiceProvider) so it stays consistent across the app.
+        if (request()->isWebviewApp()) {
             return redirect()->to('/login');
         }
-    }
-
-    /**
-     * Detect if request is coming from Flutter app webview
-     */
-    protected function isFromFlutterApp(): bool
-    {
-        $request = request();
-
-        // Method 1: Check for custom query parameter (Flutter app should add ?source=app)
-        if ($request->query('source') === 'app') {
-            return true;
-        }
-
-        // Method 2: Check for custom header (Flutter app can set X-App-Source: flutter)
-        if ($request->header('X-App-Source') === 'flutter') {
-            return true;
-        }
-
-        // Method 3: Check User-Agent for webview indicators
-        $userAgent = $request->userAgent() ?? '';
-
-        // Common webview indicators
-        $webviewIndicators = [
-            'iRacketApp',   // iRacket Flutter app marker (reliable, sent on every request)
-            'wv',           // Android WebView
-            'WebView',      // Generic WebView
-            'Flutter',      // Flutter specific
-            '; wv)',        // Android WebView pattern
-            'iPhone.*Mobile.*Safari.*wv', // iOS WebView
-        ];
-
-        foreach ($webviewIndicators as $indicator) {
-            if (stripos($userAgent, $indicator) !== false) {
-                return true;
-            }
-        }
-
-        // Check for Android WebView specific pattern
-        if (preg_match('/; wv\)/', $userAgent)) {
-            return true;
-        }
-
-        // Check for iOS WKWebView (no Safari in UA but has iPhone/iPad)
-        if (preg_match('/iPhone|iPad/', $userAgent) && !preg_match('/Safari/', $userAgent)) {
-            return true;
-        }
-
-        return false;
     }
 
     public function submitContact()

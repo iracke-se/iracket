@@ -39,6 +39,16 @@ dependencies:
   webview_flutter: ^4.10.0
   webview_flutter_android: ^4.7.0
 
+  # OAuth via the system's secure browser (ASWebAuthenticationSession on iOS,
+  # Custom Tabs on Android). Required because Google blocks OAuth inside embedded
+  # WebViews; social sign-in is handed off to the secure browser and returned to
+  # the app via a custom URL scheme.
+  flutter_web_auth_2: ^4.1.0
+
+  # Open non-app external links in the system browser instead of dead-ending in
+  # the WebView.
+  url_launcher: ^6.3.1
+
   # Firebase
   firebase_core: ^3.8.1
   firebase_messaging: ^15.1.6

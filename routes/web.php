@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\AppLoginController;
 use App\Http\Controllers\Auth\AppleController;
 use App\Http\Controllers\Auth\GoogleController;
 use App\Livewire\Auth\ConnectAccount;
@@ -79,6 +80,10 @@ Route::get('auth/google/callback', [GoogleController::class, 'callback']);
 
 Route::get('auth/apple', [AppleController::class, 'redirect'])->name('auth.apple');
 Route::post('auth/apple/callback', [AppleController::class, 'callback']);
+
+// Consumes the one-time token from the app's native OAuth flow and logs the
+// WebView session in (see App\Services\Auth\AppLoginToken).
+Route::get('auth/app-login', AppLoginController::class)->name('auth.app-login');
 
 // Terms and Privacy Policy
 Route::get('terms/{slug}', TermsShow::class)->name('terms.show');

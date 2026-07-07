@@ -31,6 +31,14 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/db-sync/*'),
         ]);
 
+        // Sign in with Apple returns its authorization response as a cross-origin
+        // form_post (Apple's servers POST to our callback via the user's browser),
+        // so no CSRF token is present. The route must be exempt or every Apple
+        // login 419s — on the website and inside the app.
+        $middleware->validateCsrfTokens(except: [
+            'auth/apple/callback',
+        ]);
+
         $middleware->web(prepend: [
             \App\Http\Middleware\DeveloperMaintenance::class,
         ], append: [

@@ -4,6 +4,10 @@
         @include('partials.head')
     </head>
     <body class="min-h-screen bg-white antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
+        {{-- Website-only navigation chrome. Hidden inside the Flutter app, where
+             the home page is never shown (so "Back to Website" would be a dead
+             tap — App Store rejection 2.1a). --}}
+        @unless(request()->isWebviewApp())
         <!-- Header with Logo and Back Link -->
         <div class="absolute top-0 left-0 right-0 z-50 p-6">
             <div class="flex items-center justify-between">
@@ -21,6 +25,7 @@
                 </a>
             </div>
         </div>
+        @endunless
 
         <div class="bg-background flex min-h-svh flex-col items-center gap-6 p-6 md:p-10 pt-24 md:pt-32">
             <div class="flex w-full max-w-[1000px] flex-col gap-2 mt-8">
