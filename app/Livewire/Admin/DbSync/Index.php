@@ -19,6 +19,35 @@ class Index extends Component
     /** Result of the last "Test connection" click. */
     public ?array $ping = null;
 
+    /** Password-gate state — keeps other admins from running a sync by accident. */
+    public string $gatePassword = '';
+
+    public bool $unlocked = false;
+
+    public function mount(): void
+    {
+        // Unlock persists for the browser session once entered.
+        $this->unlocked = (bool) session('db_sync_unlocked', false);
+    }
+
+    /**
+     * Lightweight accidental-access guard (NOT real security) — the page is
+     * hidden from the sidebar and gated behind a shared password.
+     */
+    public function unlock(): void
+    {
+        if ($this->gatePassword === '123456') {
+            session(['db_sync_unlocked' => true]);
+            $this->unlocked = true;
+            $this->reset('gatePassword');
+
+            return;
+        }
+
+        $this->reset('gatePassword');
+        $this->addError('gate', 'Incorrect password.');
+    }
+
     #[Computed]
     public function configured(): bool
     {
@@ -85,6 +114,10 @@ class Index extends Component
 
     public function startSync(): void
     {
+        if (! $this->unlocked) {
+            return;
+        }
+
         $this->ping = null;
         $this->resetErrorBag('sync');
 
@@ -113,6 +146,10 @@ class Index extends Component
 
     public function step(): void
     {
+        if (! $this->unlocked) {
+            return;
+        }
+
         app(DbSyncPusher::class)->step();
     }
 

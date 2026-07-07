@@ -116,14 +116,10 @@
                         </a>
                     @endif
 
-                    @if(auth()->user()->hasRole('Admin'))
-                        <a href="{{ route('admin.db-sync.index') }}" @click="sidebarOpen = false" class="flex items-center gap-3 px-3 py-2 rounded-lg {{ request()->routeIs('admin.db-sync.*') ? 'bg-accent text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700' }} transition-colors" wire:navigate>
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4 4 4-4m-4 4V4m8 0l-4-4-4 4m4-4v16"/>
-                            </svg>
-                            {{ __('Sync to Production') }}
-                        </a>
-                    @endif
+                    {{-- "Sync to Production" is intentionally hidden from the sidebar and
+                         password-protected (see App\Livewire\Admin\DbSync\Index) so admins
+                         don't run a production sync by accident. Reach it directly at
+                         /admin/db-sync. --}}
 
                     <a href="{{ route('admin.contacts.index') }}" @click="sidebarOpen = false" class="flex items-center gap-3 px-3 py-2 rounded-lg {{ request()->routeIs('admin.contacts.*') ? 'bg-accent text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700' }} transition-colors" wire:navigate>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

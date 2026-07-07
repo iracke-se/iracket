@@ -1,4 +1,23 @@
 <div class="max-w-4xl mx-auto py-6 px-4">
+    @if (! $unlocked)
+        {{-- Password gate: keeps other admins from opening the production sync by accident. --}}
+        <div class="max-w-sm mx-auto mt-16">
+            <h1 class="text-2xl font-bold text-zinc-900 dark:text-white text-center">Sync to Production</h1>
+            <p class="text-sm text-zinc-500 dark:text-zinc-400 text-center mt-1 mb-6">
+                This page is protected. Enter the password to continue.
+            </p>
+            <form wire:submit="unlock" class="space-y-3">
+                <input type="password" wire:model="gatePassword" placeholder="Password" autofocus autocomplete="off"
+                    class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent" />
+                @error('gate')
+                    <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                @enderror
+                <button type="submit" class="w-full px-4 py-3 bg-accent text-white rounded-lg font-medium hover:opacity-90 transition-opacity">
+                    Unlock
+                </button>
+            </form>
+        </div>
+    @else
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">Sync to Production</h1>
         <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
@@ -144,5 +163,6 @@
                 </button>
             </div>
         </div>
+    @endif
     @endif
 </div>
