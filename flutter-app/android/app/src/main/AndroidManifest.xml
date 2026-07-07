@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required in the MAIN manifest so the RELEASE build has network access.
+         Flutter only auto-adds INTERNET to the debug/profile manifests, so
+         without this the release AAB's WebView cannot load anything. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- For the camera option of the WebView's image file inputs. -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:label="iRacket"
         android:name="${applicationName}"

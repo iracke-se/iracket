@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -137,8 +138,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
     // tiny, zoomed-out content despite the site's viewport tag being correct.
     // iOS's WKWebView has no such default and needs no equivalent fix.
     if (Platform.isAndroid && _controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController)
-          .setUseWideViewPort(true);
+      final androidController =
+          _controller.platform as AndroidWebViewController;
+      androidController.setUseWideViewPort(true);
+      // iOS WKWebView handles <input type="file"> natively; Android's WebView
+      // does not, so file inputs are dead taps without this handler.
+      androidController.setOnShowFileSelector(_androidFilePicker);
     }
 
     _controller.loadRequest(Uri.parse(urlWithTheme));
@@ -216,6 +221,52 @@ class _WebViewScreenState extends State<WebViewScreen> {
     } catch (e) {
       print('OAuth error: $e');
     }
+  }
+
+  /// Backs the Android WebView's file `<input>` (all inputs on the site are
+  /// `accept="image/*"`). Lets the user pick the camera or gallery, then hands
+  /// the chosen file back to the WebView as a file:// URI. Returns an empty list
+  /// if cancelled, which the WebView treats as "no file selected".
+  Future<List<String>> _androidFilePicker(FileSelectorParams params) async {
+    final source = await _askImageSource();
+    if (source == null) return const [];
+
+    try {
+      final file = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (file == null) return const [];
+      return [Uri.file(file.path).toString()];
+    } catch (e) {
+      print('File picker error: $e');
+      return const [];
+    }
+  }
+
+  /// Ask whether to take a new photo or choose an existing one, mirroring the
+  /// native chooser iOS shows for the same inputs.
+  Future<ImageSource?> _askImageSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Library'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Open a non-app URL in the system browser (or the relevant app for

@@ -49,6 +49,10 @@ dependencies:
   # the WebView.
   url_launcher: ^6.3.1
 
+  # Backs the Android WebView's file <input> handler (camera + gallery). Unlike
+  # iOS WKWebView, Android's WebView does not handle file inputs on its own.
+  image_picker: ^1.1.2
+
   # Firebase
   firebase_core: ^3.8.1
   firebase_messaging: ^15.1.6

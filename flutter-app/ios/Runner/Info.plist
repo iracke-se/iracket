@@ -52,18 +52,16 @@
 		     from asking about export compliance on every build. -->
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
-		<!-- Media capture permissions. Required because the WebView exposes file
-		     inputs (e.g. profile photo upload) that can open the camera or photo
-		     library. Without these usage-description strings iOS terminates the app
-		     the moment the picker is invoked (App Store rejection 2.1a — crash on
-		     tapping Camera). -->
+		<!-- Media capture permissions. Required because the WebView exposes
+		     image file inputs (profile photo, club logo, banners) that can open
+		     the camera or photo library. Without these usage-description strings
+		     iOS terminates the app the moment the picker is invoked (App Store
+		     rejection 2.1a — crash on tapping Camera). Only these two are declared
+		     because every file input is accept="image/*" — there is no video/audio
+		     capture, so microphone is deliberately omitted. -->
 		<key>NSCameraUsageDescription</key>
 		<string>iRacket needs access to your camera so you can take and upload a profile photo.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>iRacket needs access to your photo library so you can choose and upload a profile photo.</string>
-		<key>NSPhotoLibraryAddUsageDescription</key>
-		<string>iRacket needs permission to save photos to your library.</string>
-		<key>NSMicrophoneUsageDescription</key>
-		<string>iRacket needs microphone access when you capture video to upload.</string>
 	</dict>
 </plist>
