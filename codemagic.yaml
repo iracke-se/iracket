@@ -46,13 +46,34 @@ workflows:
       - flutter-app/build/**/outputs/apk/**/*.apk
       - flutter-app/build/**/outputs/**/mapping.txt
     publishing:
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        # Publishes to the production track. Requires a complete store listing
-        # and (for new personal accounts) a met closed-testing period, or Play
-        # will reject the release. See docs/GOOGLE_PLAY_SETUP.md.
-        track: production
-        submit_as_draft: false
+      scripts:
+        # Google Play publish is done as a script (not the declarative
+        # google_play integration) so that a missing/unconfigured service
+        # account never fails the build — the AAB is already built and kept as
+        # an artifact. ignore_failure keeps the build green even if the upload
+        # itself errors (e.g. no initial release yet). See docs/GOOGLE_PLAY_SETUP.md.
+        - name: Publish to Google Play (only if a service account is configured)
+          ignore_failure: true
+          script: |
+            if [ -z "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" ]; then
+              echo "GCLOUD_SERVICE_ACCOUNT_CREDENTIALS not set — skipping Google Play publish."
+              exit 0
+            fi
+            AAB=$(find "$CM_BUILD_DIR/flutter-app/build" -name "*.aab" | head -1)
+            if [ -z "$AAB" ]; then
+              echo "No .aab artifact found — skipping Google Play publish."
+              exit 0
+            fi
+            echo "Publishing $AAB to Google Play (production track)…"
+            echo "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" > "$CM_BUILD_DIR/gcloud_sa.json"
+            fastlane supply \
+              --package_name "$PACKAGE_NAME" \
+              --aab "$AAB" \
+              --track production \
+              --json_key "$CM_BUILD_DIR/gcloud_sa.json" \
+              --skip_upload_metadata true \
+              --skip_upload_images true \
+              --skip_upload_screenshots true
       email:
         recipients:
           - andrej.gosevski03@gmail.com
@@ -153,13 +174,34 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        # Publishes to the production track. Requires a complete store listing
-        # and (for new personal accounts) a met closed-testing period, or Play
-        # will reject the release. See docs/GOOGLE_PLAY_SETUP.md.
-        track: production
-        submit_as_draft: false
+      scripts:
+        # Google Play publish is done as a script (not the declarative
+        # google_play integration) so a missing/unconfigured service account
+        # never fails the build — the iOS TestFlight publish and the built
+        # artifacts are unaffected. ignore_failure keeps the build green even if
+        # the upload itself errors. See docs/GOOGLE_PLAY_SETUP.md.
+        - name: Publish to Google Play (only if a service account is configured)
+          ignore_failure: true
+          script: |
+            if [ -z "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" ]; then
+              echo "GCLOUD_SERVICE_ACCOUNT_CREDENTIALS not set — skipping Google Play publish."
+              exit 0
+            fi
+            AAB=$(find "$CM_BUILD_DIR/flutter-app/build" -name "*.aab" | head -1)
+            if [ -z "$AAB" ]; then
+              echo "No .aab artifact found — skipping Google Play publish."
+              exit 0
+            fi
+            echo "Publishing $AAB to Google Play (production track)…"
+            echo "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" > "$CM_BUILD_DIR/gcloud_sa.json"
+            fastlane supply \
+              --package_name "$PACKAGE_NAME" \
+              --aab "$AAB" \
+              --track production \
+              --json_key "$CM_BUILD_DIR/gcloud_sa.json" \
+              --skip_upload_metadata true \
+              --skip_upload_images true \
+              --skip_upload_screenshots true
       email:
         recipients:
           - andrej.gosevski03@gmail.com
