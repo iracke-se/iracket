@@ -1,8 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../config/environment.dart';
 import '../services/fcm_service.dart';
+
+const _accentGreen = Color(0xFF34C759);
+const _darkSurface = Color(0xFF18181B);
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({super.key});
@@ -14,7 +18,8 @@ class WebViewScreen extends StatefulWidget {
 class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
-  double _progress = 0;
+  bool _isDarkMode = false;
+  String? _cachedFcmToken;
 
   /// User-agent marker appended so the Laravel site can reliably identify the
   /// in-app WebView on EVERY request (initial load and all subsequent
@@ -44,8 +49,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void _initWebView() {
     // Detect system theme mode
     final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    final isDarkMode = brightness == Brightness.dark;
-    final themeMode = isDarkMode ? 'dark' : 'light';
+    _isDarkMode = brightness == Brightness.dark;
+    final themeMode = _isDarkMode ? 'dark' : 'light';
 
     // Build URL with theme + app-source parameters. `source=app` guarantees the
     // Laravel home page redirects the app to /login on the very first load,
@@ -62,19 +67,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(_appUserAgent)
+      ..setBackgroundColor(_isDarkMode ? _darkSurface : Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (int progress) {
-            setState(() {
-              _progress = progress / 100;
-            });
-          },
           onPageStarted: (String url) {
+            if (!mounted) return;
             setState(() {
               _isLoading = true;
             });
           },
           onPageFinished: (String url) async {
+            if (!mounted) return;
             setState(() {
               _isLoading = false;
             });
@@ -93,6 +96,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
           },
           onWebResourceError: (WebResourceError error) {
             print('WebView error: ${error.description}');
+            // A failed main-frame load means onPageFinished never fires,
+            // which would otherwise leave the full-screen loading overlay
+            // stuck forever.
+            if ((error.isForMainFrame ?? true) && mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
           },
         ),
       )
@@ -101,15 +112,36 @@ class _WebViewScreenState extends State<WebViewScreen> {
         onMessageReceived: (JavaScriptMessage message) {
           _handleJavaScriptMessage(message.message);
         },
-      )
-      ..loadRequest(Uri.parse(urlWithTheme));
+      );
+
+    // Android's WebViewController defaults useWideViewPort to false, which
+    // makes the WebView ignore the page's <meta name="viewport"> tag and
+    // render a fixed ~980px desktop layout scaled down to fit — producing
+    // tiny, zoomed-out content despite the site's viewport tag being correct.
+    // iOS's WKWebView has no such default and needs no equivalent fix.
+    if (Platform.isAndroid && _controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setUseWideViewPort(true);
+    }
+
+    _controller.loadRequest(Uri.parse(urlWithTheme));
   }
 
   Future<void> _injectFcmToken() async {
-    String? fcmToken = await FcmService.getToken();
+    // Cache once a token is actually available, but keep re-checking
+    // SharedPreferences on every navigation until then — Firebase/FCM
+    // initialization in main.dart runs concurrently and independently, and
+    // can easily finish after the WebView's first page load (it waits on an
+    // iOS permission prompt first), so caching a null result permanently
+    // would silently disable FCM token delivery for the rest of the session.
+    _cachedFcmToken ??= await FcmService.getToken();
+    final fcmToken = _cachedFcmToken;
     if (fcmToken != null) {
       String deviceType = Platform.isAndroid ? 'android' : 'ios';
 
+      // Re-injected on every navigation regardless of caching: a real page
+      // load wipes the JS `window` context, so the JS globals need re-setting
+      // even though the cached Dart token value hasn't changed.
       await _controller.runJavaScript('''
         window.flutterFCMToken = "$fcmToken";
         window.flutterDeviceType = "$deviceType";
@@ -139,33 +171,47 @@ class _WebViewScreenState extends State<WebViewScreen> {
     print('Message from Laravel: $message');
   }
 
-  Future<void> _onRefresh() async {
-    await _controller.reload();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = _isDarkMode ? _darkSurface : Colors.white;
+
     return Scaffold(
       body: SafeArea(
         child: Stack(
           children: [
-            RefreshIndicator(
-              onRefresh: _onRefresh,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).padding.top,
-                  child: WebViewWidget(controller: _controller),
+            Positioned.fill(
+              child: WebViewWidget(controller: _controller),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: !_isLoading,
+                child: AnimatedOpacity(
+                  opacity: _isLoading ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeInOut,
+                  child: Container(
+                    color: backgroundColor,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            'assets/images/splash.png',
+                            width: 120,
+                            height: 120,
+                          ),
+                          const SizedBox(height: 24),
+                          const CircularProgressIndicator(
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(_accentGreen),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            if (_isLoading)
-              LinearProgressIndicator(
-                value: _progress,
-                backgroundColor: Colors.grey[200],
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-              ),
           ],
         ),
       ),
