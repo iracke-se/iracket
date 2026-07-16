@@ -1,4 +1,4 @@
-<div class="max-w-7xl mx-auto" x-data="{
+<div class="max-w-[1400px] mx-auto" x-data="{
     polling: false,
     init() {
         // Listen for scraper started event

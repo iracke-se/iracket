@@ -1,4 +1,4 @@
-<div class="max-w-2xl mx-auto py-6 px-4">
+<div class="max-w-[1400px] mx-auto py-6 px-4">
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">Send Notification</h1>
         <p class="text-zinc-500 dark:text-zinc-400 mt-1">Send a notification to {{ $users->count() }} selected users</p>

@@ -1,4 +1,4 @@
-<div class="max-w-3xl mx-auto py-6 px-4">
+<div class="max-w-[1400px] mx-auto py-6 px-4">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $credential ? __('admin-credentials.edit_credential') : __('admin-credentials.create_credential') }}</h1>
         <a href="{{ route('admin.credentials.index') }}" class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white" wire:navigate>

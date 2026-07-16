@@ -1,4 +1,4 @@
-<div class="max-w-4xl mx-auto py-6 px-4"
+<div class="max-w-[1400px] mx-auto py-6 px-4"
     x-data="{
         quillInstance: null,
         init() {

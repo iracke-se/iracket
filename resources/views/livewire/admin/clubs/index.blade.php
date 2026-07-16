@@ -1,4 +1,4 @@
-<div class="max-w-6xl mx-auto py-6 px-4">
+<div class="max-w-[1400px] mx-auto py-6 px-4">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ __('admin-clubs.clubs') }}</h1>
         <a href="{{ route('admin.clubs.create') }}" class="px-4 py-2 bg-accent text-white font-medium rounded-lg hover:bg-accent/90 transition-colors" wire:navigate>

@@ -1,4 +1,4 @@
-<div class="max-w-4xl mx-auto py-6 px-4">
+<div class="max-w-[1400px] mx-auto py-6 px-4">
     <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-4">
             <a href="{{ route('admin.contacts.index') }}" class="p-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white" wire:navigate>

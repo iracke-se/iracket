@@ -1,4 +1,4 @@
-<div class="max-w-4xl mx-auto py-6 px-4">
+<div class="max-w-[1400px] mx-auto py-6 px-4">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $match ? __('admin-matches.edit_match') : __('admin-matches.create_match') }}</h1>
         <a href="{{ route('admin.matches.index') }}" class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white" wire:navigate>

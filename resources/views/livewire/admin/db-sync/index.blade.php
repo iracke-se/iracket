@@ -1,4 +1,4 @@
-<div class="max-w-4xl mx-auto py-6 px-4">
+<div class="max-w-[1400px] mx-auto py-6 px-4">
     @if (! $unlocked)
         {{-- Password gate: keeps other admins from opening the production sync by accident. --}}
         <div class="max-w-sm mx-auto mt-16">
