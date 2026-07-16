@@ -19,6 +19,8 @@ return [
     'total_clubs' => 'Total Clubs',
     'total_matches' => 'Total Matches',
     'verified_users' => 'Verified Users',
+    'signed_up_users' => 'Signed Up Users',
+    'of_all_users' => 'of all users',
     'this_month' => 'This month:',
 
     // Dashboard Charts

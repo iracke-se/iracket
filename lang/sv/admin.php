@@ -19,6 +19,8 @@ return [
     'total_clubs' => 'Totalt klubbar',
     'total_matches' => 'Totalt matcher',
     'verified_users' => 'Verifierade användare',
+    'signed_up_users' => 'Registrerade användare',
+    'of_all_users' => 'av alla användare',
     'this_month' => 'Denna månad:',
 
     // Dashboard Charts

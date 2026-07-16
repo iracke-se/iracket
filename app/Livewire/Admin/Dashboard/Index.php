@@ -17,6 +17,10 @@ class Index extends Component
         $totalClubs = Club::count();
         $totalMatches = GameMatch::count();
 
+        // Users who connected their account — the real, active users.
+        // Everyone else was created by the scraper and has never signed in.
+        $connectedUsers = User::where('is_connected', true)->count();
+
         // This month stats
         $usersThisMonth = User::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
@@ -89,6 +93,7 @@ class Index extends Component
 
         return view('livewire.admin.dashboard.index', [
             'totalUsers' => $totalUsers,
+            'connectedUsers' => $connectedUsers,
             'totalClubs' => $totalClubs,
             'totalMatches' => $totalMatches,
             'usersThisMonth' => $usersThisMonth,

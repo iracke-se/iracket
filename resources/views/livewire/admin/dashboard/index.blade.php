@@ -1,4 +1,4 @@
-<div class="max-w-7xl mx-auto"
+<div class="max-w-[1400px] mx-auto"
     x-data="{
         charts: {},
         init() {
@@ -102,7 +102,7 @@
     @livewire('admin.dashboard.heartbeat-status')
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
         <!-- Total Users -->
         <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 border border-zinc-200 dark:border-zinc-700">
             <div class="flex items-center justify-between">
@@ -124,6 +124,25 @@
                 @elseif($userGrowth < 0)
                     <span class="ml-2 text-red-500 dark:text-red-400">{{ $userGrowth }}%</span>
                 @endif
+            </div>
+        </div>
+
+        <!-- Signed Up Users (connected accounts — real users, not scraped profiles) -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 border border-zinc-200 dark:border-zinc-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('admin.signed_up_users') }}</p>
+                    <p class="text-3xl font-bold text-zinc-900 dark:text-white mt-1">{{ number_format($connectedUsers) }}</p>
+                </div>
+                <div class="p-3 bg-teal-500/10 rounded-lg">
+                    <svg class="w-6 h-6 text-teal-500 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7zm7-4l2 2 4-4"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <span class="font-medium text-zinc-900 dark:text-white">{{ $totalUsers > 0 ? round(($connectedUsers / $totalUsers) * 100) : 0 }}%</span>
+                <span class="ml-2 text-zinc-500 dark:text-zinc-400">{{ __('admin.of_all_users') }}</span>
             </div>
         </div>
 
