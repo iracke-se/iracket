@@ -27,7 +27,10 @@
         </div>
         @endunless
 
-        <div class="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+        {{-- Login and register carry the most content (social buttons + form + footer
+             links), so they get extra vertical breathing room. Other auth pages keep
+             the standard p-6 md:p-10 spacing. --}}
+        <div class="bg-background flex min-h-svh flex-col items-center justify-center gap-6 px-6 md:px-10 {{ request()->routeIs('login', 'register') ? 'py-24 md:py-32' : 'py-6 md:py-10' }}">
             <div class="flex w-full max-w-sm flex-col gap-2">
                 <a href="{{ route('home') }}" class="flex flex-col items-center gap-2 font-medium" wire:navigate>
                     <span class="flex h-9 w-9 mb-1 items-center justify-center rounded-md">
