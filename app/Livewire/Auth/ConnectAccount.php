@@ -31,9 +31,9 @@ class ConnectAccount extends Component
     {
         $user = Auth::user();
 
-        // If already fully connected as an active player, redirect to players
+        // If already fully connected as an active player, redirect to player's profile
         if ($user->is_connected && $user->is_active_player) {
-            return redirect()->route('players.index');
+            return redirect()->route('players.show', $user);
         }
 
         $this->isActivePlayer = $user->is_active_player ?? true;
@@ -85,7 +85,7 @@ class ConnectAccount extends Component
             'accepts_push_notifications' => $this->acceptsPushNotifications,
         ]);
 
-        return redirect()->route('players.index');
+        return redirect()->route('players.show', $user);
     }
 
     public function connect()
@@ -166,7 +166,7 @@ class ConnectAccount extends Component
             'accepts_push_notifications' => $this->acceptsPushNotifications,
         ]);
 
-        return redirect()->route('players.index');
+        return redirect()->route('players.show', $user);
     }
 
     public function render()

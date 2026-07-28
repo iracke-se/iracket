@@ -66,7 +66,7 @@ class GoogleController extends Controller
             // token instead of logging into this (secure-browser) session.
             if ($isAppFlow) {
                 $request->session()->forget('oauth_app_flow');
-                $next = $user->is_connected ? config('fortify.home') : '/connect-account';
+                $next = $user->is_connected ? route('players.show', $user, absolute: false) : '/connect-account';
                 $token = AppLoginToken::issue($user->id, $next);
 
                 return redirect()->away('iracket://auth-callback?token='.urlencode($token));
@@ -84,7 +84,7 @@ class GoogleController extends Controller
                 return redirect('/connect-account');
             }
 
-            return redirect()->intended('/players');
+            return redirect()->intended(route('players.show', $user));
         } catch (\Exception $e) {
             // In the app flow we must return to the custom scheme so the secure
             // browser sheet closes; a normal redirect would leave it hanging.

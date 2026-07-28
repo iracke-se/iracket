@@ -114,24 +114,7 @@ class Index extends Component
 
         // Search by name or email (with Nordic character support)
         if ($this->search) {
-            $search = trim($this->search);
-            $isSqlite = \DB::connection()->getDriverName() === 'sqlite';
-
-            $query->where(function ($q) use ($search, $isSqlite) {
-                // Search individual fields
-                $q->where('first_name', 'like', '%' . $search . '%')
-                  ->orWhere('last_name', 'like', '%' . $search . '%')
-                  ->orWhere('email', 'like', '%' . $search . '%');
-
-                // Search full name as phrase (both orders)
-                if ($isSqlite) {
-                    $q->orWhereRaw("LOWER(first_name || ' ' || last_name) LIKE ?", ['%' . strtolower($search) . '%'])
-                      ->orWhereRaw("LOWER(last_name || ' ' || first_name) LIKE ?", ['%' . strtolower($search) . '%']);
-                } else {
-                    $q->orWhereRaw("LOWER(CONCAT(first_name, ' ', last_name)) LIKE ?", ['%' . strtolower($search) . '%'])
-                      ->orWhereRaw("LOWER(CONCAT(last_name, ' ', first_name)) LIKE ?", ['%' . strtolower($search) . '%']);
-                }
-            });
+            $this->applySearch($query, $this->search, ['first_name', 'last_name', 'email']);
         }
 
         // Filter by gender

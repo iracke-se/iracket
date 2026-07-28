@@ -42,7 +42,7 @@ class VerifyEmail extends Component
                 return redirect()->route('connect-account');
             }
 
-            return redirect()->intended(route('players.index'));
+            return redirect()->intended(route('players.show', $user));
         }
 
         $this->error = 'Invalid or expired verification code. Please try again or request a new code.';

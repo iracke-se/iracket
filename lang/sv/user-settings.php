@@ -9,8 +9,8 @@ return [
     */
 
     'nav_profile' => 'Profil',
-    'nav_password' => 'Losenord',
-    'nav_two_factor' => 'Tvafaktor',
+    'nav_password' => 'Lösenord',
+    'nav_two_factor' => 'Tvåfaktor',
     'nav_appearance' => 'Utseende',
     'nav_club' => 'Klubb',
 
@@ -24,20 +24,20 @@ return [
     'profile_subheading' => 'Uppdatera din profilinformation',
     'profile_picture' => 'Profilbild',
     'remove_photo' => 'Ta bort foto',
-    'first_name' => 'Fornamn',
+    'first_name' => 'Förnamn',
     'last_name' => 'Efternamn',
     'email' => 'E-post',
     'phone_number' => 'Telefonnummer',
-    'gender' => 'Kon',
-    'age' => 'Alder',
-    'select' => 'Valj...',
+    'gender' => 'Kön',
+    'age' => 'Ålder',
+    'select' => 'Välj...',
     'male' => 'Man',
     'female' => 'Kvinna',
     'other' => 'Annat',
-    'prefer_not_to_say' => 'Foredrar att inte svara',
-    'email_unverified' => 'Din e-postadress ar inte verifierad.',
-    'resend_verification' => 'Klicka har for att skicka verifieringsmailet igen.',
-    'verification_link_sent' => 'En ny verifieringslankar har skickats till din e-postadress.',
+    'prefer_not_to_say' => 'Föredrar att inte svara',
+    'email_unverified' => 'Din e-postadress är inte verifierad.',
+    'resend_verification' => 'Klicka här för att skicka verifieringsmailet igen.',
+    'verification_link_sent' => 'En ny verifieringslänk har skickats till din e-postadress.',
     'profile_updated' => 'Sparat.',
 
     /*
@@ -46,11 +46,11 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'password_heading' => 'Uppdatera losenord',
-    'password_subheading' => 'Se till att ditt konto anvander ett langt, slumpmassigt losenord for att halla det sakert',
-    'current_password' => 'Nuvarande losenord',
-    'new_password' => 'Nytt losenord',
-    'confirm_password' => 'Bekrafta losenord',
+    'password_heading' => 'Uppdatera lösenord',
+    'password_subheading' => 'Se till att ditt konto använder ett långt, slumpmässigt lösenord för att hålla det säkert',
+    'current_password' => 'Nuvarande lösenord',
+    'new_password' => 'Nytt lösenord',
+    'confirm_password' => 'Bekräfta lösenord',
     'password_updated' => 'Sparat.',
 
     /*
@@ -59,17 +59,17 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'two_factor_heading' => 'Tvafaktorsautentisering',
-    'two_factor_subheading' => 'Hantera dina tvafaktorsautentiseringsinställningar',
+    'two_factor_heading' => 'Tvåfaktorsautentisering',
+    'two_factor_subheading' => 'Hantera dina tvåfaktorsautentiseringsinställningar',
     'enabled' => 'Aktiverad',
     'disabled' => 'Inaktiverad',
-    'two_factor_enabled_description' => 'Med tvafaktorsautentisering aktiverad kommer du att uppmanas att ange en saker, slumpmassig pinkod vid inloggning, som du kan hamta fran en TOTP-stod app pa din telefon.',
-    'two_factor_disabled_description' => 'Nar du aktiverar tvafaktorsautentisering kommer du att uppmanas att ange en saker pinkod vid inloggning. Denna pinkod kan hamtas fran en TOTP-stod app pa din telefon.',
+    'two_factor_enabled_description' => 'Med tvåfaktorsautentisering aktiverad kommer du att uppmanas att ange en säker, slumpmässig pinkod vid inloggning, som du kan hämta från en TOTP-stödd app på din telefon.',
+    'two_factor_disabled_description' => 'När du aktiverar tvåfaktorsautentisering kommer du att uppmanas att ange en säker pinkod vid inloggning. Denna pinkod kan hämtas från en TOTP-stödd app på din telefon.',
     'disable_2fa' => 'Inaktivera 2FA',
     'enable_2fa' => 'Aktivera 2FA',
     'enter_code_manually' => 'eller, ange koden manuellt',
     'back' => 'Tillbaka',
-    'confirm' => 'Bekrafta',
+    'confirm' => 'Bekräfta',
 
     /*
     |--------------------------------------------------------------------------
@@ -77,12 +77,12 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'recovery_codes_heading' => '2FA Aterstallningskoder',
-    'recovery_codes_description' => 'Aterstallningskoder later dig fa atkomst om du forlorar din 2FA-enhet. Forvara dem i en saker losenordshanterare.',
-    'view_recovery_codes' => 'Visa aterstallningskoder',
-    'hide_recovery_codes' => 'Dolj aterstallningskoder',
+    'recovery_codes_heading' => '2FA Återställningskoder',
+    'recovery_codes_description' => 'Återställningskoder låter dig få åtkomst om du förlorar din 2FA-enhet. Förvara dem i en säker lösenordshanterare.',
+    'view_recovery_codes' => 'Visa återställningskoder',
+    'hide_recovery_codes' => 'Dölj återställningskoder',
     'regenerate_codes' => 'Regenerera koder',
-    'recovery_codes_usage' => 'Varje aterstallningskod kan anvandas en gang for att komma at ditt konto och tas bort efter anvandning. Om du behover fler, klicka pa Regenerera koder ovan.',
+    'recovery_codes_usage' => 'Varje återställningskod kan användas en gång för att komma åt ditt konto och tas bort efter användning. Om du behöver fler, klicka på Regenerera koder ovan.',
 
     /*
     |--------------------------------------------------------------------------
@@ -91,9 +91,9 @@ return [
     */
 
     'appearance_heading' => 'Utseende',
-    'appearance_subheading' => 'Uppdatera utseendeinstallningarna for ditt konto',
+    'appearance_subheading' => 'Uppdatera utseendeinställningarna för ditt konto',
     'light' => 'Ljust',
-    'dark' => 'Morkt',
+    'dark' => 'Mörkt',
     'system' => 'System',
 
     'language_heading' => 'Språk',
@@ -115,23 +115,23 @@ return [
     'phone' => 'Telefon',
     'website' => 'Webbplats',
     'club_logo' => 'Klubblogotyp',
-    'save_changes' => 'Spara andringar',
+    'save_changes' => 'Spara ändringar',
     'cancel' => 'Avbryt',
     'cancel_edit' => 'Avbryt redigering',
     'edit_club' => 'Redigera klubb',
-    'leave_club' => 'Lamna klubb',
-    'leave_club_confirm' => 'Ar du saker pa att du vill lamna denna klubb?',
+    'leave_club' => 'Lämna klubb',
+    'leave_club_confirm' => 'Är du säker på att du vill lämna denna klubb?',
     'club_updated' => 'Klubben har uppdaterats.',
-    'club_left' => 'Du har lamnat klubben.',
+    'club_left' => 'Du har lämnat klubben.',
     'create_a_club' => 'Skapa en klubb',
     'create_club' => 'Skapa klubb',
     'club_created' => 'Klubben har skapats!',
-    'or_join_existing' => 'eller ga med i en befintlig klubb',
-    'search_clubs' => 'Sok klubbar...',
+    'or_join_existing' => 'eller gå med i en befintlig klubb',
+    'search_clubs' => 'Sök klubbar...',
     'members' => 'medlemmar',
-    'join' => 'Ga med',
+    'join' => 'Gå med',
     'no_clubs_found' => 'Inga klubbar hittades',
-    'club_joined' => 'Du har gatt med i klubben!',
+    'club_joined' => 'Du har gått med i klubben!',
 
     /*
     |--------------------------------------------------------------------------
@@ -141,9 +141,9 @@ return [
 
     'delete_account' => 'Ta bort konto',
     'delete_account_description' => 'Ta bort ditt konto och alla dess resurser',
-    'delete_account_confirm' => 'Ar du saker pa att du vill ta bort ditt konto?',
-    'delete_account_warning' => 'Nar ditt konto ar borttaget kommer alla dess resurser och data att raderas permanent. Ange ditt losenord for att bekrafta att du vill ta bort ditt konto permanent.',
-    'password' => 'Losenord',
+    'delete_account_confirm' => 'Är du säker på att du vill ta bort ditt konto?',
+    'delete_account_warning' => 'När ditt konto är borttaget kommer alla dess resurser och data att raderas permanent. Ange ditt lösenord för att bekräfta att du vill ta bort ditt konto permanent.',
+    'password' => 'Lösenord',
 
     /*
     |--------------------------------------------------------------------------

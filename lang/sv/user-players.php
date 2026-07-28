@@ -37,7 +37,7 @@ return [
     'this_month' => 'denna månad',
 
     // Player Profile
-    'rankings_history' => 'Rankninghistorik',
+    'rankings_history' => 'Rankningshistorik',
     'no_ranking_history' => 'Ingen rankningshistorik ännu',
     'month' => 'Månad',
     'all_months' => 'Alla månader',
