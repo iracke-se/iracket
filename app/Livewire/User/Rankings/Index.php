@@ -145,6 +145,7 @@ class Index extends Component
             'player' => $player,
             'currentRanking' => $currentRanking,
             'currentRankingPoints' => $currentRankingPoints,
+            'manualPointsDelta' => $manualPointsDelta,
             'rankingsHistory' => $rankingsHistory,
             'rankingPosition' => $rankingPosition,
             'rankingCategory' => $rankingCategory,

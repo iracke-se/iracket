@@ -6,6 +6,8 @@ return [
     'actual_points' => 'Aktuella poäng',
     'current_ranking' => 'Aktuell rankning',
     'pts' => 'p',
+    'current_points' => 'Aktuella poäng',
+    'official_points' => 'Officiella poäng',
     'this_month' => 'denna månad',
     'history' => 'Historik',
     'no_history' => 'Ingen rankningshistorik ännu',

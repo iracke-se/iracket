@@ -6,6 +6,8 @@ return [
     'actual_points' => 'Actual Points',
     'current_ranking' => 'Current Ranking',
     'pts' => 'p',
+    'current_points' => 'Current Points',
+    'official_points' => 'Official Points',
     'this_month' => 'this month',
     'history' => 'History',
     'no_history' => 'No ranking history yet',

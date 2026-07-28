@@ -26,9 +26,22 @@
                 </svg>
             </button>
         </div>
-        <span class="px-4 py-1.5 bg-accent text-white text-sm font-bold rounded-full">
-            {{ number_format($currentRankingPoints) }} {{ __('user-rankings.pts') }}
-        </span>
+        @if($manualPointsDelta != 0)
+            <div class="flex items-center gap-2">
+                <span class="flex flex-col items-center px-4 py-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full leading-tight">
+                    <span class="text-sm font-bold text-zinc-900 dark:text-white">{{ number_format($currentRankingPoints) }} {{ __('user-rankings.pts') }}</span>
+                    <span class="text-[10px] text-zinc-500 dark:text-zinc-400">{{ __('user-rankings.current_points') }}</span>
+                </span>
+                <span class="flex flex-col items-center px-4 py-1.5 bg-accent text-white rounded-full leading-tight">
+                    <span class="text-sm font-bold">{{ number_format($currentRanking?->points ?? 0) }} {{ __('user-rankings.pts') }}</span>
+                    <span class="text-[10px] text-white/80">{{ __('user-rankings.official_points') }}</span>
+                </span>
+            </div>
+        @else
+            <span class="px-4 py-1.5 bg-accent text-white text-sm font-bold rounded-full">
+                {{ number_format($currentRankingPoints) }} {{ __('user-rankings.pts') }}
+            </span>
+        @endif
     </div>
     @endif
 
