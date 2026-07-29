@@ -66,21 +66,26 @@ class Show extends Component
 
         $currentRankingPoints = ($currentRanking?->points ?? 0) + $manualPointsDelta;
 
-        $rankingsHistory = $this->player->monthlyRankings()
-            ->orderBy('year', 'desc')
-            ->orderBy('month', 'desc')
-            ->get();
-
-        // Since matches are now shown under their actual played month (not the ranking month),
-        // shift points_change one row forward: each month's change reflects the matches played
-        // that month (which appear in the NEXT month's ranking). The most recent row gets null.
-        $originalChanges = $rankingsHistory->pluck('points_change')->all();
-        $rankingsHistory->each(function ($ranking, $index) use ($originalChanges) {
-            $ranking->points_change = $index > 0 ? $originalChanges[$index - 1] : null;
-        });
-
         $isOwnProfile = auth()->id() === $this->player->id;
         $isMonitoring = auth()->user()->isMonitoring($this->player);
+
+        // Ranking history list for the own-profile view. Other players' profiles
+        // render it inside the lazy RankingHistory component instead.
+        $rankingsHistory = collect();
+        if ($isOwnProfile) {
+            $rankingsHistory = $this->player->monthlyRankings()
+                ->orderBy('year', 'desc')
+                ->orderBy('month', 'desc')
+                ->get();
+
+            // Since matches are shown under their actual played month (not the ranking month),
+            // shift points_change one row forward: each month's change reflects the matches played
+            // that month (which appear in the NEXT month's ranking). The most recent row gets null.
+            $originalChanges = $rankingsHistory->pluck('points_change')->all();
+            $rankingsHistory->each(function ($ranking, $index) use ($originalChanges) {
+                $ranking->points_change = $index > 0 ? $originalChanges[$index - 1] : null;
+            });
+        }
 
         // Data for own profile
         $topMonitoredPlayers = collect();

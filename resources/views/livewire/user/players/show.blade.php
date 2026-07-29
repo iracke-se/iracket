@@ -498,54 +498,7 @@
         </div>
 
         <!-- Latest Ranking -->
-        <div class="mb-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('user-player-show.latest_ranking') }}</h2>
-
-            @if($rankingsHistory->isEmpty())
-                <div class="text-center py-8 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
-                    <p class="text-zinc-500 dark:text-zinc-400">{{ __('user-player-show.no_ranking_history') }}</p>
-                </div>
-            @else
-                <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
-                    <div class="flex items-center px-4 py-2 border-b border-zinc-200 dark:border-zinc-700">
-                        <span class="flex-1 text-xs font-bold text-zinc-900 dark:text-white">{{ __('user-player-show.month') }}</span>
-                        <span class="w-20 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('user-player-show.position') }}</span>
-                        <span class="w-16 text-xs font-bold text-zinc-900 dark:text-white text-center">{{ __('user-player-show.points') }}</span>
-                        <span class="w-14 text-xs font-bold text-zinc-900 dark:text-white text-right">+/-</span>
-                    </div>
-                <div class="space-y-0">
-                        @foreach($rankingsHistory as $ranking)
-                        <div wire:key="ranking-{{ $ranking->id }}" x-data="{ open: false }" class="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
-                            <button
-                                @click="open = !open"
-                                class="w-full px-4 py-3 flex items-center hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                            >
-                                <span class="flex-1 text-sm text-zinc-600 dark:text-zinc-400 text-left">{{ $ranking->formatted_date }}</span>
-                                <span class="w-20 text-sm text-zinc-600 dark:text-zinc-400 text-center">#{{ $ranking->rank }}</span>
-                                <span class="w-16 text-sm font-semibold text-accent text-center">{{ number_format($ranking->points) }}</span>
-                                <span class="w-10 text-sm font-semibold text-right {{ $ranking->points_change > 0 ? 'text-green-500 dark:text-green-400' : ($ranking->points_change < 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500') }}">
-                                    {{ $ranking->points_change !== null ? ($ranking->points_change > 0 ? '+' : '') . $ranking->points_change : '—' }}
-                                </span>
-                                <svg :class="{ 'rotate-180': open }" class="w-4 h-4 ml-1 text-zinc-400 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
-                            </button>
-
-                            <div x-show="open" style="display: none;">
-                                <livewire:user.players.ranking-matches-panel
-                                    :player="$player"
-                                    :year="$ranking->year"
-                                    :month="$ranking->month"
-                                    lazy
-                                    :key="'rmp-'.$ranking->id"
-                                />
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-                </div>
-            @endif
-        </div>
+        <livewire:user.players.ranking-history :player="$player" lazy :key="'ranking-history-'.$player->id" />
 
         <!-- Club Transitions -->
         <div class="mt-6 mb-6">

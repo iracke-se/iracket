@@ -3,33 +3,39 @@
 namespace App\Livewire\User\Players;
 
 use App\Models\GameMatch;
+use App\Models\Scraper\ScrapedMatch;
 use App\Models\User;
+use Carbon\Carbon;
 use Livewire\Component;
 
-class RankingMatchesPanel extends Component
+class RankingHistory extends Component
 {
     public User $player;
-    public int $year;
-    public int $month;
 
     public function placeholder()
     {
         return <<<'HTML'
-        <div class="border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-4">
-            <div class="animate-pulse h-20 bg-zinc-100 dark:bg-zinc-800 rounded-xl"></div>
+        <div class="mb-6">
+            <div class="h-6 w-36 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse mb-3"></div>
+            <div class="bg-zinc-100 dark:bg-zinc-800 rounded-xl p-4 space-y-3">
+                <div class="animate-pulse h-8 bg-zinc-200 dark:bg-zinc-700 rounded-lg"></div>
+                <div class="animate-pulse h-8 bg-zinc-200 dark:bg-zinc-700 rounded-lg"></div>
+                <div class="animate-pulse h-8 bg-zinc-200 dark:bg-zinc-700 rounded-lg"></div>
+            </div>
         </div>
         HTML;
     }
 
-    protected function getMatches()
+    /**
+     * Load the player's full match history once (2 queries) and group it by
+     * month, instead of querying per accordion row.
+     */
+    protected function getMatchesByMonth()
     {
-        // Live Center matches — played in the same month as the accordion
         $gameMatches = GameMatch::where(function ($query) {
             $query->where('player1_id', $this->player->id)
                 ->orWhere('player2_id', $this->player->id);
         })
-            ->whereYear('played_at', $this->year)
-            ->whereMonth('played_at', $this->month)
             ->with([
                 'player1',
                 'player2',
@@ -42,15 +48,12 @@ class RankingMatchesPanel extends Component
             ->orderBy('played_at', 'desc')
             ->get();
 
-        // Scraped matches — filter by actual match date month, not scraped_month
         $playerFullName = $this->player->last_name . ', ' . $this->player->first_name;
 
-        $scrapedMatches = \App\Models\Scraper\ScrapedMatch::where(function ($query) use ($playerFullName) {
+        $scrapedMatches = ScrapedMatch::where(function ($query) use ($playerFullName) {
             $query->where('player_name', $playerFullName)
                 ->orWhere('opponent_name', $playerFullName);
         })
-            ->whereRaw('YEAR(COALESCE(match_date, played_at)) = ?', [$this->year])
-            ->whereRaw('MONTH(COALESCE(match_date, played_at)) = ?', [$this->month])
             ->orderByRaw('COALESCE(match_date, played_at) DESC')
             ->get()
             ->unique(function ($m) use ($playerFullName) {
@@ -69,10 +72,10 @@ class RankingMatchesPanel extends Component
             if (!$opponentUser)
                 continue;
 
-            $gmDate = \Carbon\Carbon::parse($gm->played_at)->format('Y-m-d');
+            $gmDate = $gm->played_at->format('Y-m-d');
 
             $matchingSm = $scrapedMatches->first(function ($sm) use ($opponentUser, $gmDate, $playerFullName) {
-                $smDate = \Carbon\Carbon::parse($sm->match_date ?? $sm->played_at)->format('Y-m-d');
+                $smDate = $this->scrapedMatchDate($sm)?->format('Y-m-d');
                 if ($smDate !== $gmDate)
                     return false;
 
@@ -105,13 +108,54 @@ class RankingMatchesPanel extends Component
         // Keep only ScrapedMatches that have no GameMatch counterpart
         $remainingScraped = $scrapedMatches->whereNotIn('id', $usedScrapedIds)->values();
 
-        return $gameMatches->concat($remainingScraped);
+        return $gameMatches->concat($remainingScraped)
+            ->groupBy(function ($match) {
+                $date = $match instanceof ScrapedMatch
+                    ? $this->scrapedMatchDate($match)
+                    : $match->played_at;
+                return $date?->format('Y-n') ?? 'unknown';
+            })
+            ->map(function ($group) {
+                return $group->sortByDesc(function ($match) {
+                    return $match instanceof ScrapedMatch
+                        ? $this->scrapedMatchDate($match)
+                        : $match->played_at;
+                })->values();
+            });
+    }
+
+    protected function scrapedMatchDate(ScrapedMatch $match): ?Carbon
+    {
+        $raw = $match->match_date ?? $match->played_at;
+        if (!$raw) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($raw);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function render()
     {
-        return view('livewire.user.players.ranking-matches-panel', [
-            'matches' => $this->getMatches(),
+        $rankingsHistory = $this->player->monthlyRankings()
+            ->orderBy('year', 'desc')
+            ->orderBy('month', 'desc')
+            ->get();
+
+        // Since matches are shown under their actual played month (not the ranking month),
+        // shift points_change one row forward: each month's change reflects the matches played
+        // that month (which appear in the NEXT month's ranking). The most recent row gets null.
+        $originalChanges = $rankingsHistory->pluck('points_change')->all();
+        $rankingsHistory->each(function ($ranking, $index) use ($originalChanges) {
+            $ranking->points_change = $index > 0 ? $originalChanges[$index - 1] : null;
+        });
+
+        return view('livewire.user.players.ranking-history', [
+            'rankingsHistory' => $rankingsHistory,
+            'matchesByMonth' => $rankingsHistory->isEmpty() ? collect() : $this->getMatchesByMonth(),
         ]);
     }
 }
