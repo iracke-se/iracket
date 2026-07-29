@@ -39,6 +39,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth/apple/callback',
         ]);
 
+        // Authenticated users hitting guest-only pages (/login, /register) must
+        // land on a page they can actually view. The framework default sends
+        // them to route('home') = '/', but '/' bounces WebView-app requests
+        // back to /login (see App\Livewire\Public\Home\Index::mount), producing
+        // an infinite redirect loop — the app's blank screen on reopen once the
+        // remember-me cookie re-authenticates an expired session.
+        $middleware->redirectUsersTo('/players');
+
         $middleware->web(prepend: [
             \App\Http\Middleware\DeveloperMaintenance::class,
         ], append: [

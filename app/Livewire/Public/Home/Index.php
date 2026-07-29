@@ -22,11 +22,13 @@ class Index extends Component
 
     public function mount()
     {
-        // The Flutter app never shows the public landing page — redirect it to
-        // the login screen. Detection lives in the Request::isWebviewApp() macro
-        // (see AppServiceProvider) so it stays consistent across the app.
+        // The Flutter app never shows the public landing page. Guests go to the
+        // login screen; authenticated users (live session or remember-me cookie)
+        // go straight to the players page — sending them to /login would bounce
+        // them back here via the guest middleware and loop forever. Detection
+        // lives in the Request::isWebviewApp() macro (see AppServiceProvider).
         if (request()->isWebviewApp()) {
-            return redirect()->to('/login');
+            return redirect()->to(auth()->check() ? '/players' : '/login');
         }
     }
 
