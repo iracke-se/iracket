@@ -21,6 +21,10 @@ return [
         'chrome_path' => env('SCRAPER_CHROME_PATH', null),
         'timeout' => env('SCRAPER_TIMEOUT', 60000), // 60 seconds
         'wait_until_network_idle' => true,
+        // profixio returns "403 Request forbidden by administrative rules" to the
+        // default HeadlessChrome user-agent, so every browser (Browsershot + the
+        // Python Playwright scripts) must identify as a regular desktop Chrome.
+        'user_agent' => env('SCRAPER_USER_AGENT', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'),
     ],
 
     // Retry settings

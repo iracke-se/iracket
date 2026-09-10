@@ -51,6 +51,12 @@ POPUP_CONTENT_TIMEOUT = 30000   # ms
 GAP_BETWEEN_PLAYERS = 2.0       # seconds — be polite
 
 
+# Identify as a regular desktop Chrome — profixio 403s the HeadlessChrome UA.
+USER_AGENT = os.environ.get("SCRAPER_USER_AGENT") or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+# Discovery navigations (month dropdown, first page) must fail fast instead of
+# hanging forever when the site blocks us or changes its markup.
+PAGE_LOAD_TIMEOUT_MS = 120_000
+
 class RetryConfig:
     def __init__(self, year: str, month: str, gender: str, targets: List[Dict]):
         self.year = year
@@ -108,7 +114,9 @@ class RetryScraper:
                 log_info(f"Using system Chromium: {chrome_path}")
 
             self.browser = await p.chromium.launch(**launch_args)
-            self.context = await self.browser.new_context()
+            # profixio answers the default HeadlessChrome UA with a bare
+            # "403 Request forbidden by administrative rules" page.
+            self.context = await self.browser.new_context(user_agent=USER_AGENT)
             discovery_page = await self.context.new_page()
 
             try:
@@ -156,8 +164,11 @@ class RetryScraper:
     async def get_rid_for_month(self, page: Page) -> str:
         target_date = f"{self.config.year}.{self.config.month.zfill(2)}."
         url = f"{self.config.base_url}?gender={self.config.gender}"
-        await page.goto(url, wait_until="domcontentloaded", timeout=0)
-        await page.wait_for_selector('select[name="rid"]', timeout=0)
+        response = await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
+        if response is not None and response.status >= 400:
+            raise Exception(f"HTTP {response.status} from {url} — profixio is refusing the request "
+                            f"(check SCRAPER_USER_AGENT / IP block)")
+        await page.wait_for_selector('select[name="rid"]', timeout=PAGE_LOAD_TIMEOUT_MS)
 
         select = await page.query_selector('select[name="rid"]')
         if not select:
@@ -175,9 +186,9 @@ class RetryScraper:
 
     async def discover_page_offsets(self, page: Page, rid: str) -> List[int]:
         url = self.config.get_rankings_url(rid, 0)
-        await page.goto(url, wait_until="domcontentloaded", timeout=0)
+        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
         try:
-            await page.wait_for_selector('table tr span.rml_poeng', timeout=0)
+            await page.wait_for_selector('table tr span.rml_poeng', timeout=PAGE_LOAD_TIMEOUT_MS)
         except Exception:
             return []
 

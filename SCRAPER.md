@@ -473,6 +473,15 @@ ORDER BY started_at DESC;
 php artisan scraper:cleanup --older-than=120   # marks runs >2h old as failed
 ```
 
+### Rankings scrape hangs right after `Using system Chromium`
+
+profixio answers the default `HeadlessChrome` user-agent with a bare `403 Request forbidden by administrative rules` page (seen 2026-09-10). Every browser we launch — Browsershot and the Python Playwright scripts — therefore identifies as a regular desktop Chrome via `config('scraper.browser.user_agent')` (`SCRAPER_USER_AGENT`). If the site starts blocking again, the discovery navigations now fail within 2 minutes with an `HTTP 403` error instead of waiting forever. Quick check from the server:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -A "HeadlessChrome" "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender=m"   # 403
+curl -s -o /dev/null -w "%{http_code}\n" -A "Mozilla/5.0 (X11; Linux x86_64) Chrome/128.0.0.0" "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender=m"   # 200
+```
+
 ### Manual one-off scrape
 
 ```bash

@@ -28,7 +28,8 @@ class BrowserService
         $browser = Browsershot::url($this->mainUrl)
             ->setNodeBinary($this->browserConfig['node_binary'])
             ->setNpmBinary($this->browserConfig['npm_binary'])
-            ->timeout($this->browserConfig['timeout']);
+            ->timeout($this->browserConfig['timeout'])
+            ->userAgent($this->browserConfig['user_agent']);
 
         if ($this->browserConfig['wait_until_network_idle']) {
             $browser->waitUntilNetworkIdle();
@@ -50,6 +51,7 @@ class BrowserService
             ->setNodeBinary($this->browserConfig['node_binary'])
             ->setNpmBinary($this->browserConfig['npm_binary'])
             ->timeout($this->browserConfig['timeout'])
+            ->userAgent($this->browserConfig['user_agent'])
             ->waitUntilNetworkIdle();
 
         if ($this->browserConfig['chrome_path']) {
