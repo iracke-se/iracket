@@ -219,6 +219,7 @@ class LiveCenterDetailsScraper extends BaseScraperService
 
         $env = array_merge(getenv(), [
             'PUPPETEER_EXECUTABLE_PATH' => config('scraper.browser.chrome_path', '/usr/bin/chromium'),
+            'SCRAPER_USER_AGENT' => config('scraper.browser.user_agent'),
         ]);
         $process = new Process($arguments, null, $env);
         $process->setTimeout(null); // No timeout - allow unlimited execution time

@@ -28,6 +28,7 @@ Output:
 
 import argparse
 import json
+import os
 import re
 import sys
 from typing import List, Dict, Optional, Tuple
@@ -42,6 +43,10 @@ from html.parser import HTMLParser
 # HTTP client
 # ---------------------------------------------------------------------------
 
+# Identify as a regular desktop Chrome — profixio 403s non-browser user-agents.
+USER_AGENT = os.environ.get("SCRAPER_USER_AGENT") or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
+
 class ProfixioClient:
     BASE = "https://www.profixio.com/fx"
     ORG  = "SBTF.SE.BT"
@@ -52,8 +57,10 @@ class ProfixioClient:
             urllib.request.HTTPCookieProcessor(self._jar),
             urllib.request.HTTPRedirectHandler(),
         )
+        # profixio 403s anything that does not look like a desktop browser
+        # (the old "iRacket-scraper/2.0" UA included) — see SCRAPER.md.
         self._opener.addheaders = [
-            ("User-Agent",      "Mozilla/5.0 (compatible; iRacket-scraper/2.0)"),
+            ("User-Agent",      USER_AGENT),
             ("Accept",          "application/json, text/javascript, */*; q=0.01"),
             ("Accept-Language", "sv,en;q=0.9"),
         ]
