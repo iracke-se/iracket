@@ -225,7 +225,10 @@ class LiveCenterDetailsScraper extends BaseScraperService
 
         $scriptPath = $arguments[0] ?? 'python3';
         $scriptFile = basename($arguments[1] ?? '');
-        $this->info("Executing Python script: {$scriptPath} {$scriptFile} (with " . count($playerNames) . " player name filters)");
+        // $playerNames is null when no scraped_matches exist for the period (or with --skip-points):
+        // the Python script then scrapes every match instead of a name-filtered subset.
+        $filterLabel = $playerNames ? count($playerNames) . " player name filters" : "no player name filter";
+        $this->info("Executing Python script: {$scriptPath} {$scriptFile} ({$filterLabel})");
 
         try {
             $process->mustRun(function ($type, $buffer) {
