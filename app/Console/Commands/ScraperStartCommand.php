@@ -25,7 +25,8 @@ class ScraperStartCommand extends Command
                             {--limit-players= : Limit number of players to scrape (for testing)}
                             {--skip-live-center : Skip Live Center scraping and syncing}
                             {--skip-series : Skip Series Standings scraping}
-                            {--skip-transitions : Skip Club Transitions scraping and syncing}';
+                            {--skip-transitions : Skip Club Transitions scraping and syncing}
+                            {--skip-rankings : Skip the rankings scrape (resume a run whose rankings are already in scraped_rankings)}';
 
     protected $description = 'Scrape and sync all data for a specific month with visual progress';
 
@@ -127,6 +128,9 @@ class ScraperStartCommand extends Command
         if ($this->option('skip-series')) {
             $this->totalSteps--; // Remove Series Standings step
         }
+        if ($this->option('skip-rankings')) {
+            $this->totalSteps--; // Remove the rankings scrape step
+        }
 
         $this->displayHeader($month, $scrapeAll);
 
@@ -157,10 +161,17 @@ class ScraperStartCommand extends Command
             }
 
             // Step 1: Scrape Rankings with Popup Interaction (Male + Female in parallel)
-            $result = $this->runStep('Scraping Rankings & Matches (Male + Female parallel)', function () use ($month, $scrapeAll) {
-                return $this->scrapeRankingsParallel($month, $scrapeAll);
-            });
-            $this->latestRunId = $result['run_id'] ?? null;
+            // --skip-rankings resumes a run that died after the (multi-hour) scrape:
+            // the later sync steps pick up whatever is still unsynced in scraped_*.
+            if (!$this->option('skip-rankings')) {
+                $result = $this->runStep('Scraping Rankings & Matches (Male + Female parallel)', function () use ($month, $scrapeAll) {
+                    return $this->scrapeRankingsParallel($month, $scrapeAll);
+                });
+                $this->latestRunId = $result['run_id'] ?? null;
+            } else {
+                $this->line("  ⏭️  Skipping rankings scrape (--skip-rankings) — syncing existing scraped data");
+                $this->newLine();
+            }
 
             // Step 2: Scrape Players
             // Skip this step if --limit-players is set, since players will be created from rankings
@@ -191,8 +202,8 @@ class ScraperStartCommand extends Command
             });
 
             // Step 5: Create Monthly Rankings
-            $this->runStep('Creating Monthly Rankings', function () use ($syncService) {
-                return $this->createMonthlyRankings($syncService);
+            $this->runStep('Creating Monthly Rankings', function () use ($syncService, $month, $scrapeAll) {
+                return $this->createMonthlyRankings($syncService, $scrapeAll ? null : $month);
             });
 
             // Step 6: Sync Matches
@@ -1141,9 +1152,9 @@ class ScraperStartCommand extends Command
         return $stats;
     }
 
-    protected function createMonthlyRankings(SyncService $syncService): array
+    protected function createMonthlyRankings(SyncService $syncService, ?string $period = null): array
     {
-        $this->line("  📊 Creating monthly rankings from scraped data...");
+        $this->line("  📊 Creating monthly rankings from scraped data" . ($period ? " for {$period}" : '') . "...");
         $this->newLine();
 
         // Use parent run for logging
@@ -1152,8 +1163,10 @@ class ScraperStartCommand extends Command
         $lastLogId = $run ? $run->logs()->max('id') ?? 0 : 0;
 
         // Create monthly rankings with progress
-        $this->syncWithProgress(function() use ($syncService, $run) {
-            return $syncService->createMonthlyRankings(null, $run);
+        // Scope to the scraped month: the unscoped variant re-walks every period
+        // ever ingested and ran out of memory once the history grew large enough.
+        $this->syncWithProgress(function() use ($syncService, $run, $period) {
+            return $syncService->createMonthlyRankings(null, $run, $period);
         }, $run, $lastLogId);
 
         $stats = $syncService->getStats();

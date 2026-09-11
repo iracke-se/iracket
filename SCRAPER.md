@@ -281,7 +281,10 @@ Creates a `ScraperRun` with `type='full_scrape'` tracking the whole multi-step w
 ```bash
 php artisan scraper:start 2026-04
 php artisan scraper:start 2026-04 --no-backup --skip-live-center
+php artisan scraper:start 2026-04 --skip-rankings   # resume: rankings already in scraped_rankings, run the sync steps only
 ```
+
+Step 6 (monthly rankings) is scoped to the target month; `--all` processes every period.
 
 ### `scraper:run {type}`
 

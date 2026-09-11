@@ -157,39 +157,51 @@ class SyncService
      * Create monthly rankings from scraped rankings
      * Takes the latest ranking for each user in a given month
      */
-    public function createMonthlyRankings(?int $runId = null, ?ScraperRun $run = null): array
+    public function createMonthlyRankings(?int $runId = null, ?ScraperRun $run = null, ?string $period = null): array
     {
         $this->resetStats();
 
-        $query = ScrapedRanking::where('is_synced', true)
+        // Plain query builder, not Eloquent: the unscoped variant walks every
+        // scraped ranking ever ingested, and hydrating those as models is what
+        // exhausted the 512M CLI memory limit on the monthly full scrape.
+        $query = DB::table('scraped_rankings')
+            ->where('is_synced', true)
             ->whereNotNull('synced_user_id');
 
         if ($runId) {
             $query->where('scraper_run_id', $runId);
         }
 
-        if ($run) {
-            $run->log('info', 'Starting monthly rankings creation from scraped data');
+        if ($period) {
+            $query->where('period', $period);
         }
 
-        // Group by user and period, get the latest ranking for each
-        $rankings = $query->select('synced_user_id', 'period', DB::raw('MAX(ranking_date) as latest_date'))
-            ->groupBy('synced_user_id', 'period')
-            ->get();
+        if ($run) {
+            $run->log('info', 'Starting monthly rankings creation from scraped data' . ($period ? " for {$period}" : ''));
+        }
 
-        $totalCount = $rankings->count();
+        $totalCount = (clone $query)->count(DB::raw('DISTINCT synced_user_id, period'));
         if ($run) {
             $run->log('info', "Found {$totalCount} unique user/period combinations to process");
         }
 
+        // Group by user and period, get the latest ranking for each — streamed
+        // with cursor() so memory stays flat regardless of how many groupings exist.
+        $groupings = $query->select('synced_user_id', 'period', DB::raw('MAX(ranking_date) as latest_date'))
+            ->groupBy('synced_user_id', 'period')
+            ->orderBy('synced_user_id')
+            ->orderBy('period')
+            ->cursor();
+
         $processed = 0;
-        foreach ($rankings as $grouping) {
+        foreach ($groupings as $grouping) {
             try {
                 // Get the full ranking record for this user's latest ranking in this period
-                $ranking = ScrapedRanking::where('synced_user_id', $grouping->synced_user_id)
+                $ranking = DB::table('scraped_rankings')
+                    ->where('synced_user_id', $grouping->synced_user_id)
                     ->where('period', $grouping->period)
                     ->where('ranking_date', $grouping->latest_date)
-                    ->first();
+                    ->first(['synced_user_id', 'period', 'position', 'points', 'points_diff', 'ranking_date']);
 
                 if ($ranking) {
                     // Parse period (format: "2025-12")
