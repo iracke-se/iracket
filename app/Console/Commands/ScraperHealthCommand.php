@@ -62,6 +62,7 @@ class ScraperHealthCommand extends Command
         $this->checkStuckRuns();
         $this->checkLastRunsByDomain();
         $this->checkRecentFailureRate();
+        $this->checkRankingsCoverage();
 
         $this->section('External');
         $this->checkProfixioReachable();
@@ -552,6 +553,58 @@ PY;
             $this->checkWarn('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d)", [], $inspectHint);
         } else {
             $this->checkFail('Recent failure rate', "{$rate}% ({$failed}/{$total} in last {$window}d) — investigate", [], $inspectHint);
+        }
+    }
+
+    /**
+     * A rankings run can finish "completed" with a handful of players when
+     * profixio throttles the session. Compare each of the last months against
+     * the best of its neighbours so a collapsed month stands out.
+     */
+    protected function checkRankingsCoverage(): void
+    {
+        if (! Schema::hasTable('monthly_rankings')) {
+            return;
+        }
+
+        $months = DB::table('monthly_rankings')
+            ->select('year', 'month', DB::raw('COUNT(*) as players'))
+            ->groupBy('year', 'month')
+            ->orderByDesc('year')
+            ->orderByDesc('month')
+            ->limit(6)
+            ->get();
+
+        if ($months->count() < 2) {
+            $this->checkWarn('Rankings coverage', 'Fewer than two months of rankings to compare');
+            return;
+        }
+
+        $baseline = (int) $months->max('players');
+        $rows = [];
+        $collapsed = [];
+        $thin = [];
+
+        foreach ($months as $m) {
+            $label = sprintf('%d-%02d', $m->year, $m->month);
+            $pct = $baseline > 0 ? (int) round(($m->players / $baseline) * 100) : 0;
+            $rows[$label] = ['players' => (int) $m->players, 'of_baseline' => $pct];
+
+            if ($pct < 30) {
+                $collapsed[] = "{$label}: {$m->players} players ({$pct}%)";
+            } elseif ($pct < 70) {
+                $thin[] = "{$label}: {$m->players} players ({$pct}%)";
+            }
+        }
+
+        $hint = 'Re-run the month: php artisan scraper:start YYYY-MM --no-backup --force (check the run log for throttling/cooldown messages)';
+
+        if ($collapsed) {
+            $this->checkFail('Rankings coverage', 'Collapsed months vs baseline '.number_format($baseline).': '.implode('; ', $collapsed), ['by_month' => $rows], $hint);
+        } elseif ($thin) {
+            $this->checkWarn('Rankings coverage', 'Thin months vs baseline '.number_format($baseline).': '.implode('; ', $thin), ['by_month' => $rows], $hint);
+        } else {
+            $this->checkPass('Rankings coverage', 'Last '.count($rows).' months within 70% of baseline '.number_format($baseline), ['by_month' => $rows]);
         }
     }
 

@@ -104,7 +104,8 @@ The scraper handles six domains. For each: where it comes from, which service do
 - **Service**: [RankingsScraper](app/Services/Scraper/RankingsScraper.php) → runs Python script
 - **Python**: [scripts/scraper/rankings_popup_scraper.py](scripts/scraper/rankings_popup_scraper.py) — Playwright-based; opens the ranking page, paginates, and clicks each player's name to extract match history from a popup
 - **Source URL**: `https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender={m|k}&rid={rid}&from={offset}`
-- **Concurrency**: default 10 parallel tabs (configurable via `--concurrency N`)
+- **Pacing**: at most `SCRAPER_PYTHON_CONCURRENCY` pages open at once (default 3; `--concurrency N`), one popup at a time per page with a `SCRAPER_PYTHON_POPUP_DELAY` pause (default 1s; `--delay S`). profixio throttles the session after a burst of requests (since Aug 2026), so keep these low — a slow correct scrape (~1.5–2h) beats a fast empty one
+- **Throttle handling**: empty list pages / failed popups are retried with 30→60→120s backoff; a streak of failures pauses every tab for 5 min (max 2 cooldowns), then the run aborts. The script exits non-zero when it processed under 90% of the players the list pages advertised, so the run is marked `failed` instead of "completed" with a handful of rows. Coverage numbers are stored in the run's `step_data.coverage` and checked by `scraper:health`
 - **Raw tables**: `scraped_rankings`, `scraped_matches`
 - **Sync**: [SyncService::syncRankings()](app/Services/Scraper/SyncService.php) + [MatchSyncService](app/Services/Scraper/MatchSyncService.php)
 - **Production**: `users` (created/matched by name), `monthly_rankings`, `matches`

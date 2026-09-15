@@ -150,11 +150,27 @@ class ScraperStartCommand extends Command
         $this->newLine();
 
         try {
-            // Step 0: Create backup (unless skipped)
+            // Step 0: Create backup (unless skipped). A failed backup must not
+            // block the scrape itself: the nightly cron run died here for weeks
+            // (bad backup path) and no data was ever fetched. The sync layer is
+            // idempotent, so running without a rollback point is acceptable.
             if (!$skipBackup) {
-                $this->runStep('Creating Database Backup', function () use ($month) {
-                    return $this->createBackup($month);
-                });
+                try {
+                    $this->runStep('Creating Database Backup', function () use ($month) {
+                        return $this->createBackup($month);
+                    });
+                } catch (\Exception $e) {
+                    $this->backupFile = null;
+                    $this->warn("⚠️  Backup failed: {$e->getMessage()}");
+                    $this->parentRun?->log('warning', 'Backup failed, continuing without rollback point: ' . $e->getMessage());
+
+                    if (!$this->option('force') && !$this->confirm('Continue without a backup?', false)) {
+                        throw $e;
+                    }
+
+                    $this->warn("⚠️  Continuing without backup - no rollback available if scrape fails");
+                    $this->newLine();
+                }
             } else {
                 $this->warn("⚠️  Backup skipped - no rollback available if scrape fails");
                 $this->newLine();
@@ -378,7 +394,9 @@ class ScraperStartCommand extends Command
         $this->displayExecutionLog();
 
         // Offer rollback if backup exists
-        if ($this->backupFile && file_exists($this->backupFile)) {
+        // Never auto-rollback from cron: confirm() answers its default ("yes")
+        // when there is no TTY, which would restore production unattended.
+        if ($this->backupFile && file_exists($this->backupFile) && !$this->option('force')) {
             $this->offerRollback();
         } else {
             $this->newLine();

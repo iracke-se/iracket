@@ -155,7 +155,7 @@ Same failure modes as Smoke 3.
 php artisan scraper:run rankings --year=2026 --month=04 --gender=m --queue
 ```
 
-**Typical duration:** 30 minutes – 2 hours depending on how many players are ranked that month. The default concurrency is 10 parallel tabs.
+**Typical duration:** 1–2 hours depending on how many players are ranked that month. The default is 3 pages open at a time with a 1s pause between popups; going faster trips profixio's throttling and the run ends up failing on coverage.
 
 **Mid-run progress:**
 ```bash
@@ -182,6 +182,8 @@ echo 'scraped_matches rows: '.\App\Models\Scraper\ScrapedMatch::where('scraper_r
 | `Executable doesn't exist at /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome` | Bundled Chromium not downloaded | Same as above (`playwright install chromium`) |
 | `Failed to launch chromium because: shared library not found` | Chromium system deps missing | Install per Smoke 3 OR point `SCRAPER_CHROME_PATH` at system Chromium and pass `--executable-path` (not currently supported in script — install deps instead) |
 | `Timeout 30000ms exceeded waiting for selector` | Profixio HTML changed | Inspect `rankings_popup_scraper.py` — find the selector + update; report upstream |
+| `List page loaded without player rows` / `consecutive failures … Pausing all tabs` | profixio is throttling the session | Let the cooldown run; if the run still aborts, lower `SCRAPER_PYTHON_CONCURRENCY` / raise `SCRAPER_PYTHON_POPUP_DELAY` and re-run the month |
+| `Coverage NN% is below the required 90%` | Run lost too many players/pages to throttling | Data fetched so far is saved; re-run the same month — already-synced rows are upserted, not duplicated in production |
 | Job fails in <500ms | Precondition error | Check `error_message` (commands below) |
 
 ---

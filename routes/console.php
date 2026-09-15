@@ -130,16 +130,21 @@ if (Schema::hasTable('scraper_settings')) {
 */
 
 // Rankings scraper: First Tuesday of every month at 2 AM
-// Cron: "0 2 1-7 * 2" means 2 AM on days 1-7 of month, only on Tuesday (2)
 // Scrapes previous month's data (since profixio updates on first Monday).
+// Note: a cron of "0 2 1-7 * 2" is NOT "first Tuesday" — cron ORs day-of-month
+// and day-of-week, so it fired on every Tuesday and every 1st-7th. Run every
+// Tuesday and let the when() filter keep only the first one of the month.
 // The month argument is resolved at fire time inside scraper:start (defaults
 // to previous month). --force makes it wait for any in-flight scraper instead
-// of prompting interactively (no TTY in cron).
+// of prompting interactively (no TTY in cron). A failed backup no longer aborts
+// the run in forced mode, so this actually reaches the scrape.
 Schedule::command('scraper:start --force')
-    ->cron('0 2 1-7 * 2')
+    ->weeklyOn(2, '02:00')
+    ->when(fn () => now()->day <= 7)
     ->name('rankings-scraper-monthly-popup')
     ->onOneServer()
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/scraper-start.log'));
 
 /*
 |--------------------------------------------------------------------------

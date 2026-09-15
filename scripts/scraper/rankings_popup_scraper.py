@@ -3,26 +3,41 @@
 Profixio Rankings Popup Scraper
 
 Scrapes player rankings and matches from profixio.com using Playwright.
-All pagination pages are discovered upfront and processed in parallel —
-each page gets its own browser tab. Within each page, players are also
-processed in parallel, controlled by a single global semaphore.
+All pagination pages are discovered upfront; at most --concurrency pages are
+open at any time, and each open page walks its players one popup at a time
+with a short pause between them. This keeps the request rate low enough that
+profixio does not throttle the session (it started doing so in Aug 2026:
+after a burst of requests it hangs or serves empty list pages).
+
+Throttle handling:
+  * an empty list page or a failed popup/reload is retried with growing
+    backoff instead of being skipped;
+  * a run of consecutive failures pauses the whole scrape for a cooldown;
+  * if the cooldown does not help the run aborts with success=false.
 
 Usage:
-    python3 rankings_popup_scraper.py --year 2025 --month 12 --gender m [--limit 10] [--concurrency 10]
+    python3 rankings_popup_scraper.py --year 2025 --month 12 --gender m [--limit 10] [--concurrency 3] [--delay 1.0]
 
 Output:
-    JSON to stdout with structure:
+    NDJSON on stdout: one {"type": "player", "rankings": [...], "matches": [...]}
+    line per scraped player (the consumer saves these as they arrive), then a
+    final {"type": "summary", ...} line with counts only:
     {
         "success": true,
         "data": {
-            "players_processed": 15,
-            "rankings_count": 180,
-            "matches_count": 42,
-            "rankings": [...],
-            "matches": [...]
+            "players_discovered": 9300,
+            "players_processed": 9280,
+            "players_failed": 20,
+            "pages_failed": 0,
+            "coverage": 0.998,
+            "rankings_count": 9280,
+            "matches_count": 4200
         },
         "errors": []
     }
+    success is false (and the exit code 1) when coverage falls below
+    MIN_COVERAGE — a green run with a handful of players is worse than a
+    red one because nothing downstream notices.
 """
 
 import argparse
@@ -41,15 +56,31 @@ USER_AGENT = os.environ.get("SCRAPER_USER_AGENT") or "Mozilla/5.0 (X11; Linux x8
 # hanging forever when the site blocks us or changes its markup.
 PAGE_LOAD_TIMEOUT_MS = 120_000
 
+# --- Pacing / throttle handling ---------------------------------------------
+# Seconds to sleep between two popups on the same tab.
+DEFAULT_POPUP_DELAY_S = 1.0
+# Backoff (seconds) before retrying a failed list page load, popup or reload.
+RETRY_BACKOFF_S = [30, 60, 120]
+# After this many consecutive failures across all tabs, pause everything.
+CONSECUTIVE_FAILURE_THRESHOLD = 8
+# How long a global cooldown lasts, and how many we allow before aborting.
+COOLDOWN_S = 300
+MAX_COOLDOWNS = 2
+# Below this fraction of discovered players the run is reported as failed.
+MIN_COVERAGE = 0.90
+
+
 class RankingsScraperConfig:
     """Configuration for scraper run"""
 
-    def __init__(self, year: str, month: str, gender: str, limit_players: Optional[int] = None, concurrency: int = 10):
+    def __init__(self, year: str, month: str, gender: str, limit_players: Optional[int] = None,
+                 concurrency: int = 3, popup_delay: float = DEFAULT_POPUP_DELAY_S):
         self.year = year
         self.month = month
         self.gender = gender  # 'm' or 'k'
         self.limit_players = limit_players
-        self.concurrency = concurrency
+        self.concurrency = max(1, concurrency)
+        self.popup_delay = max(0.0, popup_delay)
         self.base_url = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php"
 
     def get_rankings_url(self, rid: str, from_offset: int = 0) -> str:
@@ -57,6 +88,10 @@ class RankingsScraperConfig:
         if from_offset > 0:
             url += f"&from={from_offset}"
         return url
+
+
+class ScrapeAborted(Exception):
+    """Raised when the throttle circuit breaker gives up on the run."""
 
 
 class RankingsScraper:
@@ -71,6 +106,77 @@ class RankingsScraper:
         self._total_processed = 0
         self._processed_lock = asyncio.Lock()
         self._stdout_lock = asyncio.Lock()
+
+        # Coverage bookkeeping — what the list pages promised vs what we got.
+        self._players_discovered = 0
+        self._players_failed = 0
+        self._pages_failed = 0
+        self._seen_player_ids: set = set()
+
+        # Throttle circuit breaker. _resume is cleared while a cooldown is in
+        # progress; every network step waits on it first so one blocked tab
+        # pauses all of them rather than the rest hammering the site.
+        self._consecutive_failures = 0
+        self._cooldowns_used = 0
+        self._breaker_lock = asyncio.Lock()
+        self._resume = asyncio.Event()
+        self._resume.set()
+        self._abort_reason: Optional[str] = None
+
+    # -------------------------------------------------------------------------
+    # Throttle circuit breaker
+    # -------------------------------------------------------------------------
+
+    async def _wait_if_paused(self) -> None:
+        """Block while a global cooldown is in progress; raise once aborted."""
+        if self._abort_reason:
+            raise ScrapeAborted(self._abort_reason)
+        await self._resume.wait()
+        if self._abort_reason:
+            raise ScrapeAborted(self._abort_reason)
+
+    async def _note_success(self) -> None:
+        async with self._breaker_lock:
+            self._consecutive_failures = 0
+
+    async def _note_failure(self, what: str) -> None:
+        """Count a failed network step. Trips a cooldown after a streak of them,
+        and aborts the run if cooldowns keep failing to help."""
+        async with self._breaker_lock:
+            self._consecutive_failures += 1
+            streak = self._consecutive_failures
+            if streak < CONSECUTIVE_FAILURE_THRESHOLD or not self._resume.is_set():
+                return
+
+            if self._cooldowns_used >= MAX_COOLDOWNS:
+                self._abort_reason = (
+                    f"profixio is still throttling after {MAX_COOLDOWNS} cooldowns "
+                    f"({streak} consecutive failures, last: {what}) — aborting run"
+                )
+                log_error(self._abort_reason)
+                self._resume.set()  # release waiters so they see the abort
+                return
+
+            self._cooldowns_used += 1
+            self._resume.clear()
+            log_error(
+                f"{streak} consecutive failures (last: {what}) — profixio appears to be "
+                f"throttling. Pausing all tabs for {COOLDOWN_S}s "
+                f"(cooldown {self._cooldowns_used}/{MAX_COOLDOWNS})"
+            )
+
+        # Sleep outside the lock so successful tabs can still record results.
+        await asyncio.sleep(COOLDOWN_S)
+        async with self._breaker_lock:
+            self._consecutive_failures = 0
+            self._resume.set()
+        log_info("Cooldown over — resuming")
+
+    async def _record_player_failure(self, player: Dict, offset: int, error: str) -> None:
+        async with self._errors_lock:
+            self.errors.append({"player": player['name'], "page_offset": offset, "error": error})
+        async with self._processed_lock:
+            self._players_failed += 1
 
     async def run(self) -> Dict:
         """Execute scraping workflow"""
@@ -119,40 +225,63 @@ class RankingsScraper:
 
                 await discovery_page.close()
 
-                # Step 3: Process all pages in parallel with a single global semaphore
-                semaphore = asyncio.Semaphore(self.config.concurrency)
-                all_rankings, all_matches = await self._process_all_pages_parallel(rid, page_offsets, semaphore)
+                # Step 3: Walk the pages, at most `concurrency` open at a time
+                log_info(
+                    f"Processing with concurrency={self.config.concurrency}, "
+                    f"popup delay={self.config.popup_delay}s"
+                )
+                all_rankings, all_matches = await self._process_all_pages(rid, page_offsets)
 
-                log_info(f"Scrape complete. Total players processed: {self._total_processed}")
+                return self._build_summary(all_rankings, all_matches)
 
-                return {
-                    "success": True,
-                    "data": {
-                        "players_processed": self._total_processed,
-                        "rankings_count": len(all_rankings),
-                        "matches_count": len(all_matches),
-                        "rankings": all_rankings,
-                        "matches": all_matches
-                    },
-                    "errors": self.errors
-                }
+            except ScrapeAborted as e:
+                log_error(f"Aborted: {e}")
+                return self._build_summary([], [], fatal=str(e))
 
             except Exception as e:
                 log_error(f"Fatal error: {e}")
-                return {
-                    "success": False,
-                    "data": {
-                        "players_processed": 0,
-                        "rankings_count": 0,
-                        "matches_count": 0,
-                        "rankings": [],
-                        "matches": []
-                    },
-                    "errors": [{"error": str(e)}]
-                }
+                return self._build_summary([], [], fatal=str(e))
 
             finally:
                 await self.browser.close()
+
+    def _build_summary(self, rankings: List[Dict], matches: List[Dict], fatal: Optional[str] = None) -> Dict:
+        """Final summary line. The run only counts as a success when it actually
+        covered (nearly) every player the list pages advertised."""
+        discovered = self._players_discovered
+        processed = self._total_processed
+        coverage = (processed / discovered) if discovered else (1.0 if not fatal else 0.0)
+
+        errors = list(self.errors)
+        success = fatal is None and coverage >= MIN_COVERAGE
+        if fatal:
+            errors.append({"error": fatal})
+        elif not success:
+            errors.append({
+                "error": f"Coverage {coverage:.1%} is below the required {MIN_COVERAGE:.0%}: "
+                         f"processed {processed} of {discovered} discovered players "
+                         f"({self._players_failed} players failed, {self._pages_failed} pages failed)"
+            })
+
+        log_info(
+            f"Scrape complete. Players discovered: {discovered}, processed: {processed}, "
+            f"failed: {self._players_failed}, pages failed: {self._pages_failed}, "
+            f"coverage: {coverage:.1%} — {'OK' if success else 'FAILED'}"
+        )
+
+        return {
+            "success": success,
+            "data": {
+                "players_discovered": discovered,
+                "players_processed": processed,
+                "players_failed": self._players_failed,
+                "pages_failed": self._pages_failed,
+                "coverage": round(coverage, 4),
+                "rankings_count": len(rankings),
+                "matches_count": len(matches),
+            },
+            "errors": errors,
+        }
 
     # -------------------------------------------------------------------------
     # Pagination discovery
@@ -213,93 +342,49 @@ class RankingsScraper:
                 if m:
                     offsets.add(int(m.group(1)))
 
+        # profixio links the first page as from=1, which is the same page as
+        # the default (from=0). Scraping both doubled the load on the top 500.
+        offsets.discard(1)
+
         return sorted(offsets)
 
     # -------------------------------------------------------------------------
-    # Parallel page processing
+    # Page processing
     # -------------------------------------------------------------------------
 
-    async def _process_all_pages_parallel(
-        self,
-        rid: str,
-        offsets: List[int],
-        semaphore: asyncio.Semaphore,
-    ) -> Tuple[List[Dict], List[Dict]]:
-        """
-        Launch one task per pagination page, all running simultaneously.
-        Each page task opens its own browser tab, extracts its player list,
-        then fans out into per-player popup tasks (bounded by semaphore).
-        """
+    async def _goto_list_page(self, tab: Page, url: str, label: str) -> bool:
+        """Load a rankings list page on `tab`. Returns False when the page came
+        back without any player rows — which, for a page the pagination links
+        advertised, means profixio is throttling us rather than that the page
+        is empty."""
+        await tab.goto(url, wait_until="domcontentloaded", timeout=60000)
+        try:
+            await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
+            return True
+        except Exception:
+            log_error(f"[{label}] List page loaded without player rows")
+            return False
 
-        # Limit concurrent page navigations with same semaphore to avoid rate-limiting
-        page_semaphore = asyncio.Semaphore(self.config.concurrency)
+    async def _process_all_pages(self, rid: str, offsets: List[int]) -> Tuple[List[Dict], List[Dict]]:
+        """
+        One task per pagination page, but only `concurrency` of them hold a
+        slot (and therefore an open tab) at a time. Each page walks its own
+        players sequentially, so total in-flight requests never exceed
+        `concurrency`.
+        """
+        page_slots = asyncio.Semaphore(self.config.concurrency)
 
         async def process_page(offset: int) -> Tuple[List[Dict], List[Dict]]:
-            url = self.config.get_rankings_url(rid, offset)
-            max_attempts = 3
-            players_to_process = None
-
-            for attempt in range(1, max_attempts + 1):
-                async with page_semaphore:
-                    tab = await self.context.new_page()
-                    try:
-                        if attempt > 1:
-                            wait = 5 * attempt
-                            log_info(f"[page from={offset}] Retry {attempt}/{max_attempts} — waiting {wait}s")
-                            await asyncio.sleep(wait)
-
-                        log_info(f"[page from={offset}] Navigating to {url} (attempt {attempt})")
-                        await tab.goto(url, wait_until="domcontentloaded", timeout=60000)
-
-                        try:
-                            await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
-                        except Exception:
-                            log_info(f"[page from={offset}] No players on this page — skipping")
-                            return [], []
-
-                        players = await self._extract_players_from_page(tab)
-                        log_info(f"[page from={offset}] Extracted {len(players)} players")
-
-                        if not players:
-                            return [], []
-
-                        # Respect global player limit — slice before processing
-                        if self.config.limit_players:
-                            async with self._processed_lock:
-                                remaining = self.config.limit_players - self._total_processed
-                                if remaining <= 0:
-                                    return [], []
-                                players = players[:remaining]
-
-                        players_to_process = players
-                        break
-
-                    except Exception as e:
-                        log_error(f"[page from={offset}] Attempt {attempt}/{max_attempts} failed: {e}")
-                        if attempt == max_attempts:
-                            log_error(f"[page from={offset}] All {max_attempts} attempts failed — skipping page")
-                            async with self._errors_lock:
-                                self.errors.append({"page_offset": offset, "error": str(e)})
-                            return [], []
-                    finally:
-                        try:
-                            await tab.close()
-                        except Exception:
-                            pass
-
-            if not players_to_process:
-                return [], []
-
-            # Each page gets its own semaphore so all active pages process players
-            # concurrently rather than sharing a single global slot pool.
-            per_page_semaphore = asyncio.Semaphore(self.config.concurrency)
-            return await self._process_players_parallel(players_to_process, url, per_page_semaphore, offset)
+            async with page_slots:
+                return await self._process_page(rid, offset)
 
         results = await asyncio.gather(*[process_page(offset) for offset in offsets], return_exceptions=True)
 
         all_rankings: List[Dict] = []
         all_matches: List[Dict] = []
         for result in results:
+            if isinstance(result, ScrapeAborted):
+                raise result
             if isinstance(result, Exception):
                 log_error(f"Page task raised unhandled exception: {result}")
                 continue
@@ -307,95 +392,148 @@ class RankingsScraper:
             all_rankings.extend(rankings)
             all_matches.extend(matches)
 
+        if self._abort_reason:
+            raise ScrapeAborted(self._abort_reason)
+
         return all_rankings, all_matches
 
-    # -------------------------------------------------------------------------
-    # Parallel player processing (per page)
-    # -------------------------------------------------------------------------
+    async def _process_page(self, rid: str, offset: int) -> Tuple[List[Dict], List[Dict]]:
+        """Load one list page, extract its players, then scrape each popup on
+        the same tab. The tab stays open for the whole page."""
+        url = self.config.get_rankings_url(rid, offset)
+        label = f"page from={offset}"
+        tab = await self.context.new_page()
 
-    async def _process_players_parallel(
+        try:
+            players = await self._load_players_with_retry(tab, url, label, offset)
+            if not players:
+                return [], []
+
+            return await self._scrape_players_on_tab(tab, players, url, label, offset)
+        finally:
+            try:
+                await tab.close()
+            except Exception:
+                pass
+
+    async def _load_players_with_retry(self, tab: Page, url: str, label: str, offset: int) -> List[Dict]:
+        """Load the list page and extract players, backing off and retrying when
+        it comes back empty or fails. Players already claimed by another page
+        (profixio's page boundaries overlap slightly) are dropped here."""
+        attempts = len(RETRY_BACKOFF_S) + 1
+        for attempt in range(1, attempts + 1):
+            await self._wait_if_paused()
+            try:
+                log_info(f"[{label}] Navigating to {url} (attempt {attempt})")
+                if not await self._goto_list_page(tab, url, label):
+                    raise Exception("no player rows on list page")
+
+                players = await self._extract_players_from_page(tab)
+                if not players:
+                    raise Exception("list page parsed to zero players")
+
+                await self._note_success()
+                players = await self._claim_players(players)
+                log_info(f"[{label}] Extracted {len(players)} players")
+                return players
+
+            except ScrapeAborted:
+                raise
+            except Exception as e:
+                await self._note_failure(f"{label}: {e}")
+                if attempt < attempts:
+                    wait = RETRY_BACKOFF_S[attempt - 1]
+                    log_error(f"[{label}] Attempt {attempt}/{attempts} failed: {e} — retrying in {wait}s")
+                    await asyncio.sleep(wait)
+                else:
+                    log_error(f"[{label}] All {attempts} attempts failed — giving up on this page")
+                    async with self._errors_lock:
+                        self.errors.append({"page_offset": offset, "error": str(e)})
+                    async with self._processed_lock:
+                        self._pages_failed += 1
+        return []
+
+    async def _claim_players(self, players: List[Dict]) -> List[Dict]:
+        """Dedupe across pages and apply --limit; counts what we commit to."""
+        claimed: List[Dict] = []
+        async with self._processed_lock:
+            for player in players:
+                pid = player['profixio_id']
+                if pid in self._seen_player_ids:
+                    continue
+                if self.config.limit_players and self._players_discovered >= self.config.limit_players:
+                    break
+                self._seen_player_ids.add(pid)
+                self._players_discovered += 1
+                claimed.append(player)
+        return claimed
+
+    async def _scrape_players_on_tab(
         self,
+        tab: Page,
         players: List[Dict],
         page_url: str,
-        semaphore: asyncio.Semaphore,
+        label: str,
         offset: int,
     ) -> Tuple[List[Dict], List[Dict]]:
-        """
-        Process all players using a pool of worker tabs.
-        Each worker loads the page ONCE and processes its assigned players
-        sequentially — no per-player page reloads.
-        1 worker × 10 active pages = 10 concurrent tabs total.
-        """
-        NUM_WORKERS = 1
-        actual_workers = min(NUM_WORKERS, len(players))
+        """Walk the page's players one popup at a time. A failed popup is
+        retried after a reload with backoff; a player that still fails is
+        recorded and skipped so the rest of the page is not lost."""
+        page_rankings: List[Dict] = []
+        page_matches: List[Dict] = []
+        attempts = len(RETRY_BACKOFF_S) + 1
 
-        # Distribute players round-robin across workers
-        worker_assignments: List[List[Dict]] = [[] for _ in range(actual_workers)]
-        for i, player in enumerate(players):
-            worker_assignments[i % actual_workers].append(player)
-
-        async def run_worker(assigned_players: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
-            tab = await self.context.new_page()
-            worker_rankings: List[Dict] = []
-            worker_matches: List[Dict] = []
-
-            try:
-                await tab.goto(page_url, wait_until="domcontentloaded", timeout=60000)
-                await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
-
-                for player in assigned_players:
-                    for attempt in range(1, 3):
-                        try:
-                            rankings, matches = await asyncio.wait_for(
-                                self._scrape_player_on_tab(tab, player, offset),
-                                timeout=60,
-                            )
-                            worker_rankings.extend(rankings)
-                            worker_matches.extend(matches)
-                            break
-
-                        except (asyncio.TimeoutError, Exception) as e:
-                            is_timeout = isinstance(e, asyncio.TimeoutError)
-                            label = "Timed out" if is_timeout else "Error"
-
-                            try:
-                                await self._close_popup(tab)
-                            except Exception:
-                                pass
-
-                            if attempt < 2:
-                                log_error(f"{label}: {player['name']} — will retry")
-                                try:
-                                    await tab.reload(wait_until="domcontentloaded", timeout=30000)
-                                    await tab.wait_for_selector('table tr span.rml_poeng', timeout=15000)
-                                except Exception as reload_err:
-                                    log_error(f"Tab reload failed: {reload_err} — stopping worker")
-                                    return worker_rankings, worker_matches
-                            else:
-                                err_msg = "Timed out after 60s" if is_timeout else str(e)
-                                async with self._errors_lock:
-                                    self.errors.append({"player": player['name'], "error": err_msg})
-                                log_error(f"{label}: {player['name']} — skipping after 2 attempts")
-
-            except Exception as e:
-                log_error(f"Worker failed for page from={offset}: {e}")
-            finally:
+        for player in players:
+            for attempt in range(1, attempts + 1):
+                await self._wait_if_paused()
                 try:
-                    await tab.close()
-                except Exception:
-                    pass
+                    rankings, matches = await asyncio.wait_for(
+                        self._scrape_player_on_tab(tab, player, offset),
+                        timeout=60,
+                    )
+                    page_rankings.extend(rankings)
+                    page_matches.extend(matches)
+                    await self._note_success()
+                    break
 
-            return worker_rankings, worker_matches
+                except ScrapeAborted:
+                    raise
+                except (asyncio.TimeoutError, Exception) as e:
+                    err = "Timed out after 60s" if isinstance(e, asyncio.TimeoutError) else str(e)
+                    await self._note_failure(f"{player['name']}: {err}")
 
-        results = await asyncio.gather(*[run_worker(assigned) for assigned in worker_assignments])
+                    try:
+                        await self._close_popup(tab)
+                    except Exception:
+                        pass
 
-        all_rankings: List[Dict] = []
-        all_matches: List[Dict] = []
-        for rankings, matches in results:
-            all_rankings.extend(rankings)
-            all_matches.extend(matches)
+                    if attempt < attempts:
+                        wait = RETRY_BACKOFF_S[attempt - 1]
+                        log_error(f"[{label}] {player['name']}: {err} — retrying in {wait}s")
+                        await asyncio.sleep(wait)
+                        await self._reload_list_page(tab, page_url, label)
+                    else:
+                        log_error(f"[{label}] {player['name']}: {err} — skipping after {attempts} attempts")
+                        await self._record_player_failure(player, offset, err)
 
-        return all_rankings, all_matches
+            if self.config.popup_delay:
+                await asyncio.sleep(self.config.popup_delay)
+
+        return page_rankings, page_matches
+
+    async def _reload_list_page(self, tab: Page, page_url: str, label: str) -> None:
+        """Get the tab back to a usable list page after a failed popup. A
+        reload that itself fails is just another throttle signal; the next
+        popup attempt will find out whether the page is usable."""
+        try:
+            await self._wait_if_paused()
+            if not await self._goto_list_page(tab, page_url, label):
+                await self._note_failure(f"{label}: reload came back empty")
+        except ScrapeAborted:
+            raise
+        except Exception as e:
+            log_error(f"[{label}] Reload failed: {e}")
+            await self._note_failure(f"{label}: reload failed")
 
     async def _scrape_player_on_tab(self, tab: Page, player: Dict, offset: int) -> Tuple[List[Dict], List[Dict]]:
         """Scrape one player's popup. The page must already be loaded on tab."""
@@ -668,14 +806,16 @@ def log_error(message: str):
 # Entry point
 # ---------------------------------------------------------------------------
 
-async def main():
+async def main() -> int:
     parser = argparse.ArgumentParser(description="Scrape rankings from profixio.com")
     parser.add_argument('--year', required=True, help='Year (e.g., 2025)')
     parser.add_argument('--month', required=True, help='Month (e.g., 12)')
     parser.add_argument('--gender', required=True, choices=['m', 'k'], help='Gender: m=male, k=female')
     parser.add_argument('--limit', type=int, help='Limit number of players (for testing)')
-    parser.add_argument('--concurrency', type=int, default=10,
-                        help='Max parallel browser tabs per batch (default: 10)')
+    parser.add_argument('--concurrency', type=int, default=3,
+                        help='Max pages open (= max in-flight requests) at once (default: 3)')
+    parser.add_argument('--delay', type=float, default=DEFAULT_POPUP_DELAY_S,
+                        help=f'Seconds to pause between popups on a tab (default: {DEFAULT_POPUP_DELAY_S})')
 
     args = parser.parse_args()
 
@@ -685,6 +825,7 @@ async def main():
         gender=args.gender,
         limit_players=args.limit,
         concurrency=args.concurrency,
+        popup_delay=args.delay,
     )
 
     scraper = RankingsScraper(config)
@@ -694,6 +835,10 @@ async def main():
     sys.stdout.write(json.dumps(result) + "\n")
     sys.stdout.flush()
 
+    # A non-zero exit makes the PHP side mark the run as failed instead of
+    # "completed" with a handful of players.
+    return 0 if result["success"] else 1
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

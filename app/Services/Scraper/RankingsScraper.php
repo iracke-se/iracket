@@ -34,37 +34,54 @@ class RankingsScraper extends BaseScraperService
             'month' => $month,
             'gender' => $gender,
             'limit_players' => $this->getParameter('limit_players'),
-            'concurrency' => $this->getParameter('concurrency') ?? config('scraper.python.concurrency', 10),
+            'concurrency' => $this->getParameter('concurrency') ?? config('scraper.python.concurrency', 3),
+            'popup_delay' => (float) config('scraper.python.popup_delay', 1.0),
         ];
 
-        $this->info("Starting Python Playwright rankings scraper for {$year}-{$month}, gender: {$gender}, concurrency: {$this->options['concurrency']}");
+        $this->info("Starting Python Playwright rankings scraper for {$year}-{$month}, gender: {$gender}, concurrency: {$this->options['concurrency']}, popup delay: {$this->options['popup_delay']}s");
 
-        // Call Python scraper script
+        // Call Python scraper script. Player data is saved as it streams in,
+        // so a failed run still keeps what it managed to fetch.
         $result = $this->executePythonScraper($year, $month, $gender, $this->options['limit_players'], (int) $this->options['concurrency']);
 
-        if (!$result['success']) {
-            throw new \Exception("Python scraper failed: " . json_encode($result['errors']));
-        }
-
-        // Parse and save results
         $data = $result['data'];
-        $this->info("Python scraper completed: {$data['players_processed']} players, {$data['rankings_count']} rankings, {$data['matches_count']} matches");
+        $this->run->updateStepData('coverage', [
+            'players_discovered' => $data['players_discovered'] ?? null,
+            'players_processed' => $data['players_processed'] ?? null,
+            'players_failed' => $data['players_failed'] ?? null,
+            'pages_failed' => $data['pages_failed'] ?? null,
+            'coverage' => $data['coverage'] ?? null,
+        ]);
 
-        // Save rankings to database
-        if (!empty($data['rankings'])) {
-            $this->saveRankingsToDatabase($data['rankings']);
+        // Player-level and page-level failures count against the run even when
+        // it succeeds overall, so a "completed" run with failures is visible.
+        $failedItems = (int) ($data['players_failed'] ?? 0) + (int) ($data['pages_failed'] ?? 0);
+        if ($failedItems > 0) {
+            $this->run->incrementFailed($failedItems);
         }
 
-        // Save matches to database
-        if (!empty($data['matches'])) {
-            $this->saveMatchesToDatabase($data['matches']);
+        if (!$result['success']) {
+            // The script already saved whatever it fetched; the summary explains
+            // why coverage was insufficient (or what aborted the run).
+            $reasons = array_map(fn ($e) => $e['error'] ?? json_encode($e), $result['errors']);
+            throw new \Exception("Python scraper failed: " . implode(' | ', array_slice($reasons, -3)));
         }
 
-        // Log any partial failures
-        if (!empty($result['errors'])) {
-            foreach ($result['errors'] as $error) {
+        $coverage = isset($data['coverage']) ? round($data['coverage'] * 100, 1) . '%' : 'n/a';
+        $this->info("Python scraper completed: {$data['players_processed']}/{$data['players_discovered']} players ({$coverage} coverage), {$data['rankings_count']} rankings, {$data['matches_count']} matches");
+
+        // Rows were already saved per player as they streamed in (see
+        // executePythonScraper); the summary only carries counts. Saving the
+        // summary lists here as well used to double every staging row.
+
+        // Log any partial failures (already counted in items_failed above)
+        foreach ($result['errors'] as $error) {
+            if (isset($error['player'])) {
                 $this->warning("Error processing player {$error['player']}: {$error['error']}");
-                $this->run->incrementFailed();
+            } elseif (isset($error['page_offset'])) {
+                $this->warning("Page from={$error['page_offset']} could not be scraped: {$error['error']}");
+            } else {
+                $this->warning($error['error'] ?? json_encode($error));
             }
         }
 
@@ -102,6 +119,8 @@ class RankingsScraper extends BaseScraperService
 
         $arguments[] = '--concurrency';
         $arguments[] = (string) $concurrency;
+        $arguments[] = '--delay';
+        $arguments[] = (string) $this->options['popup_delay'];
 
         $env = array_merge(getenv(), [
             'PUPPETEER_EXECUTABLE_PATH' => config('scraper.browser.chrome_path', '/usr/bin/chromium'),
@@ -158,18 +177,17 @@ class RankingsScraper extends BaseScraperService
 
         $process->wait();
 
-        if (!$process->isSuccessful()) {
-            $errorOutput   = $process->getErrorOutput();
-            $standardOutput = $process->getOutput();
-            throw new \Exception(
-                "Python scraper process failed:\n" .
-                "Exit Code: {$process->getExitCode()}\n" .
-                "Error Output: {$errorOutput}\n" .
-                "Standard Output: {$standardOutput}"
-            );
-        }
-
+        // The script exits non-zero when coverage is insufficient but still
+        // prints its summary line; prefer that over a raw process dump.
         if ($finalResult === null) {
+            if (!$process->isSuccessful()) {
+                $errorOutput = $process->getErrorOutput();
+                throw new \Exception(
+                    "Python scraper process failed:\n" .
+                    "Exit Code: {$process->getExitCode()}\n" .
+                    "Error Output: " . substr($errorOutput, -4000)
+                );
+            }
             throw new \Exception("Python script produced no summary line");
         }
 

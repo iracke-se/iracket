@@ -106,7 +106,11 @@ return [
     'python' => [
         'binary' => env('SCRAPER_PYTHON_BINARY', 'python3'),
         'timeout' => env('SCRAPER_PYTHON_TIMEOUT', 3600), // 1 hour default
-        'concurrency' => env('SCRAPER_PYTHON_CONCURRENCY', 10), // parallel browser tabs
+        // Rankings scraper: pages open at once = max in-flight requests. profixio
+        // throttles the session after a burst, so keep this small (3 works).
+        'concurrency' => env('SCRAPER_PYTHON_CONCURRENCY', 3),
+        // Seconds to pause between two player popups on the same tab.
+        'popup_delay' => env('SCRAPER_PYTHON_POPUP_DELAY', 1.0),
     ],
 
     // Live Center scraper settings
