@@ -16,7 +16,7 @@ Throttle handling:
   * if the cooldown does not help the run aborts with success=false.
 
 Usage:
-    python3 rankings_popup_scraper.py --year 2025 --month 12 --gender m [--limit 10] [--concurrency 3] [--delay 1.0]
+    python3 rankings_popup_scraper.py --year 2025 --month 12 --gender m [--limit 10] [--concurrency 1] [--delay 3.0]
 
 Output:
     NDJSON on stdout: one {"type": "player", "rankings": [...], "matches": [...]}
@@ -57,17 +57,27 @@ USER_AGENT = os.environ.get("SCRAPER_USER_AGENT") or "Mozilla/5.0 (X11; Linux x8
 PAGE_LOAD_TIMEOUT_MS = 120_000
 
 # --- Pacing / throttle handling ---------------------------------------------
+# profixio is behind Cloudflare rate limiting (verified 2026-09-15): ~7 requests
+# within 5s => HTTP 429 for several minutes; a steady 1 request / 2s is fine.
+# A player popup costs 2 requests (ranking history + matches), so one tab with
+# a 3s pause between popups stays safely under the limit.
 # Seconds to sleep between two popups on the same tab.
-DEFAULT_POPUP_DELAY_S = 1.0
+DEFAULT_POPUP_DELAY_S = 3.0
 # Backoff (seconds) before retrying a failed list page load, popup or reload.
-RETRY_BACKOFF_S = [30, 60, 120]
+RETRY_BACKOFF_S = [60, 120, 300]
 # After this many consecutive failures across all tabs, pause everything.
-CONSECUTIVE_FAILURE_THRESHOLD = 8
+CONSECUTIVE_FAILURE_THRESHOLD = 5
 # How long a global cooldown lasts, and how many we allow before aborting.
-COOLDOWN_S = 300
-MAX_COOLDOWNS = 2
+# A 429 clears within ~5 minutes; give it 10 so a resumed run starts clean.
+COOLDOWN_S = 600
+MAX_COOLDOWNS = 3
 # Below this fraction of discovered players the run is reported as failed.
 MIN_COVERAGE = 0.90
+# profixio pages hold 500 players. A page with fewer is the last real page;
+# the pagination links list the same offsets for both genders, so the
+# women's list "has" pages that are genuinely empty, not throttled.
+PAGE_SIZE = 500
+FULL_PAGE_MIN = 450
 
 
 class RankingsScraperConfig:
@@ -111,7 +121,12 @@ class RankingsScraper:
         self._players_discovered = 0
         self._players_failed = 0
         self._pages_failed = 0
+        self._pages_beyond_end = 0
         self._seen_player_ids: set = set()
+        # Offset of the first page that came back short — every higher offset
+        # is past the end of the list and is skipped without counting as a
+        # failure.
+        self._last_page_offset: Optional[int] = None
 
         # Throttle circuit breaker. _resume is cleared while a cooldown is in
         # progress; every network step waits on it first so one blocked tab
@@ -171,6 +186,20 @@ class RankingsScraper:
             self._consecutive_failures = 0
             self._resume.set()
         log_info("Cooldown over — resuming")
+
+    def _is_beyond_end(self, offset: int) -> bool:
+        return self._last_page_offset is not None and offset > self._last_page_offset
+
+    async def _note_page_size(self, offset: int, size: int, offsets_total: int) -> None:
+        if size >= FULL_PAGE_MIN:
+            return
+        async with self._processed_lock:
+            if self._last_page_offset is None or offset < self._last_page_offset:
+                self._last_page_offset = offset
+        # A short page that is not the highest advertised offset is expected
+        # for the women's list; log it so a truncated men's page would be
+        # noticed if profixio ever served one.
+        log_info(f"[page from={offset}] Short page ({size} < {FULL_PAGE_MIN}) — treating higher offsets as past the end of the list")
 
     async def _record_player_failure(self, player: Dict, offset: int, error: str) -> None:
         async with self._errors_lock:
@@ -266,6 +295,7 @@ class RankingsScraper:
         log_info(
             f"Scrape complete. Players discovered: {discovered}, processed: {processed}, "
             f"failed: {self._players_failed}, pages failed: {self._pages_failed}, "
+            f"pages past end: {self._pages_beyond_end}, "
             f"coverage: {coverage:.1%} — {'OK' if success else 'FAILED'}"
         )
 
@@ -276,6 +306,7 @@ class RankingsScraper:
                 "players_processed": processed,
                 "players_failed": self._players_failed,
                 "pages_failed": self._pages_failed,
+                "pages_beyond_end": self._pages_beyond_end,
                 "coverage": round(coverage, 4),
                 "rankings_count": len(rankings),
                 "matches_count": len(matches),
@@ -422,6 +453,12 @@ class RankingsScraper:
         (profixio's page boundaries overlap slightly) are dropped here."""
         attempts = len(RETRY_BACKOFF_S) + 1
         for attempt in range(1, attempts + 1):
+            if self._is_beyond_end(offset):
+                log_info(f"[{label}] Past the end of the list — skipping")
+                async with self._processed_lock:
+                    self._pages_beyond_end += 1
+                return []
+
             await self._wait_if_paused()
             try:
                 log_info(f"[{label}] Navigating to {url} (attempt {attempt})")
@@ -433,6 +470,7 @@ class RankingsScraper:
                     raise Exception("list page parsed to zero players")
 
                 await self._note_success()
+                await self._note_page_size(offset, len(players), 0)
                 players = await self._claim_players(players)
                 log_info(f"[{label}] Extracted {len(players)} players")
                 return players
@@ -440,6 +478,12 @@ class RankingsScraper:
             except ScrapeAborted:
                 raise
             except Exception as e:
+                # An empty page right after a short one is the end of the
+                # list, not throttling. Pages run a few at a time so the short
+                # page may only be known by the next attempt — hence the check
+                # at the top of the loop as well.
+                if self._is_beyond_end(offset):
+                    continue
                 await self._note_failure(f"{label}: {e}")
                 if attempt < attempts:
                     wait = RETRY_BACKOFF_S[attempt - 1]
@@ -812,8 +856,8 @@ async def main() -> int:
     parser.add_argument('--month', required=True, help='Month (e.g., 12)')
     parser.add_argument('--gender', required=True, choices=['m', 'k'], help='Gender: m=male, k=female')
     parser.add_argument('--limit', type=int, help='Limit number of players (for testing)')
-    parser.add_argument('--concurrency', type=int, default=3,
-                        help='Max pages open (= max in-flight requests) at once (default: 3)')
+    parser.add_argument('--concurrency', type=int, default=1,
+                        help='Max pages open (= max in-flight requests) at once (default: 1)')
     parser.add_argument('--delay', type=float, default=DEFAULT_POPUP_DELAY_S,
                         help=f'Seconds to pause between popups on a tab (default: {DEFAULT_POPUP_DELAY_S})')
 

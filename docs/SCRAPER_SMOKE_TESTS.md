@@ -155,7 +155,7 @@ Same failure modes as Smoke 3.
 php artisan scraper:run rankings --year=2026 --month=04 --gender=m --queue
 ```
 
-**Typical duration:** 1–2 hours depending on how many players are ranked that month. The default is 3 pages open at a time with a 1s pause between popups; going faster trips profixio's throttling and the run ends up failing on coverage.
+**Typical duration:** ~12h for men, ~1h for women (run one after the other) — one tab, 3s between popups. profixio's Cloudflare rate limit (HTTP 429 after ~7 requests in 5s) makes anything faster fail on coverage. Start it in the evening with `nohup` and check the next morning.
 
 **Mid-run progress:**
 ```bash

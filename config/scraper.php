@@ -106,11 +106,16 @@ return [
     'python' => [
         'binary' => env('SCRAPER_PYTHON_BINARY', 'python3'),
         'timeout' => env('SCRAPER_PYTHON_TIMEOUT', 3600), // 1 hour default
-        // Rankings scraper: pages open at once = max in-flight requests. profixio
-        // throttles the session after a burst, so keep this small (3 works).
-        'concurrency' => env('SCRAPER_PYTHON_CONCURRENCY', 3),
-        // Seconds to pause between two player popups on the same tab.
-        'popup_delay' => env('SCRAPER_PYTHON_POPUP_DELAY', 1.0),
+        // Rankings scraper pacing. profixio sits behind Cloudflare rate limiting
+        // (verified 2026-09-15): ~7 requests in 5s => HTTP 429 for minutes, while a
+        // steady 1 request / 2s never trips it. Each player popup is 2 requests
+        // (ranking history + matches), so one tab with a 3s pause between popups
+        // stays under the limit. A full month takes ~13h at this pace.
+        'concurrency' => env('SCRAPER_PYTHON_CONCURRENCY', 1),
+        'popup_delay' => env('SCRAPER_PYTHON_POPUP_DELAY', 3.0),
+        // Run male and female scrapes at the same time (doubles the request rate —
+        // only safe if profixio lifts the rate limit).
+        'parallel_genders' => env('SCRAPER_PYTHON_PARALLEL_GENDERS', false),
     ],
 
     // Live Center scraper settings

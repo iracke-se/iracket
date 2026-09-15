@@ -34,8 +34,8 @@ class RankingsScraper extends BaseScraperService
             'month' => $month,
             'gender' => $gender,
             'limit_players' => $this->getParameter('limit_players'),
-            'concurrency' => $this->getParameter('concurrency') ?? config('scraper.python.concurrency', 3),
-            'popup_delay' => (float) config('scraper.python.popup_delay', 1.0),
+            'concurrency' => $this->getParameter('concurrency') ?? config('scraper.python.concurrency', 1),
+            'popup_delay' => (float) config('scraper.python.popup_delay', 3.0),
         ];
 
         $this->info("Starting Python Playwright rankings scraper for {$year}-{$month}, gender: {$gender}, concurrency: {$this->options['concurrency']}, popup delay: {$this->options['popup_delay']}s");

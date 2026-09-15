@@ -180,7 +180,7 @@ class ScraperStartCommand extends Command
             // --skip-rankings resumes a run that died after the (multi-hour) scrape:
             // the later sync steps pick up whatever is still unsynced in scraped_*.
             if (!$this->option('skip-rankings')) {
-                $result = $this->runStep('Scraping Rankings & Matches (Male + Female parallel)', function () use ($month, $scrapeAll) {
+                $result = $this->runStep('Scraping Rankings & Matches (Male, then Female)', function () use ($month, $scrapeAll) {
                     return $this->scrapeRankingsParallel($month, $scrapeAll);
                 });
                 $this->latestRunId = $result['run_id'] ?? null;
@@ -853,6 +853,14 @@ class ScraperStartCommand extends Command
     /**
      * Scrape rankings for both genders in parallel using separate OS processes
      */
+    /**
+     * Scrape rankings + popup matches for both genders as separate OS processes.
+     *
+     * Genders run one after the other by default: profixio (Cloudflare) rate
+     * limits the IP at roughly one request per two seconds, and two browsers
+     * side by side doubled the rate and got both blocked. Set
+     * scraper.python.parallel_genders to run them concurrently again.
+     */
     protected function scrapeRankingsParallel(string $month, bool $scrapeAll): array
     {
         [$year, $monthNum] = explode('-', $month);
@@ -878,84 +886,55 @@ class ScraperStartCommand extends Command
         $startId = ScraperRun::max('id') ?? 0;
 
         // Wrap with setsid so child processes get their own session and survive terminal SIGHUP
-        $wrap = fn(array $args) => array_merge(['setsid'], $args);
-        $mProcess = new \Symfony\Component\Process\Process($wrap($buildArgs('m')));
-        $fProcess = new \Symfony\Component\Process\Process($wrap($buildArgs('k')));
-        // No timeout — a large month can run for many hours.
-        $mProcess->setTimeout(null);
-        $fProcess->setTimeout(null);
+        $makeProcess = function (string $gender) use ($buildArgs) {
+            $process = new \Symfony\Component\Process\Process(array_merge(['setsid'], $buildArgs($gender)));
+            // No timeout — a large month can run for many hours.
+            $process->setTimeout(null);
+            return $process;
+        };
 
-        $this->line("  <fg=cyan>Starting Male rankings process...</>");
-        $mProcess->start();
-        $this->line("  <fg=cyan>Starting Female rankings process...</>");
-        $fProcess->start();
-        $this->newLine();
+        $genders = [
+            'm' => ['label' => 'Male',   'tag' => '<fg=blue>[M]</>'],
+            'k' => ['label' => 'Female', 'tag' => '<fg=magenta>[F]</>'],
+        ];
 
-        // Poll both processes, streaming output until both finish
-        $mBuffer = '';
-        $fBuffer = '';
-        $elapsed = 0;
-        while (!$mProcess->isTerminated() || !$fProcess->isTerminated()) {
-            try {
-                $mProcess->checkTimeout();
-                $fProcess->checkTimeout();
-            } catch (\Symfony\Component\Process\Exception\ProcessTimedOutException $e) {
+        $batches = config('scraper.python.parallel_genders', false)
+            ? [array_keys($genders)]
+            : [['m'], ['k']];
+
+        $this->line('  <fg=cyan>Running genders ' . (count($batches) === 1 ? 'in parallel' : 'sequentially (one browser at a time)') . '</>');
+
+        $errors = [];
+        foreach ($batches as $batch) {
+            $batchStartId = ScraperRun::max('id') ?? 0;
+            $processes = [];
+            foreach ($batch as $gender) {
+                $this->line("  <fg=cyan>Starting {$genders[$gender]['label']} rankings process...</>");
+                $processes[$gender] = $makeProcess($gender);
+                $processes[$gender]->start();
+            }
+            $this->newLine();
+
+            $this->streamProcesses($processes, $genders, $batchStartId);
+
+            foreach ($processes as $gender => $process) {
+                if (!$process->isSuccessful()) {
+                    $errors[] = "{$genders[$gender]['label']} rankings failed (exit {$process->getExitCode()}): "
+                        . substr($process->getErrorOutput(), -2000);
+                }
+            }
+
+            // Don't start the next gender if this one was blocked/failed.
+            if (!empty($errors)) {
                 break;
             }
-
-            // Flush incremental output from male process
-            $mNew = $mProcess->getIncrementalOutput() . $mProcess->getIncrementalErrorOutput();
-            foreach (explode("\n", $mBuffer . $mNew) as $line) {
-                $line = trim($line);
-                if ($line !== '') {
-                    $this->line("  <fg=blue>[M]</> {$line}");
-                }
-            }
-            $mBuffer = '';
-
-            // Flush incremental output from female process
-            $fNew = $fProcess->getIncrementalOutput() . $fProcess->getIncrementalErrorOutput();
-            foreach (explode("\n", $fBuffer . $fNew) as $line) {
-                $line = trim($line);
-                if ($line !== '') {
-                    $this->line("  <fg=magenta>[F]</> {$line}");
-                }
-            }
-            $fBuffer = '';
-
-            usleep(500000); // 0.5s
-            $elapsed++;
-
-            // Fallback: if DB shows both runs completed/failed, don't wait for the process object
-            if ($elapsed % 20 === 0) {
-                $pending = ScraperRun::where('id', '>', $startId)
-                    ->where('type', ScraperRun::TYPE_RANKINGS)
-                    ->where('status', 'running')
-                    ->count();
-                $done = ScraperRun::where('id', '>', $startId)
-                    ->where('type', ScraperRun::TYPE_RANKINGS)
-                    ->whereIn('status', ['completed', 'failed'])
-                    ->count();
-                if ($pending === 0 && $done >= 2) {
-                    $this->line("  <fg=yellow>Both ranking runs finished in DB — continuing.</>");
-                    break;
-                }
-            }
         }
 
-        // Check exit codes
-        $errors = [];
-        if (!$mProcess->isSuccessful()) {
-            $errors[] = "Male rankings failed (exit {$mProcess->getExitCode()}): " . $mProcess->getErrorOutput();
-        }
-        if (!$fProcess->isSuccessful()) {
-            $errors[] = "Female rankings failed (exit {$fProcess->getExitCode()}): " . $fProcess->getErrorOutput();
-        }
         if (!empty($errors)) {
             throw new \Exception(implode("\n", $errors));
         }
 
-        // Find the two new ScraperRun records created by the sub-processes
+        // Find the new ScraperRun records created by the sub-processes
         $runs = ScraperRun::where('id', '>', $startId)
             ->where('type', ScraperRun::TYPE_RANKINGS)
             ->get();
@@ -971,6 +950,49 @@ class ScraperStartCommand extends Command
             'items_scraped' => $runs->sum('items_scraped'),
             'items_failed' => $runs->sum('items_failed'),
         ];
+    }
+
+    /**
+     * Poll the given rankings processes, streaming their output with a gender
+     * tag, until all of them have terminated.
+     *
+     * @param array<string, \Symfony\Component\Process\Process> $processes keyed by gender
+     */
+    protected function streamProcesses(array $processes, array $genders, int $startId): void
+    {
+        $elapsed = 0;
+        $running = fn () => array_filter($processes, fn ($p) => !$p->isTerminated());
+
+        while (!empty($running())) {
+            foreach ($processes as $gender => $process) {
+                $new = $process->getIncrementalOutput() . $process->getIncrementalErrorOutput();
+                foreach (explode("\n", $new) as $line) {
+                    $line = trim($line);
+                    if ($line !== '') {
+                        $this->line("  {$genders[$gender]['tag']} {$line}");
+                    }
+                }
+            }
+
+            usleep(500000); // 0.5s
+            $elapsed++;
+
+            // Fallback: if DB shows every run in this batch completed/failed, don't wait for the process object
+            if ($elapsed % 20 === 0) {
+                $pending = ScraperRun::where('id', '>', $startId)
+                    ->where('type', ScraperRun::TYPE_RANKINGS)
+                    ->where('status', 'running')
+                    ->count();
+                $done = ScraperRun::where('id', '>', $startId)
+                    ->where('type', ScraperRun::TYPE_RANKINGS)
+                    ->whereIn('status', ['completed', 'failed'])
+                    ->count();
+                if ($pending === 0 && $done >= count($processes)) {
+                    $this->line("  <fg=yellow>Ranking run(s) finished in DB — continuing.</>");
+                    break;
+                }
+            }
+        }
     }
 
     /**
