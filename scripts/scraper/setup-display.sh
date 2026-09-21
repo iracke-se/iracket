@@ -44,6 +44,14 @@ else
     exit 1
 fi
 
+# Xwayland binds its socket in /tmp/.X11-unix, which never exists on a server
+# without X. Create it on the host now and via tmpfiles.d for every boot.
+say "Creating /tmp/.X11-unix"
+mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+echo "d /tmp/.X11-unix 1777 root root -" > /etc/tmpfiles.d/scraper-x11.conf
+systemd-tmpfiles --create /etc/tmpfiles.d/scraper-x11.conf || true
+ls -ld /tmp/.X11-unix
+
 say "Writing /etc/systemd/system/${SERVICE}.service"
 cat > /etc/systemd/system/${SERVICE}.service <<EOF
 [Unit]
@@ -53,10 +61,10 @@ After=network.target
 [Service]
 Type=simple
 Environment=XDG_RUNTIME_DIR=${RUNTIME_DIR}
+# The X socket must land in the *host's* /tmp so the scraper's Chromium finds it.
+PrivateTmp=no
 ExecStartPre=/bin/mkdir -p ${RUNTIME_DIR}
 ExecStartPre=/bin/chmod 700 ${RUNTIME_DIR}
-# Xwayland binds its socket in /tmp/.X11-unix, which never exists on a server
-# without X (and /tmp may be wiped on reboot), so create it on every start.
 ExecStartPre=/bin/mkdir -p /tmp/.X11-unix
 ExecStartPre=/bin/chmod 1777 /tmp/.X11-unix
 ExecStart=/usr/bin/weston --backend=headless --xwayland --socket=scraper --width=1366 --height=768 --idle-time=0 --log=${LOG}
@@ -73,8 +81,12 @@ systemctl restart ${SERVICE}     # (re)start — the script is safe to re-run
 sleep 3
 
 if ! systemctl is-active --quiet ${SERVICE}; then
-    echo "Service failed to start. Log:" >&2
-    tail -n 30 "$LOG" >&2 || journalctl -u ${SERVICE} -n 30 --no-pager >&2
+    echo "Service failed to start." >&2
+    systemctl status ${SERVICE} --no-pager >&2 || true
+    echo "--- weston log:" >&2
+    tail -n 15 "$LOG" >&2 || true
+    echo "--- journal:" >&2
+    journalctl -u ${SERVICE} -n 20 --no-pager >&2 || true
     exit 1
 fi
 say "Service running. Weston log:"
