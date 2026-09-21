@@ -55,6 +55,10 @@ Type=simple
 Environment=XDG_RUNTIME_DIR=${RUNTIME_DIR}
 ExecStartPre=/bin/mkdir -p ${RUNTIME_DIR}
 ExecStartPre=/bin/chmod 700 ${RUNTIME_DIR}
+# Xwayland binds its socket in /tmp/.X11-unix, which never exists on a server
+# without X (and /tmp may be wiped on reboot), so create it on every start.
+ExecStartPre=/bin/mkdir -p /tmp/.X11-unix
+ExecStartPre=/bin/chmod 1777 /tmp/.X11-unix
 ExecStart=/usr/bin/weston --backend=headless --xwayland --socket=scraper --width=1366 --height=768 --idle-time=0 --log=${LOG}
 Restart=always
 RestartSec=5
@@ -64,7 +68,8 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now ${SERVICE}
+systemctl enable ${SERVICE} >/dev/null 2>&1
+systemctl restart ${SERVICE}     # (re)start — the script is safe to re-run
 sleep 3
 
 if ! systemctl is-active --quiet ${SERVICE}; then
