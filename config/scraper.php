@@ -25,6 +25,32 @@ return [
         // default HeadlessChrome user-agent, so every browser (Browsershot + the
         // Python Playwright scripts) must identify as a regular desktop Chrome.
         'user_agent' => env('SCRAPER_USER_AGENT', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'),
+        // X display a *headed* browser can open on. Only needed to obtain the
+        // Cloudflare clearance (see 'cloudflare' below); on the server this is
+        // the virtual display started by scripts/scraper/setup-display.sh.
+        'display' => env('SCRAPER_DISPLAY', ':0'),
+        'xdg_runtime_dir' => env('SCRAPER_XDG_RUNTIME_DIR', '/run/user/0'),
+    ],
+
+    /*
+    | Cloudflare managed challenge
+    |
+    | Since 2026-09 profixio fronts ranking_sbtf_list.php and serieoppsett.php
+    | with a Cloudflare managed challenge. Headless Chromium can never pass it;
+    | a headed Chromium clears it in a few seconds and gets a `cf_clearance`
+    | cookie bound to the server IP + user-agent. scripts/scraper/cf_clearance.py
+    | obtains that cookie on a (virtual) display, and every scraper that touches
+    | a challenged page sends it along, headless. See SCRAPER.md § Cloudflare.
+    */
+    'cloudflare' => [
+        'enabled' => env('SCRAPER_CF_CLEARANCE', true),
+        // A page behind the challenge — used to trigger and pass it.
+        'challenge_url' => 'https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender=m',
+        // Seconds to wait for the headed browser to clear the challenge.
+        'timeout' => env('SCRAPER_CF_TIMEOUT', 90),
+        // How long to reuse a clearance before obtaining a fresh one. The cookie
+        // itself is issued for a year, but a fresh one per run is cheap.
+        'cache_ttl' => env('SCRAPER_CF_CACHE_TTL', 6 * 3600),
     ],
 
     // Retry settings

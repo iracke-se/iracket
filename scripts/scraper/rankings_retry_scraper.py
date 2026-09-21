@@ -52,7 +52,36 @@ GAP_BETWEEN_PLAYERS = 2.0       # seconds — be polite
 
 
 # Identify as a regular desktop Chrome — profixio 403s the HeadlessChrome UA.
+# When a Cloudflare clearance is in use (see cf_clearance.py) the PHP side
+# passes the user-agent the clearance was issued for; the cookie is only valid
+# together with that exact string.
 USER_AGENT = os.environ.get("SCRAPER_USER_AGENT") or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
+
+def load_clearance_cookies() -> List[Dict]:
+    """Cookies (cf_clearance) obtained by cf_clearance.py, passed as a JSON
+    array in SCRAPER_CF_COOKIES. Without them profixio's Cloudflare managed
+    challenge blocks every headless request."""
+    raw = os.environ.get("SCRAPER_CF_COOKIES")
+    if not raw:
+        return []
+    try:
+        cookies = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"[ERROR] SCRAPER_CF_COOKIES is not valid JSON: {e}")
+    return [
+        {
+            "name": c["name"],
+            "value": c["value"],
+            "domain": c.get("domain", ".profixio.com"),
+            "path": c.get("path", "/"),
+            "expires": c.get("expires", -1),
+            "httpOnly": c.get("httpOnly", True),
+            "secure": c.get("secure", True),
+            "sameSite": c.get("sameSite", "None"),
+        }
+        for c in cookies
+    ]
 # Discovery navigations (month dropdown, first page) must fail fast instead of
 # hanging forever when the site blocks us or changes its markup.
 PAGE_LOAD_TIMEOUT_MS = 120_000
@@ -117,6 +146,13 @@ class RetryScraper:
             # profixio answers the default HeadlessChrome UA with a bare
             # "403 Request forbidden by administrative rules" page.
             self.context = await self.browser.new_context(user_agent=USER_AGENT)
+            clearance_cookies = load_clearance_cookies()
+            if clearance_cookies:
+                await self.context.add_cookies(clearance_cookies)
+                log_info(f"Using Cloudflare clearance ({', '.join(c['name'] for c in clearance_cookies)})")
+            else:
+                log_info("No Cloudflare clearance cookies passed (SCRAPER_CF_COOKIES) — "
+                         "the challenged pages will most likely return HTTP 403")
             discovery_page = await self.context.new_page()
 
             try:
@@ -166,8 +202,9 @@ class RetryScraper:
         url = f"{self.config.base_url}?gender={self.config.gender}"
         response = await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
         if response is not None and response.status >= 400:
-            raise Exception(f"HTTP {response.status} from {url} — profixio is refusing the request "
-                            f"(check SCRAPER_USER_AGENT / IP block)")
+            raise Exception(f"HTTP {response.status} from {url} — profixio is refusing the request. "
+                            f"403 = Cloudflare challenge: the clearance cookie is missing, expired or was "
+                            f"issued for another IP/user-agent (php artisan scraper:cf-clearance --refresh)")
         await page.wait_for_selector('select[name="rid"]', timeout=PAGE_LOAD_TIMEOUT_MS)
 
         select = await page.query_selector('select[name="rid"]')

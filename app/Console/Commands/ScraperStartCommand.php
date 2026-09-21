@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Scraper\ScraperRun;
+use App\Services\Scraper\CloudflareClearanceService;
 use App\Services\Scraper\SyncService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -131,6 +132,11 @@ class ScraperStartCommand extends Command
         if ($this->option('skip-rankings')) {
             $this->totalSteps--; // Remove the rankings scrape step
         }
+        $needsClearance = app(CloudflareClearanceService::class)->enabled()
+            && (!$this->option('skip-rankings') || !$this->option('skip-series'));
+        if ($needsClearance) {
+            $this->totalSteps++; // Cloudflare clearance step
+        }
 
         $this->displayHeader($month, $scrapeAll);
 
@@ -174,6 +180,18 @@ class ScraperStartCommand extends Command
             } else {
                 $this->warn("⚠️  Backup skipped - no rollback available if scrape fails");
                 $this->newLine();
+            }
+
+            // Cloudflare clearance: the ranking list and series pages sit behind a
+            // managed challenge (since 2026-09). Get a fresh clearance up front so
+            // a broken virtual display fails here, in seconds, not inside a
+            // sub-process hours later.
+            if ($needsClearance) {
+                $this->runStep('Obtaining Cloudflare Clearance', function () {
+                    $clearance = app(CloudflareClearanceService::class)->get(refresh: true);
+                    $this->line("  <fg=cyan>Challenge cleared in {$clearance['cleared_in']}s — user-agent: {$clearance['user_agent']}</>");
+                    return $clearance;
+                });
             }
 
             // Step 1: Scrape Rankings with Popup Interaction (Male + Female in parallel)
@@ -427,10 +445,29 @@ class ScraperStartCommand extends Command
         // Provide context-specific suggestions
         $this->displayErrorSuggestions();
 
-        if ($this->option('verbose') || ($this->input->isInteractive() && $this->confirm("Show full stack trace?", false))) {
+        if ($this->option('verbose') || $this->confirmStackTrace()) {
             $this->newLine();
             $this->warn("Full Stack Trace:");
             $this->line($this->failureException->getTraceAsString());
+        }
+    }
+
+    /**
+     * Ask whether to print the stack trace — but never crash on the question.
+     * Under `nohup ... &` stdin looks interactive yet is unreadable, and the
+     * prompt used to die with "fgets(): Bad file descriptor" right after the
+     * real error, burying it.
+     */
+    protected function confirmStackTrace(): bool
+    {
+        if (!$this->input->isInteractive() || !stream_isatty(STDIN)) {
+            return false;
+        }
+
+        try {
+            return (bool) $this->confirm("Show full stack trace?", false);
+        } catch (\Throwable) {
+            return false;
         }
     }
 
@@ -919,8 +956,13 @@ class ScraperStartCommand extends Command
 
             foreach ($processes as $gender => $process) {
                 if (!$process->isSuccessful()) {
-                    $errors[] = "{$genders[$gender]['label']} rankings failed (exit {$process->getExitCode()}): "
-                        . substr($process->getErrorOutput(), -2000);
+                    // The child reports its failure through Laravel's error(),
+                    // which goes to stdout — so look there, not only at stderr.
+                    $tail = trim($process->getErrorOutput()) !== ''
+                        ? $process->getErrorOutput()
+                        : $this->lastLines($process->getOutput(), 15);
+                    $errors[] = "{$genders[$gender]['label']} rankings failed (exit {$process->getExitCode()}):\n"
+                        . substr($tail, -2000);
                 }
             }
 
@@ -952,6 +994,13 @@ class ScraperStartCommand extends Command
         ];
     }
 
+    protected function lastLines(string $output, int $count): string
+    {
+        $lines = array_values(array_filter(array_map('trim', explode("\n", $output))));
+
+        return implode("\n", array_slice($lines, -$count));
+    }
+
     /**
      * Poll the given rankings processes, streaming their output with a gender
      * tag, until all of them have terminated.
@@ -963,7 +1012,7 @@ class ScraperStartCommand extends Command
         $elapsed = 0;
         $running = fn () => array_filter($processes, fn ($p) => !$p->isTerminated());
 
-        while (!empty($running())) {
+        $flush = function () use ($processes, $genders) {
             foreach ($processes as $gender => $process) {
                 $new = $process->getIncrementalOutput() . $process->getIncrementalErrorOutput();
                 foreach (explode("\n", $new) as $line) {
@@ -973,6 +1022,10 @@ class ScraperStartCommand extends Command
                     }
                 }
             }
+        };
+
+        while (!empty($running())) {
+            $flush();
 
             usleep(500000); // 0.5s
             $elapsed++;
@@ -993,6 +1046,10 @@ class ScraperStartCommand extends Command
                 }
             }
         }
+
+        // Whatever the child wrote between the last poll and its exit — which
+        // is exactly where its "Scrape failed: ..." line ends up.
+        $flush();
     }
 
     /**

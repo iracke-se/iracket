@@ -122,10 +122,17 @@ class RankingsScraper extends BaseScraperService
         $arguments[] = '--delay';
         $arguments[] = (string) $this->options['popup_delay'];
 
+        // The Cloudflare clearance (cookie + the user-agent it was issued for)
+        // overrides the configured user-agent; without it the ranking list 403s.
+        $clearance = app(CloudflareClearanceService::class);
+        if ($clearance->enabled()) {
+            $this->info("Obtaining Cloudflare clearance for profixio...");
+        }
+
         $env = array_merge(getenv(), [
             'PUPPETEER_EXECUTABLE_PATH' => config('scraper.browser.chrome_path', '/usr/bin/chromium'),
             'SCRAPER_USER_AGENT' => config('scraper.browser.user_agent'),
-        ]);
+        ], $clearance->env());
         $process = new Process($arguments, null, $env);
         $process->setTimeout(null); // No timeout — rankings scrape can take many hours
 

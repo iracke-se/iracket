@@ -36,6 +36,10 @@ class SeriesScraper extends BaseScraperService
             $browser->setChromePath(config('scraper.browser.chrome_path'));
         }
 
+        // serieoppsett.php sits behind profixio's Cloudflare managed challenge;
+        // send the clearance cookie (+ its user-agent) with every request.
+        app(CloudflareClearanceService::class)->apply($browser);
+
         // Fetch series page using fetch with credentials
         $initJs = <<<JS
         (async function() {
@@ -44,6 +48,9 @@ class SeriesScraper extends BaseScraperService
                     credentials: 'include'
                 });
                 const html = await response.text();
+                if (response.status === 403 || html.includes('_cf_chl_opt')) {
+                    return JSON.stringify({ error: 'HTTP ' + response.status + ' Cloudflare challenge — clearance cookie missing/expired (php artisan scraper:cf-clearance --refresh)' });
+                }
 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
@@ -172,6 +179,9 @@ class SeriesScraper extends BaseScraperService
                     credentials: 'include'
                 });
                 const html = await response.text();
+                if (response.status === 403 || html.includes('_cf_chl_opt')) {
+                    return JSON.stringify({ error: 'HTTP ' + response.status + ' Cloudflare challenge — clearance cookie missing/expired (php artisan scraper:cf-clearance --refresh)' });
+                }
 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
@@ -262,6 +272,9 @@ class SeriesScraper extends BaseScraperService
                     credentials: 'include'
                 });
                 const html = await response.text();
+                if (response.status === 403 || html.includes('_cf_chl_opt')) {
+                    return JSON.stringify({ error: 'HTTP ' + response.status + ' Cloudflare challenge — clearance cookie missing/expired (php artisan scraper:cf-clearance --refresh)' });
+                }
 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');

@@ -412,6 +412,8 @@ SCRAPER_HEADLESS=true
 SCRAPER_NODE_BINARY=/usr/local/bin/node
 SCRAPER_NPM_BINARY=/usr/local/bin/npm
 SCRAPER_CHROME_PATH=/usr/bin/chromium
+SCRAPER_DISPLAY=:0                      # virtual display for the headed browser (Cloudflare clearance)
+SCRAPER_CF_CLEARANCE=true               # obtain + send the cf_clearance cookie (see Troubleshooting)
 
 # Python
 SCRAPER_PYTHON_BINARY=python3
@@ -477,14 +479,25 @@ ORDER BY started_at DESC;
 php artisan scraper:cleanup --older-than=120   # marks runs >2h old as failed
 ```
 
-### Rankings scrape hangs right after `Using system Chromium`
+### Rankings scrape fails right after `Using system Chromium` (HTTP 403) — Cloudflare challenge
 
-profixio answers the default `HeadlessChrome` user-agent with a bare `403 Request forbidden by administrative rules` page (seen 2026-09-10). Every browser we launch — Browsershot and the Python Playwright scripts — therefore identifies as a regular desktop Chrome via `config('scraper.browser.user_agent')` (`SCRAPER_USER_AGENT`). If the site starts blocking again, the discovery navigations now fail within 2 minutes with an `HTTP 403` error instead of waiting forever. Quick check from the server:
+Since 2026-09-21 profixio fronts `ranking_sbtf_list.php` (rankings + matches) and `serieoppsett.php` (series standings/matches) with a **Cloudflare managed challenge** (`Just a moment...`). Nothing else is challenged (login, licences/transitions, live center). It is site-wide, not an IP block: `curl` gets a 403 from every network, and the Python scraper reported `HTTP 403 from .../ranking_sbtf_list.php`.
+
+How it is handled (verified 2026-09-21):
+
+- **Headless Chromium never passes the challenge**, whatever user-agent it sends. A **headed** Chromium passes it automatically in a few seconds (no captcha), and Cloudflare then issues a `cf_clearance` cookie bound to the client IP + user-agent. Any later request carrying that cookie *and the same user-agent* is served normally — headless Playwright and Browsershot included.
+- `scripts/scraper/cf_clearance.py` opens a headed browser on `$DISPLAY`, waits for the challenge to clear and prints the cookie + user-agent as JSON. Do not override the user-agent in that browser: a spoofed version string contradicts the real fingerprint and turns a 3 s pass into 40 s or a failure.
+- `App\Services\Scraper\CloudflareClearanceService` runs the script, caches the result (`SCRAPER_CF_CACHE_TTL`, 6 h) and injects it: the Python rankings scrapers get `SCRAPER_CF_COOKIES` + `SCRAPER_USER_AGENT` in their environment, the Browsershot series scrapers get `useCookies()` + `userAgent()`. `scraper:start` obtains a fresh clearance as its first step, so a broken display fails in seconds instead of inside a sub-process.
+- The server needs a display for the headed browser. AlmaLinux/RHEL 10 has no Xvfb; `scripts/scraper/setup-display.sh` installs **Weston (headless) + Xwayland** as the `scraper-display` systemd service and verifies it by obtaining a clearance. Settings: `SCRAPER_DISPLAY` (default `:0`), `SCRAPER_XDG_RUNTIME_DIR` (default `/run/user/0`), `SCRAPER_CF_CLEARANCE=false` disables the whole mechanism.
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -A "HeadlessChrome" "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender=m"   # 403
-curl -s -o /dev/null -w "%{http_code}\n" -A "Mozilla/5.0 (X11; Linux x86_64) Chrome/128.0.0.0" "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php?gender=m"   # 200
+bash scripts/scraper/setup-display.sh              # once per server, as root
+php artisan scraper:cf-clearance                  # show the cached clearance
+php artisan scraper:cf-clearance --refresh        # obtain a new one (after "HTTP 403 ... Cloudflare challenge")
+systemctl status scraper-display                  # the virtual display
 ```
+
+Before that (2026-09-10) profixio only 403'd the literal `HeadlessChrome` user-agent, which is why `config('scraper.browser.user_agent')` (`SCRAPER_USER_AGENT`) still defaults to a desktop Chrome string; with a clearance in use it is overridden by the user-agent the clearance was issued for.
 
 ### Manual one-off scrape
 
