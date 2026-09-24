@@ -56,10 +56,10 @@ it('exposes the clearance as environment for the python scrapers', function () {
 });
 
 it('throws a helpful error when the challenge is not cleared', function () {
-    config(['scraper.python.binary' => stubClearanceScript('', 1), 'scraper.browser.display' => ':9']);
+    config(['scraper.python.binary' => stubClearanceScript('', 1)]);
 
     app(CloudflareClearanceService::class)->get();
-})->throws(RuntimeException::class, 'DISPLAY=:9');
+})->throws(RuntimeException::class, 'camoufox');
 
 it('is a no-op when disabled', function () {
     config(['scraper.cloudflare.enabled' => false, 'scraper.python.binary' => stubClearanceScript('', 1)]);
