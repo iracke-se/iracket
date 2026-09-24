@@ -20,6 +20,9 @@ pip install -r requirements.txt
 echo "Installing Playwright Chromium browser..."
 playwright install chromium
 
+echo "Downloading the Camoufox browser (Cloudflare clearance)..."
+python3 -m camoufox fetch
+
 echo ""
 echo "✅ Setup complete!"
 echo ""

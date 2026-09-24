@@ -3,3 +3,5 @@ playwright==1.48.0
 
 # livecenter_scraper.py — uses only Python stdlib (urllib, html.parser)
 # no extra packages needed
+# Stealth Firefox used by cf_clearance.py to pass profixio's Cloudflare challenge
+camoufox[geoip]>=0.4

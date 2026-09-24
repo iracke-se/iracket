@@ -11,11 +11,11 @@ use Symfony\Component\Process\Process;
  * Obtains and caches the Cloudflare clearance profixio requires since 2026-09.
  *
  * profixio fronts ranking_sbtf_list.php and serieoppsett.php with a Cloudflare
- * managed challenge that headless Chromium never passes. A headed Chromium
- * (on the server: a virtual display, see scripts/scraper/setup-display.sh)
- * clears it in a few seconds and receives a `cf_clearance` cookie bound to the
- * server IP + user-agent. This service runs scripts/scraper/cf_clearance.py to
- * get that cookie, caches it, and hands it to the scrapers:
+ * managed challenge that Chromium cannot pass on a machine without a hardware
+ * GPU. Camoufox (a stealth Firefox, headless) clears it in a few seconds and
+ * receives a `cf_clearance` cookie bound to the server IP + user-agent. This
+ * service runs scripts/scraper/cf_clearance.py to get that cookie, caches it,
+ * and hands it to the scrapers:
  *
  *  - Python Playwright scrapers get it through the SCRAPER_CF_COOKIES /
  *    SCRAPER_USER_AGENT environment variables (see env()).
@@ -153,8 +153,9 @@ class CloudflareClearanceService
             $stderr = trim($process->getErrorOutput());
             throw new \RuntimeException(
                 "Could not obtain a Cloudflare clearance for profixio (exit {$process->getExitCode()}). "
-                . "A headed browser must be able to open DISPLAY={$env['DISPLAY']} — on the server run "
-                . "scripts/scraper/setup-display.sh once, or set SCRAPER_DISPLAY.\n"
+                . "The scraper's Python needs camoufox: "
+                . '<venv>/bin/pip install "camoufox[geoip]" && <venv>/bin/python3 -m camoufox fetch'
+                . " (see SCRAPER.md § Cloudflare).\n"
                 . ($stderr !== '' ? substr($stderr, -2000) : '(no output from cf_clearance.py)')
             );
         }
