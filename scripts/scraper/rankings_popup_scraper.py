@@ -358,16 +358,32 @@ class RankingsScraper:
     # Pagination discovery
     # -------------------------------------------------------------------------
 
+    async def _goto_discovery(self, page: Page, url: str):
+        """Navigate for discovery, waiting out a rate limit instead of dying.
+        profixio answers a burst with HTTP 429 for a few minutes (e.g. right
+        after a smoke test); the page walk already backs off on it, discovery
+        did not — so a run started at the wrong moment failed within seconds."""
+        for attempt in range(len(RETRY_BACKOFF_S) + 1):
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
+            status = response.status if response is not None else 200
+            if status == 429 and attempt < len(RETRY_BACKOFF_S):
+                wait = RETRY_BACKOFF_S[attempt]
+                log_info(f"HTTP 429 (rate limited) from {url} — waiting {wait}s before retry {attempt + 1}")
+                await asyncio.sleep(wait)
+                continue
+            if status >= 400:
+                raise Exception(f"HTTP {status} from {url} — profixio is refusing the request. "
+                                f"403 = Cloudflare challenge: the clearance cookie is missing, expired or was "
+                                f"issued for another IP/user-agent (php artisan scraper:cf-clearance --refresh); "
+                                f"429 = rate limited even after {sum(RETRY_BACKOFF_S)}s of waiting")
+            return response
+
     async def get_rid_for_month(self, page: Page) -> str:
         """Get ranking ID for target month from dropdown"""
         target_date = f"{self.config.year}.{self.config.month.zfill(2)}."
 
         url = f"{self.config.base_url}?gender={self.config.gender}"
-        response = await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
-        if response is not None and response.status >= 400:
-            raise Exception(f"HTTP {response.status} from {url} — profixio is refusing the request. "
-                            f"403 = Cloudflare challenge: the clearance cookie is missing, expired or was "
-                            f"issued for another IP/user-agent (php artisan scraper:cf-clearance --refresh)")
+        await self._goto_discovery(page, url)
         await page.wait_for_selector('select[name="rid"]', timeout=PAGE_LOAD_TIMEOUT_MS)
 
         select = await page.query_selector('select[name="rid"]')
@@ -394,7 +410,7 @@ class RankingsScraper:
         Returns a sorted list of from= offset values.
         """
         url = self.config.get_rankings_url(rid, 0)
-        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
+        await self._goto_discovery(page, url)
 
         try:
             await page.wait_for_selector('table tr span.rml_poeng', timeout=PAGE_LOAD_TIMEOUT_MS)

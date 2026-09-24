@@ -57,7 +57,7 @@ async def is_challenged(page) -> bool:
     return any(marker in html for marker in CHALLENGE_MARKERS)
 
 
-async def obtain(url: str, timeout: float) -> dict:
+async def obtain(url: str, timeout: float, proxy: str | None = None) -> dict:
     if not os.environ.get("DISPLAY"):
         raise RuntimeError("DISPLAY is not set — a headed browser is required to pass the challenge "
                            "(run scripts/scraper/setup-display.sh on the server and set SCRAPER_DISPLAY)")
@@ -76,6 +76,9 @@ async def obtain(url: str, timeout: float) -> dict:
         if chrome_path:
             launch_args["executable_path"] = chrome_path
             log(f"Using system Chromium: {chrome_path}")
+        if proxy:
+            launch_args["proxy"] = {"server": proxy}
+            log(f"Routing the browser through proxy {proxy}")
 
         browser = await p.chromium.launch(**launch_args)
         try:
@@ -112,6 +115,7 @@ async def obtain(url: str, timeout: float) -> dict:
 
             return {
                 "user_agent": user_agent,
+                "proxy": proxy,
                 "cookies": [
                     {
                         "name": c["name"],
@@ -136,10 +140,14 @@ async def main() -> int:
     parser = argparse.ArgumentParser(description="Obtain a Cloudflare clearance cookie for profixio.com")
     parser.add_argument("--url", default=DEFAULT_URL, help="Challenged URL to open")
     parser.add_argument("--timeout", type=float, default=90, help="Seconds to wait for the challenge to clear")
+    parser.add_argument("--proxy", default=os.environ.get("SCRAPER_CF_PROXY") or None,
+                        help="Send the browser's traffic through this proxy (e.g. http://SERVER:18080). "
+                             "The clearance is bound to the IP profixio sees, so solving it through the "
+                             "production server's relay yields a cookie the server can use.")
     args = parser.parse_args()
 
     try:
-        result = await obtain(args.url, args.timeout)
+        result = await obtain(args.url, args.timeout, args.proxy)
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr, flush=True)
         return 1
