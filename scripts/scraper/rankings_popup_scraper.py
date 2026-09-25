@@ -57,11 +57,11 @@ from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 USER_AGENT = os.environ.get("SCRAPER_USER_AGENT") or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
 
-def load_clearance_cookies() -> List[Dict]:
+def load_clearance_cookies(raw: Optional[str] = None) -> List[Dict]:
     """Cookies (cf_clearance) obtained by cf_clearance.py, passed as a JSON
-    array in SCRAPER_CF_COOKIES. Without them profixio's Cloudflare managed
-    challenge blocks every headless request."""
-    raw = os.environ.get("SCRAPER_CF_COOKIES")
+    array in SCRAPER_CF_COOKIES (or given directly). Without them profixio's
+    Cloudflare managed challenge blocks every headless request."""
+    raw = raw if raw is not None else os.environ.get("SCRAPER_CF_COOKIES")
     if not raw:
         return []
     try:
@@ -84,6 +84,8 @@ def load_clearance_cookies() -> List[Dict]:
 # Discovery navigations (month dropdown, first page) must fail fast instead of
 # hanging forever when the site blocks us or changes its markup.
 PAGE_LOAD_TIMEOUT_MS = 120_000
+# Cloudflare may revoke a clearance mid-run; renew it at most this many times.
+MAX_CLEARANCE_RENEWALS = 5
 
 # --- Pacing / throttle handling ---------------------------------------------
 # profixio is behind Cloudflare rate limiting (verified 2026-09-15): ~7 requests
@@ -113,11 +115,15 @@ class RankingsScraperConfig:
     """Configuration for scraper run"""
 
     def __init__(self, year: str, month: str, gender: str, limit_players: Optional[int] = None,
-                 concurrency: int = 3, popup_delay: float = DEFAULT_POPUP_DELAY_S):
+                 concurrency: int = 3, popup_delay: float = DEFAULT_POPUP_DELAY_S,
+                 skip_ids: Optional[set] = None):
         self.year = year
         self.month = month
         self.gender = gender  # 'm' or 'k'
         self.limit_players = limit_players
+        # profixio player ids already scraped for this month (resume after a
+        # failed run): counted as processed, not fetched again.
+        self.skip_ids = skip_ids or set()
         self.concurrency = max(1, concurrency)
         self.popup_delay = max(0.0, popup_delay)
         self.base_url = "https://www.profixio.com/fx/ranking_sbtf/ranking_sbtf_list.php"
@@ -152,6 +158,10 @@ class RankingsScraper:
         self._pages_failed = 0
         self._pages_beyond_end = 0
         self._seen_player_ids: set = set()
+        self._players_skipped = 0
+        # Only one Cloudflare re-clearance at a time (see _renew_clearance).
+        self._renew_lock = asyncio.Lock()
+        self._renewals = 0
         # Offset of the first page that came back short — every higher offset
         # is past the end of the list and is skipped without counting as a
         # failure.
@@ -333,7 +343,8 @@ class RankingsScraper:
             })
 
         log_info(
-            f"Scrape complete. Players discovered: {discovered}, processed: {processed}, "
+            f"Scrape complete. Players discovered: {discovered}, processed: {processed} "
+            f"(of which {self._players_skipped} already scraped by an earlier run), "
             f"failed: {self._players_failed}, pages failed: {self._pages_failed}, "
             f"pages past end: {self._pages_beyond_end}, "
             f"coverage: {coverage:.1%} — {'OK' if success else 'FAILED'}"
@@ -366,6 +377,11 @@ class RankingsScraper:
         for attempt in range(len(RETRY_BACKOFF_S) + 1):
             response = await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
             status = response.status if response is not None else 200
+            if status == 403 and await self._is_challenge_page(page):
+                log_error(f"Cloudflare challenge page (HTTP 403) on {url} — clearance missing or revoked, renewing")
+                await self._renew_clearance()
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
+                status = response.status if response is not None else 200
             if status == 429 and attempt < len(RETRY_BACKOFF_S):
                 wait = RETRY_BACKOFF_S[attempt]
                 log_info(f"HTTP 429 (rate limited) from {url} — waiting {wait}s before retry {attempt + 1}")
@@ -445,13 +461,66 @@ class RankingsScraper:
         back without any player rows — which, for a page the pagination links
         advertised, means profixio is throttling us rather than that the page
         is empty."""
-        await tab.goto(url, wait_until="domcontentloaded", timeout=60000)
+        response = await tab.goto(url, wait_until="domcontentloaded", timeout=60000)
+        status = response.status if response is not None else 0
+
+        if status == 403 and await self._is_challenge_page(tab):
+            # Cloudflare re-challenged us mid-run: the clearance cookie was
+            # revoked. Get a new one and load the page again.
+            log_error(f"[{label}] Cloudflare challenge page (HTTP 403) — the clearance was revoked, renewing")
+            await self._renew_clearance()
+            response = await tab.goto(url, wait_until="domcontentloaded", timeout=60000)
+            status = response.status if response is not None else 0
+
         try:
             await tab.wait_for_selector('table tr span.rml_poeng', timeout=30000)
             return True
         except Exception:
-            log_error(f"[{label}] List page loaded without player rows")
+            reason = "HTTP 429 (rate limited)" if status == 429 else f"HTTP {status}"
+            log_error(f"[{label}] List page loaded without player rows ({reason})")
             return False
+
+    async def _is_challenge_page(self, tab: Page) -> bool:
+        try:
+            html = await tab.content()
+        except Exception:
+            return False
+        return "_cf_chl_opt" in html or "challenges.cloudflare.com" in html
+
+    async def _renew_clearance(self) -> None:
+        """Pass Cloudflare's challenge again (Camoufox, in-process) and put the
+        fresh cf_clearance into this browser context. The cookie is bound to
+        the user-agent, so the new clearance is requested for the exact UA
+        this context sends. Also tells the PHP side so it caches the new one."""
+        async with self._renew_lock:
+            if self._renewals >= MAX_CLEARANCE_RENEWALS:
+                raise ScrapeAborted(
+                    f"Cloudflare re-challenged {self._renewals} times this run — aborting")
+            self._renewals += 1
+            try:
+                from cf_clearance import obtain_camoufox
+            except ImportError as e:
+                raise ScrapeAborted(f"cannot renew the Cloudflare clearance: {e}")
+
+            result = await obtain_camoufox(
+                self.config.base_url + f"?gender={self.config.gender}",
+                timeout=90, proxy=os.environ.get("SCRAPER_CF_PROXY") or None,
+                user_agent=USER_AGENT,
+            )
+            cookies = [c for c in result["cookies"] if c["name"] == "cf_clearance"]
+            if not cookies:
+                raise ScrapeAborted("Cloudflare challenge renewed but no cf_clearance cookie came back")
+            await self.context.add_cookies(load_clearance_cookies(json.dumps(cookies)))
+            log_info(f"Cloudflare clearance renewed in {result['cleared_in']}s (renewal {self._renewals}/{MAX_CLEARANCE_RENEWALS})")
+
+            async with self._stdout_lock:
+                sys.stdout.write(json.dumps({
+                    "type": "clearance",
+                    "user_agent": result["user_agent"],
+                    "cookies": result["cookies"],
+                    "cleared_in": result["cleared_in"],
+                }) + "\n")
+                sys.stdout.flush()
 
     async def _process_all_pages(self, rid: str, offsets: List[int]) -> Tuple[List[Dict], List[Dict]]:
         """
@@ -566,7 +635,14 @@ class RankingsScraper:
                     break
                 self._seen_player_ids.add(pid)
                 self._players_discovered += 1
+                if pid in self.config.skip_ids:
+                    # Already in the database from an earlier run this month.
+                    self._players_skipped += 1
+                    self._total_processed += 1
+                    continue
                 claimed.append(player)
+        if self._players_skipped and not claimed:
+            log_info(f"All players on this page were scraped by an earlier run — skipping")
         return claimed
 
     async def _scrape_players_on_tab(
@@ -917,8 +993,16 @@ async def main() -> int:
                         help='Max pages open (= max in-flight requests) at once (default: 1)')
     parser.add_argument('--delay', type=float, default=DEFAULT_POPUP_DELAY_S,
                         help=f'Seconds to pause between popups on a tab (default: {DEFAULT_POPUP_DELAY_S})')
+    parser.add_argument('--skip-file', help='File with one profixio player id per line to skip '
+                                            '(already scraped this month — resume after a failed run)')
 
     args = parser.parse_args()
+
+    skip_ids: set = set()
+    if args.skip_file:
+        with open(args.skip_file) as fh:
+            skip_ids = {line.strip() for line in fh if line.strip()}
+        log_info(f"Resuming: {len(skip_ids)} players already scraped this month will be skipped")
 
     config = RankingsScraperConfig(
         year=args.year,
@@ -927,6 +1011,7 @@ async def main() -> int:
         limit_players=args.limit,
         concurrency=args.concurrency,
         popup_delay=args.delay,
+        skip_ids=skip_ids,
     )
 
     scraper = RankingsScraper(config)

@@ -142,6 +142,9 @@ return [
         // Run male and female scrapes at the same time (doubles the request rate —
         // only safe if profixio lifts the rate limit).
         'parallel_genders' => env('SCRAPER_PYTHON_PARALLEL_GENDERS', false),
+        // Skip players that already have a ranking row for the month (saved by
+        // an earlier run that died half-way) instead of scraping them again.
+        'resume' => env('SCRAPER_PYTHON_RESUME', true),
     ],
 
     // Live Center scraper settings

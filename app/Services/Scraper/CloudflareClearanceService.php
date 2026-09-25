@@ -59,6 +59,20 @@ class CloudflareClearanceService
     }
 
     /**
+     * Cache a clearance obtained elsewhere (e.g. renewed by the Python scraper
+     * mid-run after Cloudflare revoked the previous one).
+     */
+    public function store(array $clearance): void
+    {
+        Cache::put(self::CACHE_KEY, [
+            'user_agent' => $clearance['user_agent'],
+            'cookies' => $clearance['cookies'],
+            'cleared_in' => $clearance['cleared_in'] ?? null,
+            'obtained_at' => now()->toIso8601String(),
+        ], (int) config('scraper.cloudflare.cache_ttl', 6 * 3600));
+    }
+
+    /**
      * The currently cached clearance without trying to obtain one.
      */
     public function cached(): ?array

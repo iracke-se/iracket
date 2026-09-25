@@ -501,6 +501,9 @@ php artisan scraper:cf-clearance --refresh        # verify: "Clearance obtained 
 php artisan scraper:cf-clearance                  # show the cached clearance
 ```
 
+- **Mid-run revocation.** Cloudflare can revoke a clearance hours into a run (seen 2026-09-24 after 871 players: list pages came back as the challenge page and the run aborted as "throttling"). The rankings scraper now recognises the challenge page on any list-page load, renews the clearance in-process with Camoufox (pinned to the user-agent its Chromium context sends, since the cookie is bound to it) and continues; the new cookie is passed back to PHP (`{"type": "clearance"}` line) and cached for the other scrapers. At most `MAX_CLEARANCE_RENEWALS` (5) per run.
+- **Resume.** Each player is saved as soon as its popup is scraped, so a run that dies half-way leaves the first half in `scraped_rankings`. The next run for the same month/gender skips those players (`--skip-file`, built by `RankingsScraper::alreadyScrapedPlayerIds()`; `SCRAPER_PYTHON_RESUME=false` to force a full re-scrape) — re-running `scraper:start` after a failure costs only the remaining players.
+
 The earlier `scraper-display` systemd service (Weston + Xwayland) is no longer needed; `systemctl disable --now scraper-display` if it was set up.
 
 Before that (2026-09-10) profixio only 403'd the literal `HeadlessChrome` user-agent, which is why `config('scraper.browser.user_agent')` (`SCRAPER_USER_AGENT`) still defaults to a desktop Chrome string; with a clearance in use it is overridden by the user-agent the clearance was issued for.

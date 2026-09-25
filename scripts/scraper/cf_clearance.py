@@ -120,10 +120,24 @@ async def wait_for_clearance(page, context, url: str, timeout: float) -> dict:
     }
 
 
-async def obtain_camoufox(url: str, timeout: float, proxy: str | None) -> dict:
+def os_from_user_agent(user_agent: str) -> str:
+    if "Windows" in user_agent:
+        return "windows"
+    if "Macintosh" in user_agent:
+        return "macos"
+    return "linux"
+
+
+async def obtain_camoufox(url: str, timeout: float, proxy: str | None, user_agent: str | None = None) -> dict:
     from camoufox.async_api import AsyncCamoufox
 
     options = {"headless": True, "geoip": True, "humanize": True}
+    if user_agent:
+        # A clearance is bound to the user-agent. When renewing one for a
+        # browser that is already running, ask for exactly its UA (and a
+        # matching OS so the fingerprint stays coherent).
+        options["config"] = {"navigator.userAgent": user_agent}
+        options["os"] = os_from_user_agent(user_agent)
     if proxy:
         options["proxy"] = {"server": proxy}
         log(f"Routing the browser through proxy {proxy}")
@@ -181,6 +195,8 @@ async def main() -> int:
     parser.add_argument("--engine", choices=["auto", "camoufox", "chromium"],
                         default=os.environ.get("SCRAPER_CF_ENGINE", "auto"),
                         help="auto = camoufox when installed, else headed Chromium (default: auto)")
+    parser.add_argument("--user-agent", default=None,
+                        help="Ask for a clearance bound to exactly this user-agent (camoufox engine only)")
     parser.add_argument("--proxy", default=os.environ.get("SCRAPER_CF_PROXY") or None,
                         help="Send the browser's traffic through this proxy (e.g. socks5://127.0.0.1:1080). "
                              "The clearance is bound to the IP profixio sees.")
@@ -195,7 +211,7 @@ async def main() -> int:
 
     try:
         if engine == "camoufox":
-            result = await obtain_camoufox(args.url, args.timeout, args.proxy)
+            result = await obtain_camoufox(args.url, args.timeout, args.proxy, args.user_agent)
         else:
             result = await obtain_chromium(args.url, args.timeout, args.proxy)
     except Exception as e:

@@ -117,6 +117,20 @@ class RankingsScraper extends BaseScraperService
             $arguments[] = (string) $limitPlayers;
         }
 
+        // Resume: players already saved for this month/gender by an earlier
+        // (failed) run are skipped instead of scraped again.
+        $skipFile = null;
+        if (config('scraper.python.resume', true)) {
+            $alreadyScraped = $this->alreadyScrapedPlayerIds($year, $month, $gender);
+            if ($alreadyScraped->isNotEmpty()) {
+                $skipFile = tempnam(sys_get_temp_dir(), 'scraper-skip-');
+                file_put_contents($skipFile, $alreadyScraped->implode("\n") . "\n");
+                $arguments[] = '--skip-file';
+                $arguments[] = $skipFile;
+                $this->info("Resuming: {$alreadyScraped->count()} players already scraped for {$year}-{$month} ({$gender}) will be skipped");
+            }
+        }
+
         $arguments[] = '--concurrency';
         $arguments[] = (string) $concurrency;
         $arguments[] = '--delay';
@@ -168,7 +182,12 @@ class RankingsScraper extends BaseScraperService
                     continue;
                 }
 
-                if ($decoded['type'] === 'player') {
+                if ($decoded['type'] === 'clearance') {
+                    // The scraper had to pass Cloudflare's challenge again;
+                    // cache the new cookie for the other scrapers.
+                    app(CloudflareClearanceService::class)->store($decoded);
+                    $this->info("Cloudflare clearance renewed by the scraper ({$decoded['cleared_in']}s)");
+                } elseif ($decoded['type'] === 'player') {
                     // Save this player's data immediately — safe even on Ctrl+C
                     if (!empty($decoded['rankings'])) {
                         $this->saveRankingsToDatabase($decoded['rankings']);
@@ -183,6 +202,10 @@ class RankingsScraper extends BaseScraperService
         });
 
         $process->wait();
+
+        if ($skipFile) {
+            @unlink($skipFile);
+        }
 
         // The script exits non-zero when coverage is insufficient but still
         // prints its summary line; prefer that over a raw process dump.
@@ -199,6 +222,24 @@ class RankingsScraper extends BaseScraperService
         }
 
         return $finalResult;
+    }
+
+    /**
+     * profixio player ids that already have a ranking row for this month and
+     * gender — saved by an earlier run (each player is written as soon as its
+     * popup is scraped, so a run that died half-way left the first half in).
+     */
+    protected function alreadyScrapedPlayerIds(string $year, string $month, string $gender): \Illuminate\Support\Collection
+    {
+        $start = sprintf('%04d-%02d-01', (int) $year, (int) $month);
+        $end = date('Y-m-t', strtotime($start));
+
+        return DB::table('scraped_rankings')
+            ->where('gender', $gender === 'm' ? 'male' : 'female')
+            ->whereBetween('ranking_date', [$start, $end])
+            ->whereNotNull('profixio_player_id')
+            ->distinct()
+            ->pluck('profixio_player_id');
     }
 
     /**

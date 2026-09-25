@@ -69,3 +69,18 @@ it('is a no-op when disabled', function () {
     expect($service->get())->toBeNull()
         ->and($service->env())->toBe([]);
 });
+
+it('stores a clearance renewed by the scraper mid-run', function () {
+    $service = app(CloudflareClearanceService::class);
+
+    $service->store([
+        'type' => 'clearance',
+        'user_agent' => 'renewed-ua',
+        'cookies' => [['name' => 'cf_clearance', 'value' => 'new', 'domain' => '.profixio.com', 'path' => '/']],
+        'cleared_in' => 7.3,
+    ]);
+
+    expect($service->cached()['user_agent'])->toBe('renewed-ua')
+        ->and($service->env()['SCRAPER_USER_AGENT'])->toBe('renewed-ua')
+        ->and($service->cached())->toHaveKey('obtained_at');
+});
